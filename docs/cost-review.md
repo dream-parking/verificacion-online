@@ -7,7 +7,7 @@ Suscripción `8d54dd89-acb8-49f0-84af-131da12df4ca` (Azure subscription 1) — *
 | Recursos existentes antes del setup | 0 (los RG `db2` y `soldadura-de-sedas-rg` estaban vacíos) |
 | Costo histórico (jul–oct 2026) | USD 2.85 total: Container Registry 2.85, Key Vault 0.003, Log Analytics 0, SQL Database 0 |
 | Costo actual | Sin cargos en sep/oct: esos recursos ya fueron eliminados |
-| Budgets / alertas de costo | Ninguno configurado |
+| Budgets / alertas de costo | Ninguno al inicio; se creó `budget-verificaciononline-1usd` (1 USD/mes, avisos al 50% y 100% real y 100% forecast) |
 | Defender for Cloud | `Microsoft.Security` no registrado (sin planes de pago activos) |
 
 ## Decisiones para mantenerse en Free tier

@@ -32,7 +32,7 @@ Reservados sin DNS aún: `api.*` y `onboarding.*` con el mismo patrón por ambie
 - Hosting: Azure Container Apps (consumo), escala a cero, máx. 1 réplica, 0.5 vCPU / 1 GiB, sin Log Analytics. La franja gratis es por suscripción: 180 000 vCPU-s, 360 000 GiB-s y 2 M de requests al mes. Primera petición tras inactividad = arranque en frío (~30-60 s).
 - Base de datos: **un** servidor `psql-verificaciononline` (PostgreSQL 17, Burstable B1ms, 32 GiB) con **dos** bases. Cada rol solo accede a la suya. Firewall: solo "servicios de Azure".
 - Conexión: la app lee `DB_URL`, `DB_USER` y `DB_PASSWORD` (esta última es un secret de la Container App). Flyway aplica las migraciones de `backend/src/main/resources/db/migration` al arrancar.
-- Imagen: `ghcr.io/dream-parking/verificacion-online-backend` (tags `<sha>`, `dev`, `qa`). Es **pública** para que Azure la descargue sin credenciales y no hacer falta un Container Registry (de pago).
+- Imagen: `ghcr.io/dream-parking/verificacion-online-backend` (tags `<sha>`, `dev`, `qa`). Es **pública** para que Azure la descargue sin credenciales sin necesitar un Container Registry (de pago).
 - Deploy: `backend-deploy.yml` hace test, build, push, login OIDC con la identidad `sp-verificaciononline-github` (Contributor solo sobre `rg-verificaciononline`), actualiza la Container App y corre un smoke test a `/actuator/health/liveness`.
 - Local: `docker compose up -d` en `backend/` y `./mvnw spring-boot:run`; o `./mvnw spring-boot:test-run` con Postgres desechable.
 

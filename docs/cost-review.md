@@ -1,6 +1,6 @@
 # Revisión de costos Azure (2026-10-01)
 
-Suscripción `8d54dd89-acb8-49f0-84af-131da12df4ca` (Azure subscription 1) — **Pay-As-You-Go, spending limit: Off** (no hay tope automático de gasto).
+Suscripción "Azure subscription 1" (ID omitido porque el repo es público) — **Pay-As-You-Go, spending limit: Off** (no hay tope automático de gasto).
 
 | Hallazgo | Detalle |
 |---|---|

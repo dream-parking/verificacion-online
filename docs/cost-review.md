@@ -18,3 +18,9 @@ Suscripción `8d54dd89-acb8-49f0-84af-131da12df4ca` (Azure subscription 1) — *
 - GitHub Actions en repo privado: minutos gratuitos limitados; los runners macOS cuentan 10x, por eso solo se compila Android en Linux.
 
 Cada recurso creado se registra en [`azure-resources.csv`](azure-resources.csv).
+
+## Backend (2026-10-05)
+
+- Container Apps (consumo, escala a cero) y el registro en GHCR público: 0 USD dentro de la franja gratis.
+- Se evitó Azure Container Registry (causa del costo de jul-ago: 2.85 USD).
+- PostgreSQL Flexible Server B1ms 32 GiB: **costo condicionado**, ver `docs/cicd.md`.

@@ -1,0 +1,14 @@
+# Local PostgreSQL matching the credentials defaults in application.properties.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: verificacion
+      POSTGRES_USER: verificacion
+      POSTGRES_PASSWORD: verificacion
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

@@ -84,7 +84,7 @@ class EntityMappingTests {
 		assertThat(signals.getTotalDurationSeconds()).isEqualTo(292L);
 		assertThat(signals.getTypingPace()).isEqualTo(TypingPace.NORMAL);
 
-		AlertInboxItem item = em.createQuery("from AlertInboxItem", AlertInboxItem.class).getSingleResult();
+		AlertInboxItem item = em.createQuery("from AlertInboxItem where lastFour = '4821'", AlertInboxItem.class).getSingleResult();
 		assertThat(item.getCriticality()).isEqualTo(AlertCriticality.CRITICAL);
 		assertThat(item.getStatus()).isEqualTo(AlertStatus.UNASSIGNED);
 		assertThat(item.getMaskedAccount()).isEqualTo("•••• 4821");
@@ -106,7 +106,7 @@ class EntityMappingTests {
 		event.setData(Map.of("source", "test"));
 		em.persist(event);
 
-		Alert alert = em.createQuery("from Alert", Alert.class).getSingleResult();
+		Alert alert = em.createQuery("from Alert a where a.account.lastFour = '4821'", Alert.class).getSingleResult();
 		alert.setCriticality(AlertCriticality.LOW);
 		em.flush();
 		em.clear();

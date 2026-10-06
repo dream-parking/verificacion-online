@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.jayway.jsonpath.JsonPath;
 
-/** VDI-25: a request that declares a small monthly amount gets a low risk score. */
+/** VDI-23, VDI-24, VDI-25: income and expected activity are chosen from the catalogs; a low range scores low risk. */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -32,19 +32,19 @@ class OnboardingApiTests {
 	MockMvc mvc;
 
 	@Test
-	void smallMonthlyAmountScoresLowRisk() throws Exception {
+	void lowMonthlyRangeScoresLowRisk() throws Exception {
 		String id = startRequest();
 
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", id)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountUsd": 320}
+					{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "200_500"}
 					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.level").value("LOW"))
 			.andExpect(jsonPath("$.ruleCode").value("R-01"))
 			.andExpect(jsonPath("$.explanation")
-				.value("Monto mensual declarado de USD 320, menor al umbral de USD 500, riesgo bajo."));
+				.value("Monto mensual declarado en el rango «USD 200.01 a 500», que no supera el umbral de USD 500, riesgo bajo."));
 
 		mvc.perform(get("/api/onboarding/requests/{id}", id))
 			.andExpect(jsonPath("$.riskLevel").value("LOW"))
@@ -52,14 +52,14 @@ class OnboardingApiTests {
 	}
 
 	@Test
-	void amountAtThresholdStaysPendingAndReplacesPreviousScore() throws Exception {
+	void rangeAboveTheThresholdStaysPendingAndReplacesPreviousScore() throws Exception {
 		String id = startRequest();
-		registerAmount(id, "120");
+		registerRange(id, "HASTA_200");
 
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", id)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"transactionTypeCode": "AHORRO", "monthlyAmountUsd": 500}
+					{"transactionTypeCode": "AHORRO", "monthlyAmountRangeCode": "500_1000"}
 					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.level").value("PENDING_REVIEW"))
@@ -68,7 +68,7 @@ class OnboardingApiTests {
 		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.level").value("PENDING_REVIEW"))
-			.andExpect(jsonPath("$.evaluatedValue").value(500));
+			.andExpect(jsonPath("$.evaluatedValue").value(1000));
 	}
 
 	@Test
@@ -78,14 +78,14 @@ class OnboardingApiTests {
 		mvc.perform(put("/api/onboarding/requests/{id}/income", id)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"sourceCode": "SALARIO", "rangeCode": "MENOS_500"}
+					{"sourceCode": "SALARIO", "rangeCode": "HASTA_500"}
 					"""))
 			.andExpect(status().isNoContent());
 
 		mvc.perform(put("/api/onboarding/requests/{id}/income", id)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"sourceCode": "OTRO", "rangeCode": "MENOS_500"}
+					{"sourceCode": "OTRO", "rangeCode": "HASTA_500"}
 					"""))
 			.andExpect(status().isBadRequest());
 	}
@@ -97,14 +97,14 @@ class OnboardingApiTests {
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", id)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountUsd": -1}
+					{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "NO_EXISTE"}
 					"""))
 			.andExpect(status().isBadRequest());
 
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", id)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"transactionTypeCode": "NO_EXISTE", "monthlyAmountUsd": 100}
+					{"transactionTypeCode": "NO_EXISTE", "monthlyAmountRangeCode": "HASTA_200"}
 					"""))
 			.andExpect(status().isBadRequest());
 
@@ -116,7 +116,7 @@ class OnboardingApiTests {
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", EntityMappingTests.DEMO_REQUEST)
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountUsd": 100}
+					{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "HASTA_200"}
 					"""))
 			.andExpect(status().isConflict());
 	}
@@ -126,7 +126,13 @@ class OnboardingApiTests {
 		mvc.perform(get("/api/catalogs"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.incomeSources.length()").value(5))
-			.andExpect(jsonPath("$.incomeRanges[0].code").value("MENOS_500"))
+			.andExpect(jsonPath("$.incomeRanges.length()").value(4))
+			.andExpect(jsonPath("$.incomeRanges[0].code").value("HASTA_500"))
+			.andExpect(jsonPath("$.incomeRanges[3].code").value("MAS_2500"))
+			.andExpect(jsonPath("$.monthlyAmountRanges.length()").value(4))
+			.andExpect(jsonPath("$.monthlyAmountRanges[0].code").value("HASTA_200"))
+			.andExpect(jsonPath("$.monthlyAmountRanges[1].minUsd").value(200.01))
+			.andExpect(jsonPath("$.monthlyAmountRanges[3].maxUsd").isEmpty())
 			.andExpect(jsonPath("$.transactionTypes[0].code").value("PAGO_SALARIO"));
 	}
 
@@ -141,10 +147,10 @@ class OnboardingApiTests {
 		return JsonPath.read(body, "$.id");
 	}
 
-	private void registerAmount(String id, String amount) throws Exception {
+	private void registerRange(String id, String rangeCode) throws Exception {
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", id)
 			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"transactionTypeCode\": \"PAGO_SALARIO\", \"monthlyAmountUsd\": " + amount + "}"))
+			.content("{\"transactionTypeCode\": \"PAGO_SALARIO\", \"monthlyAmountRangeCode\": \"" + rangeCode + "\"}"))
 			.andExpect(status().isOk());
 	}
 

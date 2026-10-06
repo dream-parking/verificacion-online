@@ -38,6 +38,7 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 - Imagen: `ghcr.io/dream-parking/verificacion-online-backend` (tags `<sha>`, `dev`, `qa`). Es **pública** para que Azure la descargue sin credenciales sin necesitar un Container Registry (de pago).
 - Deploy: `backend-deploy.yml` hace test, build, push, login OIDC con la identidad `sp-verificaciononline-github` (Contributor solo sobre `rg-verificaciononline`), actualiza la Container App y corre un smoke test a `/actuator/health/liveness`.
 - Esquema: las tablas de dominio viven en el esquema `ceiba` (`V2__esquema_ceiba.sql`). Requiere la extensión `pg_trgm`: en el servidor, Server parameters → `azure.extensions` debe incluir `PG_TRGM`, o la migración falla al arrancar.
+- Datos: `V3__datos_referencia.sql` (catálogos, regla R-01, tipos de alerta) va a todos los ambientes. `db/demo/V4__datos_demo.sql` (usuarios ficticios, solicitud SOL-2026-00418, alerta de ejemplo) solo a local/dev/qa; en Prod definir `SPRING_FLYWAY_LOCATIONS=classpath:db/migration`.
 - Local: `docker compose up -d` en `backend/` y `./mvnw spring-boot:run`; o `./mvnw spring-boot:test-run` con Postgres desechable.
 
 ### Paso manual único: hacer público el paquete

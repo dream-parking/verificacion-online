@@ -9,7 +9,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-dark px-4 py-8">
       <form
-        className="w-full max-w-[440px] bg-white px-9 pt-10 pb-9"
+        className="anim-pagina w-full max-w-[440px] bg-white px-6 pt-8 pb-7 sm:px-9 sm:pt-10 sm:pb-9"
         onSubmit={(e) => {
           e.preventDefault();
           router.push("/solicitudes");

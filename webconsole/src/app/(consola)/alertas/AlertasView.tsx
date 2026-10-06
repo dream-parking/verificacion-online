@@ -1,11 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useConsola } from "@/components/consola/ConsolaProvider";
-import { Cargando, Encabezado, ErrorCarga, KeyValue, useEstadoDatos, Vacio } from "@/components/consola/ui";
+import {
+  Cargando,
+  Encabezado,
+  ErrorCarga,
+  FiltroSelect,
+  FiltroTexto,
+  KeyValue,
+  Paginacion,
+  PanelFiltros,
+  useEstadoDatos,
+  useFiltrosPaginados,
+  Vacio,
+} from "@/components/consola/ui";
 import { CRITICIDAD, ESTADO_ALERTA, SEVERIDAD, type Alerta } from "@/lib/consola/datos";
 
-type Tab = "todas" | "mias" | "sin";
+const FILTROS_INICIALES = {
+  tab: "todas",
+  crit: "todas",
+  cuenta: "",
+  motivo: "",
+  estado: "todos",
+  resp: "todos",
+  fecha: "7d",
+  accion: "todas",
+};
+
+const SIN_RESPONSABLE = "sin";
 
 export function AlertasView() {
   // Al cambiar de rol se reinician los filtros y el aviso.
@@ -16,55 +39,57 @@ export function AlertasView() {
 function Bandeja() {
   const { usuario, alertas, tomarAlerta } = useConsola();
   const { estado, reintentar } = useEstadoDatos();
-  const [tab, setTab] = useState<Tab>("todas");
-  const [aQ, setAQ] = useState("");
-  const [aEstado, setAEstado] = useState("todos");
-  const [aCrit, setACrit] = useState("todas");
-  const [aFecha, setAFecha] = useState("7d");
+  const { filtros: f, setFiltro, limpiar, hayFiltros, tamano, setTamano, setPagina, paginar } =
+    useFiltrosPaginados(FILTROS_INICIALES);
   const [toast, setToast] = useState("");
   const [selId, setSelId] = useState("");
 
   const sinAsignar = alertas.filter((x) => x.estado === "Sin asignar").length;
   const mias = alertas.filter((x) => x.resp === usuario.nombre).length;
-  const digitos = aQ.replace(/\D/g, "");
+  const responsables = [...new Set(alertas.flatMap((x) => (x.resp ? [x.resp] : [])))].sort();
+  const digitos = f.cuenta.replace(/\D/g, "");
+  const motivo = f.motivo.trim().toLowerCase();
 
   const filtradas = alertas
     .filter((x) => {
-      if (tab === "mias" && x.resp !== usuario.nombre) return false;
-      if (tab === "sin" && x.estado !== "Sin asignar") return false;
-      if (aEstado !== "todos" && x.estado !== aEstado) return false;
-      if (aCrit !== "todas" && x.crit !== aCrit) return false;
-      if (aFecha === "hoy" && x.d !== 5) return false;
-      if (aFecha === "48h" && x.d < 4) return false;
+      if (f.tab === "mias" && x.resp !== usuario.nombre) return false;
+      if (f.tab === "sin" && x.estado !== "Sin asignar") return false;
+      if (f.crit !== "todas" && x.crit !== f.crit) return false;
       if (digitos && !x.cuenta.includes(digitos)) return false;
+      if (motivo && !x.motivo.toLowerCase().includes(motivo)) return false;
+      if (f.estado !== "todos" && x.estado !== f.estado) return false;
+      if (f.resp === SIN_RESPONSABLE && x.resp) return false;
+      if (f.resp !== "todos" && f.resp !== SIN_RESPONSABLE && x.resp !== f.resp) return false;
+      if (f.fecha === "hoy" && x.d !== 5) return false;
+      if (f.fecha === "48h" && x.d < 4) return false;
+      if (f.accion === "tomar" && x.estado !== "Sin asignar") return false;
+      if (f.accion === "ninguna" && x.estado === "Sin asignar") return false;
       return true;
     })
     .sort((a, b) => SEVERIDAD[a.crit] - SEVERIDAD[b.crit] || (a.ts < b.ts ? 1 : -1));
+  const pag = paginar(filtradas);
 
-  const hayFiltros = !!(digitos || aEstado !== "todos" || aCrit !== "todas" || aFecha !== "7d" || tab !== "todas");
-  const limpiar = () => {
-    setAQ("");
-    setAEstado("todos");
-    setACrit("todas");
-    setAFecha("7d");
-    setTab("todas");
-  };
   const tomar = (id: string) => setToast(tomarAlerta(id));
   const seleccionada = alertas.find((x) => x.id === selId);
+  const cerrarPreview = useCallback(() => setSelId(""), []);
 
+  // ¿Solo está activo el filtro rápido «Mis alertas», sin ningún otro filtro?
+  const soloTab = (Object.keys(FILTROS_INICIALES) as (keyof typeof FILTROS_INICIALES)[]).every(
+    (k) => k === "tab" || f[k] === FILTROS_INICIALES[k],
+  );
   let vacioTitulo = "No hay alertas con esos filtros";
   let vacioTexto = "Cambia o quita los filtros para ver más alertas.";
   if (estado === "vacio") {
     vacioTitulo = "Tu bandeja está al día";
     vacioTexto = "No hay alertas por atender en este momento. Cuando el sistema genere una nueva, aparecerá aquí.";
-  } else if (tab === "mias" && !hayFiltros) {
+  } else if (f.tab === "mias" && soloTab) {
     vacioTitulo = "No tienes alertas asignadas";
     vacioTexto = "Revisa «Sin asignar» para tomar una.";
-  } else if (tab === "mias") {
+  } else if (f.tab === "mias") {
     vacioTitulo = "No tienes alertas con esos filtros";
   }
 
-  const tabs: { key: Tab; label: string; count: number }[] = [
+  const tabs = [
     { key: "todas", label: "Todas", count: alertas.length },
     { key: "mias", label: "Mis alertas", count: mias },
     { key: "sin", label: "Sin asignar", count: sinAsignar },
@@ -76,113 +101,163 @@ function Bandeja() {
 
       <div className="flex flex-wrap gap-2.5" role="group" aria-label="Filtro rápido">
         {tabs.map((t) => (
-          <button key={t.key} type="button" className="tab" aria-pressed={tab === t.key} onClick={() => setTab(t.key)}>
+          <button
+            key={t.key}
+            type="button"
+            className="tab"
+            aria-pressed={f.tab === t.key}
+            onClick={() => setFiltro("tab", t.key)}
+          >
             {t.label}
-            <span className="font-extrabold">{t.count}</span>
+            <span key={t.count} className="anim-rebote font-extrabold">
+              {t.count}
+            </span>
           </button>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
-        <div className="max-w-[300px] flex-[1_1_220px]">
-          <label htmlFor="a-q" className="lbl">
-            Buscar por cuenta
-          </label>
-          <input
-            id="a-q"
-            className="fld"
-            type="search"
-            placeholder="Por ejemplo, 4821"
-            value={aQ}
-            onChange={(e) => setAQ(e.target.value)}
-          />
-        </div>
-        <div className="min-w-[150px] flex-[0_1_180px]">
-          <label htmlFor="a-e" className="lbl">
-            Estado
-          </label>
-          <select id="a-e" className="fld" value={aEstado} onChange={(e) => setAEstado(e.target.value)}>
-            <option value="todos">Todos</option>
-            <option value="Sin asignar">Sin asignar</option>
-            <option value="Asignada">Asignada</option>
-            <option value="En revisión">En revisión</option>
-          </select>
-        </div>
-        <div className="min-w-[150px] flex-[0_1_180px]">
-          <label htmlFor="a-c" className="lbl">
-            Criticidad
-          </label>
-          <select id="a-c" className="fld" value={aCrit} onChange={(e) => setACrit(e.target.value)}>
-            <option value="todas">Todas</option>
-            <option value="Crítica">Crítica</option>
-            <option value="Alta">Alta</option>
-            <option value="Media">Media</option>
-            <option value="Baja">Baja</option>
-          </select>
-        </div>
-        <div className="min-w-[170px] flex-[0_1_200px]">
-          <label htmlFor="a-f" className="lbl">
-            Fecha
-          </label>
-          <select id="a-f" className="fld" value={aFecha} onChange={(e) => setAFecha(e.target.value)}>
-            <option value="7d">Últimos 7 días</option>
-            <option value="48h">Últimas 48 horas</option>
-            <option value="hoy">Hoy</option>
-          </select>
-        </div>
-      </div>
+      <PanelFiltros etiqueta="alertas" hayFiltros={hayFiltros} onLimpiar={limpiar}>
+        <FiltroSelect
+          id="a-c"
+          label="Criticidad"
+          value={f.crit}
+          onChange={(v) => setFiltro("crit", v)}
+          opciones={[
+            { value: "todas", label: "Todas" },
+            { value: "Crítica", label: "Crítica" },
+            { value: "Alta", label: "Alta" },
+            { value: "Media", label: "Media" },
+            { value: "Baja", label: "Baja" },
+          ]}
+        />
+        <FiltroTexto
+          id="a-q"
+          label="Cuenta"
+          placeholder="Por ejemplo, 4821"
+          inputMode="numeric"
+          value={f.cuenta}
+          onChange={(v) => setFiltro("cuenta", v)}
+        />
+        <FiltroTexto
+          id="a-m"
+          label="Motivo"
+          placeholder="Por ejemplo, dispositivo"
+          value={f.motivo}
+          onChange={(v) => setFiltro("motivo", v)}
+        />
+        <FiltroSelect
+          id="a-e"
+          label="Estado"
+          value={f.estado}
+          onChange={(v) => setFiltro("estado", v)}
+          opciones={[
+            { value: "todos", label: "Todos" },
+            { value: "Sin asignar", label: "Sin asignar" },
+            { value: "Asignada", label: "Asignada" },
+            { value: "En revisión", label: "En revisión" },
+          ]}
+        />
+        <FiltroSelect
+          id="a-r"
+          label="Responsable"
+          value={f.resp}
+          onChange={(v) => setFiltro("resp", v)}
+          opciones={[
+            { value: "todos", label: "Todos" },
+            ...responsables.map((x) => ({ value: x, label: x })),
+            { value: SIN_RESPONSABLE, label: "Sin responsable" },
+          ]}
+        />
+        <FiltroSelect
+          id="a-f"
+          label="Fecha"
+          value={f.fecha}
+          onChange={(v) => setFiltro("fecha", v)}
+          opciones={[
+            { value: "7d", label: "Últimos 7 días" },
+            { value: "48h", label: "Últimas 48 horas" },
+            { value: "hoy", label: "Hoy" },
+          ]}
+        />
+        <FiltroSelect
+          id="a-a"
+          label="Acción"
+          value={f.accion}
+          onChange={(v) => setFiltro("accion", v)}
+          opciones={[
+            { value: "todas", label: "Todas" },
+            { value: "tomar", label: "Se puede tomar" },
+            { value: "ninguna", label: "Sin acción disponible" },
+          ]}
+        />
+      </PanelFiltros>
 
       {toast && (
         <div
+          key={toast}
           role="status"
-          className="border border-[#0b6b4a] bg-[#e2f5ec] px-4 py-3 text-[15px] leading-[22px] font-semibold text-[#0b4f37]"
+          className="anim-aviso border border-[#0b6b4a] bg-[#e2f5ec] px-4 py-3 text-[15px] leading-[22px] font-semibold text-[#0b4f37]"
         >
           ✓ {toast}
         </div>
       )}
 
       <div className="flex min-w-0 flex-wrap items-start gap-5">
-        <div className="tblwrap min-w-0 flex-[1_1_640px]" role="table" aria-label="Alertas">
-          <div className="gh g-ale" role="row">
-            <div role="columnheader">Criticidad</div>
-            <div role="columnheader">Cuenta</div>
-            <div role="columnheader">Motivo</div>
-            <div role="columnheader">Estado</div>
-            <div role="columnheader">Responsable</div>
-            <div role="columnheader">Fecha</div>
-            <div role="columnheader">Acción</div>
+        <div className="flex min-w-0 flex-[1_1_560px] flex-col gap-4">
+          <div className="tblwrap" role="table" aria-label="Alertas">
+            <div className="gh g-ale" role="row">
+              <div role="columnheader">Criticidad</div>
+              <div role="columnheader">Cuenta</div>
+              <div role="columnheader">Motivo</div>
+              <div role="columnheader">Estado</div>
+              <div role="columnheader">Responsable</div>
+              <div role="columnheader">Fecha</div>
+              <div role="columnheader">Acción</div>
+            </div>
+
+            {estado === "cargando" && (
+              <Cargando
+                etiqueta="alertas"
+                className="md:min-w-[960px]"
+                grid="g-ale"
+                anchos={["90px", "70px", "75%", "90px", "100px", "70px", "70px"]}
+              />
+            )}
+            {estado === "error" && (
+              <ErrorCarga
+                titulo="No pudimos cargar las alertas"
+                texto="Hubo un problema de conexión con el servidor. Intenta de nuevo en un momento."
+                onRetry={reintentar}
+              />
+            )}
+            {(estado === "vacio" || (estado === "normal" && filtradas.length === 0)) && (
+              <Vacio
+                titulo={vacioTitulo}
+                texto={vacioTexto}
+                onLimpiar={estado === "normal" && hayFiltros ? limpiar : undefined}
+              />
+            )}
+            {estado === "normal" &&
+              pag.visibles.map((a, i) => (
+                <FilaAlerta key={a.id} indice={i} alerta={a} onOpen={() => setSelId(a.id)} onTake={() => tomar(a.id)} />
+              ))}
           </div>
 
-          {estado === "cargando" && (
-            <Cargando
+          {estado === "normal" && filtradas.length > 0 && (
+            <Paginacion
               etiqueta="alertas"
-              minWidth={960}
-              grid="g-ale"
-              anchos={["90px", "70px", "75%", "90px", "100px", "70px", "70px"]}
+              total={pag.total}
+              pagina={pag.pagina}
+              totalPaginas={pag.totalPaginas}
+              tamano={tamano}
+              onPagina={setPagina}
+              onTamano={setTamano}
             />
           )}
-          {estado === "error" && (
-            <ErrorCarga
-              titulo="No pudimos cargar las alertas"
-              texto="Hubo un problema de conexión con el servidor. Intenta de nuevo en un momento."
-              onRetry={reintentar}
-            />
-          )}
-          {(estado === "vacio" || (estado === "normal" && filtradas.length === 0)) && (
-            <Vacio
-              titulo={vacioTitulo}
-              texto={vacioTexto}
-              onLimpiar={estado === "normal" && hayFiltros ? limpiar : undefined}
-            />
-          )}
-          {estado === "normal" &&
-            filtradas.map((a) => (
-              <FilaAlerta key={a.id} alerta={a} onOpen={() => setSelId(a.id)} onTake={() => tomar(a.id)} />
-            ))}
         </div>
 
         {seleccionada && (
-          <VistaPrevia alerta={seleccionada} onClose={() => setSelId("")} onTake={() => tomar(seleccionada.id)} />
+          <VistaPrevia alerta={seleccionada} onClose={cerrarPreview} onTake={() => tomar(seleccionada.id)} />
         )}
       </div>
     </div>
@@ -195,25 +270,35 @@ function insignias(alerta: Alerta) {
   return { crit: <span className={`badge ${critCls}`}>{critLabel}</span>, est: <span className={`badge ${estCls}`}>{estLabel}</span> };
 }
 
-function FilaAlerta({ alerta: a, onOpen, onTake }: { alerta: Alerta; onOpen: () => void; onTake: () => void }) {
+function FilaAlerta({
+  alerta: a,
+  indice,
+  onOpen,
+  onTake,
+}: {
+  alerta: Alerta;
+  indice: number;
+  onOpen: () => void;
+  onTake: () => void;
+}) {
   const b = insignias(a);
   return (
-    <div className="gr g-ale" role="row">
+    <div className="gr g-ale anim-fila" style={{ "--i": indice } as CSSProperties} role="row">
       <div role="cell">
         <button type="button" className="rowlink" onClick={onOpen} aria-label={`Ver vista previa: ${a.motivo}`}>
           {b.crit}
         </button>
       </div>
-      <div role="cell" className="tabular-nums">
+      <div role="cell" data-label="Cuenta" className="tabular-nums">
         {a.cuenta}
       </div>
       <div role="cell">{a.motivo}</div>
-      <div role="cell">{b.est}</div>
-      <div role="cell">{a.resp || "—"}</div>
-      <div role="cell" className="text-ink-soft">
+      <div role="cell" data-label="Estado">{b.est}</div>
+      <div role="cell" data-label="Responsable">{a.resp || "—"}</div>
+      <div role="cell" data-label="Fecha" className="text-ink-soft">
         {a.fecha}
       </div>
-      <div role="cell">
+      <div role="cell" className="empty:hidden">
         {a.estado === "Sin asignar" && (
           <button type="button" className="btn btn-take" onClick={onTake} aria-label={`Tomar la alerta de la cuenta ${a.cuenta}`}>
             Tomarla
@@ -226,11 +311,27 @@ function FilaAlerta({ alerta: a, onOpen, onTake }: { alerta: Alerta; onOpen: () 
 
 function VistaPrevia({ alerta: a, onClose, onTake }: { alerta: Alerta; onClose: () => void; onTake: () => void }) {
   const b = insignias(a);
+  const cerrar = useRef<HTMLButtonElement>(null);
+
+  // Al abrirse lleva el foco al panel; Escape lo cierra.
+  useEffect(() => {
+    cerrar.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [a.id, onClose]);
+
   return (
-    <aside className="card flex min-w-[260px] flex-[0_1_320px] flex-col gap-3.5" aria-label="Vista previa de la alerta">
+    <>
+      {/* Por debajo de xl la vista previa es un panel superpuesto; en xl va junto a la tabla. */}
+      <div className="anim-aparecer fixed inset-0 z-40 bg-black/40 xl:hidden" aria-hidden="true" onClick={onClose} />
+      <aside
+        className="card anim-panel fixed inset-x-0 bottom-0 z-50 flex max-h-[80vh] flex-col gap-3.5 overflow-y-auto shadow-[0_-8px_24px_rgba(0,0,0,0.18)] sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-none sm:w-[360px] xl:sticky xl:top-24 xl:z-auto xl:max-h-[calc(100vh-7rem)] xl:w-auto xl:min-w-[260px] xl:flex-[0_1_320px] xl:shadow-none"
+        aria-label="Vista previa de la alerta"
+      >
       <div className="flex items-center justify-between gap-2">
         <h2 className="m-0 font-display text-lg font-extrabold">Vista previa</h2>
-        <button type="button" className="btn2 px-4" onClick={onClose} aria-label="Cerrar vista previa">
+        <button ref={cerrar} type="button" className="btn2 px-4" onClick={onClose} aria-label="Cerrar vista previa">
           Cerrar
         </button>
       </div>
@@ -256,6 +357,7 @@ function VistaPrevia({ alerta: a, onClose, onTake }: { alerta: Alerta; onClose: 
           Tomarla
         </button>
       )}
-    </aside>
+      </aside>
+    </>
   );
 }

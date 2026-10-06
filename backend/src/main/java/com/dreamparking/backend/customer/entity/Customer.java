@@ -17,7 +17,7 @@ import org.hibernate.type.SqlTypes;
 
 /** Customer identified by their DUI. */
 @Entity
-@Table(name = "cliente")
+@Table(name = "customer")
 public class Customer {
 
 	@Id
@@ -29,22 +29,22 @@ public class Customer {
 	@Column(name = "dui", nullable = false, unique = true, length = 10)
 	private String dui;
 
-	@Column(name = "nombres", nullable = false, length = 100)
+	@Column(name = "first_names", nullable = false, length = 100)
 	private String firstNames;
 
-	@Column(name = "apellidos", nullable = false, length = 100)
+	@Column(name = "last_names", nullable = false, length = 100)
 	private String lastNames;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(name = "celular", nullable = false, length = 9)
+	@Column(name = "mobile_phone", nullable = false, length = 9)
 	private String mobilePhone;
 
 	@CreationTimestamp
-	@Column(name = "creado_en", nullable = false)
+	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
 	@UpdateTimestamp
-	@Column(name = "actualizado_en", nullable = false)
+	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
 	public UUID getId() {

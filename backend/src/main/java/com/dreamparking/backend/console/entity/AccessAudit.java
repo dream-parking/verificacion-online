@@ -19,7 +19,7 @@ import org.hibernate.type.SqlTypes;
 
 /** Audit trail of console access to personal data (KYC requirement). */
 @Entity
-@Table(name = "auditoria_acceso")
+@Table(name = "access_audit")
 public class AccessAudit {
 
 	@Id
@@ -28,16 +28,16 @@ public class AccessAudit {
 	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "usuario_id", nullable = false)
+	@JoinColumn(name = "user_id", nullable = false)
 	private ConsoleUser user;
 
-	@Column(name = "accion", nullable = false, length = 40)
+	@Column(name = "action", nullable = false, length = 40)
 	private String action;
 
-	@Column(name = "entidad", nullable = false, length = 40)
+	@Column(name = "entity_name", nullable = false, length = 40)
 	private String entityName;
 
-	@Column(name = "entidad_id", nullable = false, length = 64)
+	@Column(name = "entity_id", nullable = false, length = 64)
 	private String entityId;
 
 	@JdbcTypeCode(SqlTypes.INET)
@@ -45,7 +45,7 @@ public class AccessAudit {
 	private InetAddress ip;
 
 	@CreationTimestamp
-	@Column(name = "ocurrido_en", nullable = false)
+	@Column(name = "occurred_at", nullable = false)
 	private Instant occurredAt;
 
 	public Long getId() {

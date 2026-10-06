@@ -4,8 +4,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,11 +17,9 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.customer.entity.Customer;
 import com.dreamparking.backend.customer.entity.Device;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
@@ -28,7 +27,7 @@ import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
 /** Onboarding request (aggregate root). Personal data is a snapshot of what the customer declared. */
 @Entity
-@Table(name = "solicitud")
+@Table(name = "onboarding_request")
 public class OnboardingRequest {
 
 	@Id
@@ -36,34 +35,34 @@ public class OnboardingRequest {
 	@Column(name = "id")
 	private UUID id;
 
-	@Column(name = "numero", unique = true, length = 14)
+	@Column(name = "number", unique = true, length = 14)
 	private String number;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "cliente_id")
+	@JoinColumn(name = "customer_id")
 	private Customer customer;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "dispositivo_id")
+	@JoinColumn(name = "device_id")
 	private Device device;
 
-	@Convert(converter = RequestStatus.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "estado", nullable = false, columnDefinition = "estado_solicitud")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "status", nullable = false, columnDefinition = "request_status")
 	private RequestStatus status = RequestStatus.IN_PROGRESS;
 
-	@Column(name = "etapas_completadas", nullable = false)
+	@Column(name = "completed_steps", nullable = false)
 	private Short completedSteps = (short) 0;
 
-	@Convert(converter = RiskLevel.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "nivel_riesgo", nullable = false, columnDefinition = "nivel_riesgo")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "risk_level", nullable = false, columnDefinition = "risk_level")
 	private RiskLevel riskLevel = RiskLevel.NOT_EVALUATED;
 
-	@Column(name = "nombres", length = 100)
+	@Column(name = "first_names", length = 100)
 	private String firstNames;
 
-	@Column(name = "apellidos", length = 100)
+	@Column(name = "last_names", length = 100)
 	private String lastNames;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
@@ -71,20 +70,20 @@ public class OnboardingRequest {
 	private String dui;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(name = "celular", length = 9)
+	@Column(name = "mobile_phone", length = 9)
 	private String mobilePhone;
 
-	@Column(name = "canal", nullable = false, length = 20)
-	private String channel = "APP_MOVIL";
+	@Column(name = "channel", nullable = false, length = 20)
+	private String channel = "MOBILE_APP";
 
 	@CreationTimestamp
-	@Column(name = "iniciada_en", nullable = false)
+	@Column(name = "started_at", nullable = false)
 	private Instant startedAt;
 
-	@Column(name = "enviada_en")
+	@Column(name = "submitted_at")
 	private Instant submittedAt;
 
-	@Column(name = "ultima_actividad_en", nullable = false)
+	@Column(name = "last_activity_at", nullable = false)
 	private Instant lastActivityAt = Instant.now();
 
 	@Column(name = "idempotency_key", unique = true)

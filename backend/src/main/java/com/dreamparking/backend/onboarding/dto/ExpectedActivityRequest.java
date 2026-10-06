@@ -1,7 +1,8 @@
 package com.dreamparking.backend.onboarding.dto;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Body of step 3 (expected activity): the type of money and the monthly amount range, both from the catalogs. */
 public record ExpectedActivityRequest(

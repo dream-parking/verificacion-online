@@ -13,23 +13,23 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.dreamparking.backend.account.Account;
-import com.dreamparking.backend.account.AccountStatus;
-import com.dreamparking.backend.alert.AlertCriticality;
-import com.dreamparking.backend.alert.AlertHistory;
-import com.dreamparking.backend.alert.AlertStatus;
-import com.dreamparking.backend.alert.AlertType;
-import com.dreamparking.backend.catalog.IncomeRange;
-import com.dreamparking.backend.catalog.IncomeSource;
-import com.dreamparking.backend.catalog.MonthlyAmountRange;
-import com.dreamparking.backend.catalog.PrivacyNotice;
-import com.dreamparking.backend.catalog.TransactionType;
-import com.dreamparking.backend.console.ConsoleRole;
-import com.dreamparking.backend.console.ConsoleUser;
-import com.dreamparking.backend.customer.Customer;
-import com.dreamparking.backend.customer.Device;
-import com.dreamparking.backend.onboarding.PrivacyConsent;
-import com.dreamparking.backend.onboarding.RequestNumberSequence;
+import com.dreamparking.backend.account.entity.Account;
+import com.dreamparking.backend.account.entity.enums.AccountStatus;
+import com.dreamparking.backend.alert.entity.AlertHistory;
+import com.dreamparking.backend.alert.entity.AlertType;
+import com.dreamparking.backend.alert.entity.enums.AlertCriticality;
+import com.dreamparking.backend.alert.entity.enums.AlertStatus;
+import com.dreamparking.backend.catalog.entity.IncomeRange;
+import com.dreamparking.backend.catalog.entity.IncomeSource;
+import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
+import com.dreamparking.backend.catalog.entity.PrivacyNotice;
+import com.dreamparking.backend.catalog.entity.TransactionType;
+import com.dreamparking.backend.console.entity.ConsoleUser;
+import com.dreamparking.backend.console.entity.enums.ConsoleRole;
+import com.dreamparking.backend.customer.entity.Customer;
+import com.dreamparking.backend.customer.entity.Device;
+import com.dreamparking.backend.onboarding.entity.PrivacyConsent;
+import com.dreamparking.backend.onboarding.entity.RequestNumberSequence;
 
 /** The reference and demo data (V3, V4, V6) read back through the entities, so a schema drift fails the build. */
 @Import(TestcontainersConfiguration.class)

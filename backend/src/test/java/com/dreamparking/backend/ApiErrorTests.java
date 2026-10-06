@@ -72,7 +72,7 @@ class ApiErrorTests {
 	void malformedBodiesAndPathsAreBadRequests() throws Exception {
 		String id = startRequest();
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", id).contentType(MediaType.APPLICATION_JSON)
-			.content("{\"transactionTypeCode\": \"AHORRO\", \"monthlyAmountUsd\": \"mucho\"}"))
+			.content("{\"transactionTypeCode\": \"AHORRO\", \"monthlyAmountRangeCode\": "))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.detail")
 				.value("The request body is not valid JSON or a field has a value of the wrong type."));

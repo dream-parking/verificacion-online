@@ -11,7 +11,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
-import com.dreamparking.backend.console.ConsoleUser;
+import com.dreamparking.backend.console.entity.ConsoleUser;
 
 /** Issues the access token a console user gets after signing in. */
 @Service

@@ -5,66 +5,65 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.Immutable;
-import org.hibernate.annotations.Synchronize;
-import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Synchronize;
 import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 
 /** Session and device signals of a request, as shown in the console (view). */
 @Entity
 @Immutable
 // Tables the view reads: Hibernate flushes pending changes to them before querying it.
-@Synchronize({ "solicitud", "dispositivo", "sesion_onboarding", "paso_solicitud" })
-@Table(name = "v_solicitud_senales")
+@Synchronize({ "onboarding_request", "device", "onboarding_session", "request_step" })
+@Table(name = "v_request_signals")
 public class RequestSignals {
 
 	@Id
-	@Column(name = "solicitud_id")
+	@Column(name = "request_id")
 	private UUID requestId;
 
 	@JdbcTypeCode(SqlTypes.INET)
 	@Column(name = "ip")
 	private InetAddress ip;
 
-	@Column(name = "ubicacion_aprox", length = 120)
+	@Column(name = "approximate_location", length = 120)
 	private String approximateLocation;
 
-	@Column(name = "huella", length = 64)
+	@Column(name = "device_fingerprint", length = 64)
 	private String deviceFingerprint;
 
-	@Column(name = "dispositivo", columnDefinition = "text")
+	@Column(name = "device", columnDefinition = "text")
 	private String device;
 
-	@Column(name = "ritmo_cpm")
+	@Column(name = "typing_speed_cpm")
 	private Short typingSpeedCpm;
 
-	@Convert(converter = TypingPace.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "ritmo_categoria", columnDefinition = "ritmo_escritura")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "typing_pace", columnDefinition = "typing_pace")
 	private TypingPace typingPace;
 
-	@Column(name = "iniciada_en")
+	@Column(name = "started_at")
 	private Instant startedAt;
 
-	@Column(name = "enviada_en")
+	@Column(name = "submitted_at")
 	private Instant submittedAt;
 
-	@Column(name = "horario_nocturno")
+	@Column(name = "night_time")
 	private Boolean nightTime;
 
-	@Column(name = "duracion_total_seg")
+	@Column(name = "total_duration_seconds")
 	private Long totalDurationSeconds;
 
-	@Column(name = "solicitudes_mismo_dispositivo")
+	@Column(name = "requests_from_same_device")
 	private Long requestsFromSameDevice;
 
 	public UUID getRequestId() {

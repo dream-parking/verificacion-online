@@ -14,7 +14,7 @@ public interface OnboardingRequestRepository extends JpaRepository<OnboardingReq
 	Optional<OnboardingRequest> findByNumber(String number);
 
 	/** Next SOL-YYYY-NNNNN number; the database function keeps a gap-free yearly counter under concurrency. */
-	@Query(value = "select siguiente_numero_solicitud(:at)", nativeQuery = true)
+	@Query(value = "select next_request_number(:at)", nativeQuery = true)
 	String nextNumber(Instant at);
 
 }

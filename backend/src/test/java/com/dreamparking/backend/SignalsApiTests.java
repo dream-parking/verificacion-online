@@ -19,10 +19,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.context.WebApplicationContext;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
-import com.dreamparking.backend.console.ConsoleRole;
+import com.dreamparking.backend.console.entity.enums.ConsoleRole;
 import com.jayway.jsonpath.JsonPath;
 
 /** VDI-41 / VDI-42: device and behavior signals are stored with the request and shown in the console. */

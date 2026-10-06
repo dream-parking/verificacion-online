@@ -5,8 +5,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,17 +17,15 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.customer.entity.Device;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 
 /** Session and behavior signals captured while the customer fills in a request. */
 @Entity
-@Table(name = "sesion_onboarding")
+@Table(name = "onboarding_session")
 public class OnboardingSession {
 
 	@Id
@@ -35,22 +34,22 @@ public class OnboardingSession {
 	private UUID id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "solicitud_id", nullable = false)
+	@JoinColumn(name = "request_id", nullable = false)
 	private OnboardingRequest request;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "dispositivo_id", nullable = false)
+	@JoinColumn(name = "device_id", nullable = false)
 	private Device device;
 
 	@JdbcTypeCode(SqlTypes.INET)
 	@Column(name = "ip", nullable = false)
 	private InetAddress ip;
 
-	@Column(name = "ubicacion_aprox", length = 120)
+	@Column(name = "approximate_location", length = 120)
 	private String approximateLocation;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(name = "pais_iso", length = 2)
+	@Column(name = "country_iso", length = 2)
 	private String countryIso;
 
 	@Column(name = "user_agent", columnDefinition = "text")
@@ -59,19 +58,19 @@ public class OnboardingSession {
 	@Column(name = "app_version", length = 20)
 	private String appVersion;
 
-	@Column(name = "ritmo_cpm")
+	@Column(name = "typing_speed_cpm")
 	private Short typingSpeedCpm;
 
-	@Convert(converter = TypingPace.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "ritmo_categoria", columnDefinition = "ritmo_escritura")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "typing_pace", columnDefinition = "typing_pace")
 	private TypingPace typingPace;
 
 	@CreationTimestamp
-	@Column(name = "iniciada_en", nullable = false)
+	@Column(name = "started_at", nullable = false)
 	private Instant startedAt;
 
-	@Column(name = "finalizada_en")
+	@Column(name = "ended_at")
 	private Instant endedAt;
 
 	public UUID getId() {

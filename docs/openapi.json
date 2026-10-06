@@ -1,6 +1,156 @@
 {
   "components" : {
     "schemas" : {
+      "AccessAuditResponse" : {
+        "properties" : {
+          "action" : {
+            "type" : "string"
+          },
+          "entityId" : {
+            "type" : "string"
+          },
+          "entityName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "ip" : {
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AccountResponse" : {
+        "properties" : {
+          "customerId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "maskedNumber" : {
+            "type" : "string"
+          },
+          "openedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "ACTIVE", "BLOCKED", "CLOSED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AlertCommentRequest" : {
+        "properties" : {
+          "comment" : {
+            "description" : "Comentario para el historial de la alerta",
+            "example" : "Revisando estados de cuenta",
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AlertDetailResponse" : {
+        "properties" : {
+          "accountId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "assignedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "assigneeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "assigneeName" : {
+            "type" : "string"
+          },
+          "closedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "criticality" : {
+            "enum" : [ "CRITICAL", "HIGH", "MEDIUM", "LOW" ],
+            "type" : "string"
+          },
+          "evidence" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "maskedAccount" : {
+            "type" : "string"
+          },
+          "raisedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "resolution" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "UNASSIGNED", "ASSIGNED", "IN_REVIEW", "CLOSED" ],
+            "type" : "string"
+          },
+          "typeCode" : {
+            "type" : "string"
+          },
+          "typeDescription" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AlertHistoryResponse" : {
+        "properties" : {
+          "actorName" : {
+            "type" : "string"
+          },
+          "assigneeName" : {
+            "type" : "string"
+          },
+          "comment" : {
+            "type" : "string"
+          },
+          "newStatus" : {
+            "enum" : [ "UNASSIGNED", "ASSIGNED", "IN_REVIEW", "CLOSED" ],
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "previousStatus" : {
+            "enum" : [ "UNASSIGNED", "ASSIGNED", "IN_REVIEW", "CLOSED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AlertResponse" : {
         "properties" : {
           "account" : {
@@ -33,6 +183,47 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "AlertTypeResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "defaultCriticality" : {
+            "enum" : [ "CRITICAL", "HIGH", "MEDIUM", "LOW" ],
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "BasicDataRequest" : {
+        "properties" : {
+          "dui" : {
+            "minLength" : 1,
+            "pattern" : "[0-9]{8}-[0-9]",
+            "type" : "string"
+          },
+          "firstNames" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "lastNames" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "mobilePhone" : {
+            "minLength" : 1,
+            "pattern" : "[67][0-9]{3}-[0-9]{4}",
+            "type" : "string"
+          }
+        },
+        "required" : [ "dui", "firstNames", "lastNames", "mobilePhone" ],
         "type" : "object"
       },
       "CaptureSignalsRequest" : {
@@ -168,6 +359,16 @@
         },
         "type" : "object"
       },
+      "ChangeAccountStatusRequest" : {
+        "properties" : {
+          "status" : {
+            "enum" : [ "ACTIVE", "BLOCKED", "CLOSED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "status" ],
+        "type" : "object"
+      },
       "ChangePasswordRequest" : {
         "properties" : {
           "currentPassword" : {
@@ -182,6 +383,26 @@
           }
         },
         "required" : [ "currentPassword", "newPassword" ],
+        "type" : "object"
+      },
+      "CloseAlertRequest" : {
+        "properties" : {
+          "comment" : {
+            "description" : "Comentario para el historial de la alerta",
+            "example" : "Pago de aguinaldo",
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "resolution" : {
+            "description" : "Código de resolución",
+            "example" : "FALSO_POSITIVO",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "resolution" ],
         "type" : "object"
       },
       "ConsoleRequestApplicant" : {
@@ -494,6 +715,31 @@
         "required" : [ "email", "fullName", "initialPassword", "jobTitle", "role" ],
         "type" : "object"
       },
+      "CustomerResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "dui" : {
+            "type" : "string"
+          },
+          "firstNames" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "lastNames" : {
+            "type" : "string"
+          },
+          "mobilePhone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ExpectedActivityRequest" : {
         "properties" : {
           "monthlyAmountRangeCode" : {
@@ -610,6 +856,26 @@
         },
         "type" : "object"
       },
+      "OpenAccountRequest" : {
+        "properties" : {
+          "lastFour" : {
+            "minLength" : 1,
+            "pattern" : "[0-9]{4}",
+            "type" : "string"
+          },
+          "numberToken" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "lastFour", "numberToken", "requestId" ],
+        "type" : "object"
+      },
       "PageResponseConsoleRequestListItem" : {
         "properties" : {
           "content" : {
@@ -637,6 +903,15 @@
         },
         "type" : "object"
       },
+      "PrivacyConsentRequest" : {
+        "properties" : {
+          "signalsAccepted" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "signalsAccepted" ],
+        "type" : "object"
+      },
       "ProblemDetail" : {
         "description" : "Error de la API (RFC 9457)",
         "properties" : {
@@ -661,6 +936,33 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "RaiseAlertRequest" : {
+        "properties" : {
+          "accountId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "criticality" : {
+            "enum" : [ "CRITICAL", "HIGH", "MEDIUM", "LOW" ],
+            "type" : "string"
+          },
+          "evidence" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "reason" : {
+            "maxLength" : 250,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "typeCode" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "accountId", "reason", "typeCode" ],
         "type" : "object"
       },
       "ResetPasswordRequest" : {
@@ -812,6 +1114,247 @@
         "tags" : [ "Catálogos" ]
       }
     },
+    "/api/console/accounts" : {
+      "post" : {
+        "description" : "Solo se guarda el token del core y los últimos 4 dígitos. Una cuenta por solicitud.",
+        "operationId" : "accountOpen",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OpenAccountRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountResponse"
+                }
+              }
+            },
+            "description" : "Cuenta registrada"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no está enviada, ya tiene cuenta o el token ya existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Registra la cuenta abierta en el core para una solicitud enviada",
+        "tags" : [ "Consola · Cuentas" ]
+      }
+    },
+    "/api/console/accounts/{accountId}" : {
+      "get" : {
+        "operationId" : "accountGet",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "accountId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountResponse"
+                }
+              }
+            },
+            "description" : "Cuenta"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La cuenta no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Una cuenta",
+        "tags" : [ "Consola · Cuentas" ]
+      }
+    },
+    "/api/console/accounts/{accountId}/status" : {
+      "put" : {
+        "description" : "Una cuenta cerrada no se puede reactivar.",
+        "operationId" : "accountChangeStatus",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "accountId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangeAccountStatusRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccountResponse"
+                }
+              }
+            },
+            "description" : "Cuenta con su nuevo estado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Estado inválido"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La cuenta no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La cuenta está cerrada"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Bloquea, reactiva o cierra una cuenta",
+        "tags" : [ "Consola · Cuentas" ]
+      }
+    },
+    "/api/console/alert-types" : {
+      "get" : {
+        "operationId" : "alertTypes",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AlertTypeResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Tipos de alerta"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Tipos de alerta y su criticidad por defecto",
+        "tags" : [ "Consola · Alertas" ]
+      }
+    },
     "/api/console/alerts" : {
       "get" : {
         "description" : "De la más crítica a la menos crítica y, dentro de cada criticidad, la más reciente primero. `account` busca por los últimos 4 dígitos; `from` y `to` son días (aaaa-mm-dd, hora de El Salvador), ambos inclusivos.",
@@ -895,6 +1438,346 @@
           "bearerAuth" : [ ]
         } ],
         "summary" : "Alertas abiertas ordenadas por criticidad",
+        "tags" : [ "Consola · Alertas" ]
+      },
+      "post" : {
+        "description" : "Sin `criticality` se usa la del tipo de alerta.",
+        "operationId" : "alertRaise",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RaiseAlertRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertDetailResponse"
+                }
+              }
+            },
+            "description" : "Alerta creada sin responsable"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos o tipo de alerta desconocido"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La cuenta no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Levanta una alerta sobre una cuenta",
+        "tags" : [ "Consola · Alertas" ]
+      }
+    },
+    "/api/console/alerts/{alertId}" : {
+      "get" : {
+        "description" : "Cuenta, tipo, evidencia, responsable y fechas del flujo.",
+        "operationId" : "alertGet",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "alertId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertDetailResponse"
+                }
+              }
+            },
+            "description" : "Alerta"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La alerta no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Detalle de una alerta",
+        "tags" : [ "Consola · Alertas" ]
+      }
+    },
+    "/api/console/alerts/{alertId}/close" : {
+      "post" : {
+        "description" : "Puede cerrarla quien la tomó, la líder de Conozca a su Cliente o un administrador.",
+        "operationId" : "alertClose",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "alertId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CloseAlertRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertDetailResponse"
+                }
+              }
+            },
+            "description" : "Alerta cerrada"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta la resolución"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El usuario no puede cerrar esta alerta"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La alerta no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La alerta no está asignada ni en revisión"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Cierra una alerta con su resolución",
+        "tags" : [ "Consola · Alertas" ]
+      }
+    },
+    "/api/console/alerts/{alertId}/history" : {
+      "get" : {
+        "operationId" : "alertHistory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "alertId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AlertHistoryResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Cambios de estado, del más antiguo al más reciente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La alerta no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Historial de una alerta",
+        "tags" : [ "Consola · Alertas" ]
+      }
+    },
+    "/api/console/alerts/{alertId}/review" : {
+      "post" : {
+        "description" : "Solo quien la tomó.",
+        "operationId" : "alertStartReview",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "alertId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AlertCommentRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertDetailResponse"
+                }
+              }
+            },
+            "description" : "La alerta quedó en revisión"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El usuario no es el responsable de la alerta"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La alerta no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La alerta no está asignada"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Empieza a revisar una alerta",
         "tags" : [ "Consola · Alertas" ]
       }
     },
@@ -1095,6 +1978,152 @@
         } ],
         "summary" : "Usuario de la sesión actual",
         "tags" : [ "Consola · Acceso" ]
+      }
+    },
+    "/api/console/customers" : {
+      "get" : {
+        "description" : "Formato 00000000-0.",
+        "operationId" : "customerGetByDui",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "dui",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CustomerResponse"
+                }
+              }
+            },
+            "description" : "Cliente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No hay cliente con ese DUI"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Busca un cliente por DUI",
+        "tags" : [ "Consola · Clientes" ]
+      }
+    },
+    "/api/console/customers/{customerId}" : {
+      "get" : {
+        "operationId" : "customerGet",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "customerId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CustomerResponse"
+                }
+              }
+            },
+            "description" : "Cliente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El cliente no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Un cliente",
+        "tags" : [ "Consola · Clientes" ]
+      }
+    },
+    "/api/console/customers/{customerId}/accounts" : {
+      "get" : {
+        "operationId" : "accountByCustomer",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "customerId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AccountResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Cuentas del cliente, de la más antigua a la más reciente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Cuentas de un cliente",
+        "tags" : [ "Consola · Cuentas" ]
       }
     },
     "/api/console/requests" : {
@@ -1387,6 +2416,55 @@
       }
     },
     "/api/console/users/{userId}" : {
+      "get" : {
+        "operationId" : "consoleUserGet",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConsoleUserResponse"
+                }
+              }
+            },
+            "description" : "Usuario de la consola"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El usuario no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Un usuario de la consola",
+        "tags" : [ "Consola · Usuarios" ]
+      },
       "put" : {
         "description" : "Desactivar a alguien le quita el acceso de inmediato. No se puede quitar el último administrador activo.",
         "operationId" : "consoleUserUpdate",
@@ -1465,6 +2543,61 @@
           "bearerAuth" : [ ]
         } ],
         "summary" : "Edita nombre, cargo, rol o estado (administradores)",
+        "tags" : [ "Consola · Usuarios" ]
+      }
+    },
+    "/api/console/users/{userId}/access-audit" : {
+      "get" : {
+        "description" : "Auditoría KYC: qué hizo el usuario y sobre qué registro, del más reciente al más antiguo.",
+        "operationId" : "consoleUserAccessAudit",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AccessAuditResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Accesos, del más reciente al más antiguo"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Accesos de un usuario a datos de clientes (administradores)",
         "tags" : [ "Consola · Usuarios" ]
       }
     },
@@ -1599,6 +2732,75 @@
         "tags" : [ "Onboarding" ]
       }
     },
+    "/api/onboarding/requests/{requestId}/basic-data" : {
+      "put" : {
+        "description" : "DUI (00000000-0), nombres, apellidos y celular (7000-0000). Si el DUI ya existe se reutiliza el cliente.",
+        "operationId" : "onboardingRegisterBasicData",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BasicDataRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingRequestResponse"
+                }
+              }
+            },
+            "description" : "Resumen de la solicitud con el paso completado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud ya no está en progreso"
+          }
+        },
+        "summary" : "Registra los datos básicos del cliente",
+        "tags" : [ "Onboarding" ]
+      }
+    },
     "/api/onboarding/requests/{requestId}/expected-activity" : {
       "put" : {
         "description" : "Guarda o reemplaza la actividad esperada y devuelve el score calculado con el monto mensual.",
@@ -1730,6 +2932,75 @@
         "tags" : [ "Onboarding" ]
       }
     },
+    "/api/onboarding/requests/{requestId}/privacy-consent" : {
+      "put" : {
+        "description" : "Registra la aceptación, incluida la captura de señales, y la IP desde la que se aceptó.",
+        "operationId" : "onboardingAcceptPrivacyNotice",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PrivacyConsentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingRequestResponse"
+                }
+              }
+            },
+            "description" : "Resumen de la solicitud con el paso completado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "`signalsAccepted` debe ser `true`"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud ya no está en progreso o no hay aviso vigente"
+          }
+        },
+        "summary" : "Acepta el aviso de privacidad vigente",
+        "tags" : [ "Onboarding" ]
+      }
+    },
     "/api/onboarding/requests/{requestId}/risk-assessment" : {
       "get" : {
         "operationId" : "riskAssessmentCurrent",
@@ -1829,6 +3100,55 @@
         "summary" : "Captura las señales de dispositivo y comportamiento",
         "tags" : [ "Onboarding" ]
       }
+    },
+    "/api/onboarding/requests/{requestId}/submit" : {
+      "post" : {
+        "description" : "Requiere los pasos anteriores completos. Asigna el número y deja la solicitud como completada.",
+        "operationId" : "onboardingSubmit",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingRequestResponse"
+                }
+              }
+            },
+            "description" : "Solicitud enviada, con su número SOL-AAAA-NNNNN"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Faltan pasos o la solicitud ya no está en progreso"
+          }
+        },
+        "summary" : "Envía la solicitud",
+        "tags" : [ "Onboarding" ]
+      }
     }
   },
   "servers" : [ {
@@ -1842,8 +3162,14 @@
     "url" : "http://localhost:8080"
   } ],
   "tags" : [ {
+    "description" : "Cuentas abiertas a partir de solicitudes enviadas",
+    "name" : "Consola · Cuentas"
+  }, {
     "description" : "Score de riesgo asignado a una solicitud",
     "name" : "Riesgo"
+  }, {
+    "description" : "Clientes identificados por su DUI",
+    "name" : "Consola · Clientes"
   }, {
     "description" : "Pasos de la solicitud de apertura de cuenta (app móvil)",
     "name" : "Onboarding"

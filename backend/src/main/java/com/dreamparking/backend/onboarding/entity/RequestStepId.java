@@ -5,24 +5,25 @@ import java.util.Objects;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Embeddable;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 
-import org.hibernate.annotations.JdbcType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 
 /** Primary key of {@link RequestStep}: one row per request and step. */
 @Embeddable
 public class RequestStepId implements Serializable {
 
-	@Column(name = "solicitud_id")
+	@Column(name = "request_id")
 	private UUID requestId;
 
-	@Convert(converter = OnboardingStep.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "paso", columnDefinition = "paso_onboarding")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "step", columnDefinition = "onboarding_step")
 	private OnboardingStep step;
 
 	protected RequestStepId() {

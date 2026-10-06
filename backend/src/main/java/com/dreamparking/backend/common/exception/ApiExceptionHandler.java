@@ -33,6 +33,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage());
 	}
 
+	/** Same as any business error, plus the {@code Retry-After} header. */
+	@ExceptionHandler(TooManyAttemptsException.class)
+	public ResponseEntity<ProblemDetail> tooManyAttempts(TooManyAttemptsException ex) {
+		return ResponseEntity.status(ex.getStatus())
+			.header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+			.body(ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage()));
+	}
+
 	/** Someone else changed the same record first (optimistic locking): the client should reload and retry. */
 	@ExceptionHandler(OptimisticLockingFailureException.class)
 	public ProblemDetail concurrentModification() {

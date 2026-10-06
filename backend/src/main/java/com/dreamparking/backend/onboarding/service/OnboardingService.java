@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dreamparking.backend.catalog.entity.IncomeSource;
+import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
 import com.dreamparking.backend.catalog.service.CatalogService;
 import com.dreamparking.backend.catalog.service.PrivacyNoticeService;
 import com.dreamparking.backend.common.exception.InvalidInputException;
@@ -154,7 +155,7 @@ public class OnboardingService {
 		recordEvent(request, RequestEventType.INCOME_REGISTERED, "Ingresos registrados");
 	}
 
-	/** Step 4: saves (or replaces) the expected activity and scores the request's risk from the monthly amount. */
+	/** Step 4: saves (or replaces) the expected activity and scores the request's risk from the monthly amount range. */
 	@Transactional
 	public RiskAssessmentResponse registerExpectedActivity(UUID requestId, ExpectedActivityRequest body) {
 		OnboardingRequest request = findInProgress(requestId);
@@ -162,12 +163,13 @@ public class OnboardingService {
 		ExpectedActivity activity = expectedActivities.findById(requestId).orElseGet(ExpectedActivity::new);
 		activity.setRequest(request);
 		activity.setTransactionType(catalogService.activeTransactionType(body.transactionTypeCode()));
-		activity.setMonthlyAmountUsd(body.monthlyAmountUsd());
+		MonthlyAmountRange range = catalogService.activeMonthlyAmountRange(body.monthlyAmountRangeCode());
+		activity.setMonthlyAmountRange(range);
 		expectedActivities.save(activity);
 
 		completeStep(request, OnboardingStep.EXPECTED_ACTIVITY);
 		recordEvent(request, RequestEventType.EXPECTED_ACTIVITY_REGISTERED, "Movimiento esperado registrado");
-		return riskAssessmentService.evaluate(request, body.monthlyAmountUsd());
+		return riskAssessmentService.evaluate(request, range);
 	}
 
 	/** Review and submit: assigns the SOL-YYYY-NNNNN number and closes the request. */
@@ -185,7 +187,7 @@ public class OnboardingService {
 		request.setStatus(RequestStatus.COMPLETED);
 		request.setSubmittedAt(now);
 		recordEvent(request, RequestEventType.REQUEST_SUBMITTED, "Solicitud enviada",
-				Map.of("numero", request.getNumber()));
+				Map.of("number", request.getNumber()));
 		return OnboardingRequestResponse.of(request);
 	}
 

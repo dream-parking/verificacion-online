@@ -75,7 +75,7 @@ class EntityMappingTests {
 			.setParameter("id", DEMO_REQUEST)
 			.setParameter("type", RequestEventType.SCORE_ASSIGNED)
 			.getSingleResult();
-		assertThat(scoreEvent.getData()).containsEntry("regla", "R-01");
+		assertThat(scoreEvent.getData()).containsEntry("rule", "R-01");
 	}
 
 	@Test

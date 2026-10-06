@@ -14,7 +14,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 /** Device fingerprint, reused across requests to detect several requests from the same device. */
 @Entity
-@Table(name = "dispositivo")
+@Table(name = "device")
 public class Device {
 
 	@Id
@@ -22,20 +22,20 @@ public class Device {
 	@Column(name = "id")
 	private UUID id;
 
-	@Column(name = "huella", nullable = false, unique = true, length = 64)
+	@Column(name = "fingerprint", nullable = false, unique = true, length = 64)
 	private String fingerprint;
 
-	@Column(name = "modelo", length = 80)
+	@Column(name = "model", length = 80)
 	private String model;
 
-	@Column(name = "sistema_op", length = 30)
+	@Column(name = "operating_system", length = 30)
 	private String operatingSystem;
 
 	@CreationTimestamp
-	@Column(name = "primera_vez_en", nullable = false)
+	@Column(name = "first_seen_at", nullable = false)
 	private Instant firstSeenAt;
 
-	@Column(name = "ultima_vez_en", nullable = false)
+	@Column(name = "last_seen_at", nullable = false)
 	private Instant lastSeenAt = Instant.now();
 
 	public UUID getId() {

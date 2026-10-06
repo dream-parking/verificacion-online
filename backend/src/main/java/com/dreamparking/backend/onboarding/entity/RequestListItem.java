@@ -1,20 +1,20 @@
 package com.dreamparking.backend.onboarding.entity;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Synchronize;
-import org.hibernate.annotations.JdbcType;
+import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
@@ -22,40 +22,40 @@ import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 @Entity
 @Immutable
 // Tables the view reads: Hibernate flushes pending changes to them before querying it.
-@Synchronize({ "solicitud", "movimiento_esperado", "cat_tipo_movimiento" })
-@Table(name = "v_solicitud_listado")
+@Synchronize({ "onboarding_request", "expected_activity", "transaction_type", "monthly_amount_range" })
+@Table(name = "v_request_list")
 public class RequestListItem {
 
 	@Id
 	@Column(name = "id")
 	private UUID id;
 
-	@Column(name = "numero", length = 14)
+	@Column(name = "number", length = 14)
 	private String number;
 
-	@Column(name = "nombre", columnDefinition = "text")
+	@Column(name = "name", columnDefinition = "text")
 	private String name;
 
-	@Column(name = "fecha")
+	@Column(name = "activity_date")
 	private Instant date;
 
-	@Column(name = "tipo_dinero", length = 80)
+	@Column(name = "transaction_type_label", length = 80)
 	private String transactionTypeLabel;
 
-	@Column(name = "monto_mensual_usd", precision = 14, scale = 2)
-	private BigDecimal monthlyAmountUsd;
+	@Column(name = "monthly_amount_range_label", length = 80)
+	private String monthlyAmountRangeLabel;
 
-	@Convert(converter = RiskLevel.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "nivel_riesgo", nullable = false, columnDefinition = "nivel_riesgo")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "risk_level", nullable = false, columnDefinition = "risk_level")
 	private RiskLevel riskLevel;
 
-	@Convert(converter = RequestStatus.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "estado", nullable = false, columnDefinition = "estado_solicitud")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "status", nullable = false, columnDefinition = "request_status")
 	private RequestStatus status;
 
-	@Column(name = "etapas_completadas")
+	@Column(name = "completed_steps")
 	private Short completedSteps;
 
 	public UUID getId() {
@@ -78,8 +78,8 @@ public class RequestListItem {
 		return transactionTypeLabel;
 	}
 
-	public BigDecimal getMonthlyAmountUsd() {
-		return monthlyAmountUsd;
+	public String getMonthlyAmountRangeLabel() {
+		return monthlyAmountRangeLabel;
 	}
 
 	public RiskLevel getRiskLevel() {

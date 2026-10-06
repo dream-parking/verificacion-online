@@ -14,7 +14,7 @@ import org.hibernate.type.SqlTypes;
 
 /** Versioned privacy notice; the hash identifies the exact text shown to the customer. */
 @Entity
-@Table(name = "aviso_privacidad")
+@Table(name = "privacy_notice")
 public class PrivacyNotice {
 
 	@Id
@@ -26,13 +26,13 @@ public class PrivacyNotice {
 	private String version;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(name = "hash_texto", nullable = false, length = 64)
+	@Column(name = "text_hash", nullable = false, length = 64)
 	private String textHash;
 
-	@Column(name = "vigente_desde", nullable = false)
+	@Column(name = "valid_from", nullable = false)
 	private Instant validFrom;
 
-	@Column(name = "vigente_hasta")
+	@Column(name = "valid_to")
 	private Instant validTo;
 
 	public Short getId() {

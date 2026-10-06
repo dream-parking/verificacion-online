@@ -7,9 +7,11 @@ import com.dreamparking.backend.catalog.dto.CatalogItem;
 import com.dreamparking.backend.catalog.dto.CatalogsResponse;
 import com.dreamparking.backend.catalog.entity.IncomeRange;
 import com.dreamparking.backend.catalog.entity.IncomeSource;
+import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
 import com.dreamparking.backend.catalog.entity.TransactionType;
 import com.dreamparking.backend.catalog.repository.IncomeRangeRepository;
 import com.dreamparking.backend.catalog.repository.IncomeSourceRepository;
+import com.dreamparking.backend.catalog.repository.MonthlyAmountRangeRepository;
 import com.dreamparking.backend.catalog.repository.TransactionTypeRepository;
 import com.dreamparking.backend.common.exception.InvalidInputException;
 

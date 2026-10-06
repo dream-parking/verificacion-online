@@ -49,4 +49,4 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 GitHub no permite cambiar la visibilidad de un paquete por API. Tras el **primer** push de la imagen: GitHub → organización `dream-parking` → Packages → `verificacion-online-backend` → Package settings → Change visibility → Public. Si falla, revisar en la organización que se permita crear paquetes públicos. Luego, re-ejecutar el workflow.
 
 ### Costo de Postgres
-La oferta gratis (12 meses, B1ms + 32 GiB) solo aplica a cuentas nuevas; no se puede verificar por CLI. Si no aplica, cuesta ~16 USD/mes. Revisar Cost Management 24 h después de crear el servidor; si cobra, borrarlo o moverlo a una alternativa gratis.
+Verificado el 2026-10-06 en Cost Management: los medidores son `B1MS Compute - Free` y `Storage Data Stored - Free` con costo 0.00 USD, así que aplica la oferta gratis de 12 meses (B1ms, 750 h/mes y 32 GiB en total). Cuidado: un segundo servidor B1ms o más de 32 GiB se cobrarían, y la oferta vence 12 meses después de la fecha de alta de la cuenta de Azure (no de este servidor); conviene confirmar esa fecha en el portal.

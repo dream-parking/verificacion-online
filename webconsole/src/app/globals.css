@@ -20,6 +20,7 @@
   --color-danger: #8c1d18;
   --font-sans: var(--font-open-sans), sans-serif;
   --font-display: var(--font-nunito), sans-serif;
+  --font-marca: var(--font-cinzel), serif;
 }
 
 /* En una capa para que las clases de componentes (.btn, .fld…) puedan sobrescribirlo. */
@@ -223,12 +224,12 @@
     background: var(--color-soft);
   }
   .g-sol {
-    grid-template-columns: 150px minmax(210px, 1.6fr) 140px 180px 110px 200px 130px;
-    min-width: 1060px;
+    grid-template-columns: 150px minmax(210px, 1.6fr) 150px 180px 140px 200px 130px;
+    min-width: 1100px;
   }
   .g-ale {
-    grid-template-columns: 130px 110px minmax(250px, 1fr) 130px 150px 110px 110px;
-    min-width: 960px;
+    grid-template-columns: 120px 105px minmax(200px, 1fr) 130px 140px 130px 100px;
+    min-width: 1030px;
   }
   /* El enlace de la primera celda cubre toda la fila. */
   .rowlink {
@@ -280,6 +281,7 @@
   .s-rev { background: #eee8f6; color: #4a2f78; }
   .s-ok { background: #e2f5ec; color: #0b6b4a; }
   .s-prog { background: #f4f4f4; color: #4a4a4a; border-color: #989696; }
+  .s-aband { background: #fbeaea; color: #8c1d18; border-color: #8c1d18; }
 
   /* Pares clave / valor */
   .kv {

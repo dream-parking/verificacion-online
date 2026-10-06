@@ -8,22 +8,15 @@ import {
   ErrorCarga,
   FiltroSelect,
   FiltroTexto,
+  mensajeDeError,
   Paginacion,
   PanelFiltros,
-  useEstadoDatos,
+  useCarga,
   useFiltrosPaginados,
   Vacio,
 } from "@/components/consola/ui";
-import {
-  completada,
-  estadoSolicitud,
-  fechaCorta,
-  numeroDe,
-  riesgoDe,
-  SOLICITUDES,
-  usd,
-  type Solicitud,
-} from "@/lib/consola/datos";
+import { apiFetch, todasLasSolicitudes, type Catalogos, type SolicitudResumen } from "@/lib/consola/api";
+import { ESTADO_SOLICITUD, fecha, fechaCorta, NOTA_HORA, RIESGO } from "@/lib/consola/formato";
 
 const FILTROS_INICIALES = {
   numero: "",
@@ -35,48 +28,53 @@ const FILTROS_INICIALES = {
   estado: "todos",
 };
 
-const SIN_DECLARAR = "sin";
+const SIN_DECLARAR = "__sin__";
+const SIN_NUMERO = "Sin número aún";
 
-// Opciones calculadas a partir de los datos disponibles.
-const FECHAS = [...new Set(SOLICITUDES.map((r) => r.f))];
-const TIPOS = [...new Set(SOLICITUDES.flatMap((r) => (r.tipo ? [r.tipo] : [])))].sort();
-
-const RANGOS_MONTO: Record<string, (m: number) => boolean> = {
-  "menos-500": (m) => m < 500,
-  "500-1500": (m) => m >= 500 && m < 1500,
-  "1500-mas": (m) => m >= 1500,
-};
-
-function cumple(r: Solicitud, f: typeof FILTROS_INICIALES) {
+function cumple(r: SolicitudResumen, f: typeof FILTROS_INICIALES) {
   const numero = f.numero.trim().toLowerCase();
   const nombre = f.nombre.trim().toLowerCase();
-  if (numero && !numeroDe(r).toLowerCase().includes(numero)) return false;
-  if (nombre && !r.nombre.toLowerCase().includes(nombre)) return false;
-  if (f.fecha !== "todas" && r.f !== f.fecha) return false;
-  if (f.tipo === SIN_DECLARAR && r.tipo) return false;
-  if (f.tipo !== "todos" && f.tipo !== SIN_DECLARAR && r.tipo !== f.tipo) return false;
-  if (f.monto === SIN_DECLARAR && r.monto != null) return false;
-  if (f.monto in RANGOS_MONTO && (r.monto == null || !RANGOS_MONTO[f.monto](r.monto))) return false;
-  if (f.riesgo !== "todos" && riesgoDe(r).key !== f.riesgo) return false;
-  if (f.estado === "progreso" && completada(r)) return false;
-  if (f.estado === "completada" && !completada(r)) return false;
+  if (numero && !(r.number ?? SIN_NUMERO).toLowerCase().includes(numero)) return false;
+  if (nombre && !(r.name ?? "").toLowerCase().includes(nombre)) return false;
+  if (f.fecha !== "todas" && fecha(r.date) !== f.fecha) return false;
+  if (f.tipo === SIN_DECLARAR ? r.transactionTypeLabel : f.tipo !== "todos" && r.transactionTypeLabel !== f.tipo)
+    return false;
+  if (
+    f.monto === SIN_DECLARAR
+      ? r.monthlyAmountRangeLabel
+      : f.monto !== "todos" && r.monthlyAmountRangeLabel !== f.monto
+  )
+    return false;
+  if (f.riesgo !== "todos" && r.riskLevel !== f.riesgo) return false;
+  if (f.estado !== "todos" && r.status !== f.estado) return false;
   return true;
 }
 
+/** Opciones de un filtro: las del catálogo y, si los datos traen alguna que no esté, también esa. */
+function opcionesDe(catalogo: string[] | undefined, valores: (string | null)[]) {
+  const todas = [...(catalogo ?? [])];
+  for (const v of valores) if (v && !todas.includes(v)) todas.push(v);
+  return todas.map((x) => ({ value: x, label: x }));
+}
+
 export function SolicitudesView() {
-  const { estado, reintentar } = useEstadoDatos();
+  const solicitudes = useCarga("solicitudes", todasLasSolicitudes);
+  // Los catálogos solo dan las opciones de los filtros; si fallan, se usan los valores de los datos.
+  const catalogos = useCarga("catalogos", (t) => apiFetch<Catalogos>("/api/catalogs", { token: t }));
   const { filtros: f, setFiltro, limpiar, hayFiltros, tamano, setTamano, setPagina, paginar } =
     useFiltrosPaginados(FILTROS_INICIALES);
 
-  const filtradas = SOLICITUDES.filter((r) => cumple(r, f));
+  const datos = solicitudes.datos ?? [];
+  const filtradas = datos.filter((r) => cumple(r, f));
   const pag = paginar(filtradas);
+  const fechas = [...new Set(datos.map((r) => fecha(r.date)))];
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <Encabezado titulo="Solicitudes">
-        {estado === "normal"
-          ? `${filtradas.length} de ${SOLICITUDES.length} solicitudes de onboarding.`
-          : "Solicitudes de onboarding recibidas desde la app móvil."}
+        {solicitudes.datos
+          ? `${filtradas.length} de ${datos.length} solicitudes de onboarding. ${NOTA_HORA}`
+          : `Solicitudes de onboarding recibidas desde la app móvil. ${NOTA_HORA}`}
       </Encabezado>
 
       <PanelFiltros etiqueta="solicitudes" hayFiltros={hayFiltros} onLimpiar={limpiar}>
@@ -99,7 +97,7 @@ export function SolicitudesView() {
           label="Fecha"
           value={f.fecha}
           onChange={(v) => setFiltro("fecha", v)}
-          opciones={[{ value: "todas", label: "Todas" }, ...FECHAS.map((x) => ({ value: x, label: x }))]}
+          opciones={[{ value: "todas", label: "Todas" }, ...fechas.map((x) => ({ value: x, label: x }))]}
         />
         <FiltroSelect
           id="f-tipo"
@@ -108,7 +106,10 @@ export function SolicitudesView() {
           onChange={(v) => setFiltro("tipo", v)}
           opciones={[
             { value: "todos", label: "Todos" },
-            ...TIPOS.map((x) => ({ value: x, label: x })),
+            ...opcionesDe(
+              catalogos.datos?.transactionTypes.map((x) => x.label),
+              datos.map((r) => r.transactionTypeLabel),
+            ),
             { value: SIN_DECLARAR, label: "Sin declarar" },
           ]}
         />
@@ -119,9 +120,10 @@ export function SolicitudesView() {
           onChange={(v) => setFiltro("monto", v)}
           opciones={[
             { value: "todos", label: "Todos" },
-            { value: "menos-500", label: "Menos de USD 500" },
-            { value: "500-1500", label: "USD 500 a 1,499" },
-            { value: "1500-mas", label: "USD 1,500 o más" },
+            ...opcionesDe(
+              catalogos.datos?.monthlyAmountRanges.map((x) => x.label),
+              datos.map((r) => r.monthlyAmountRangeLabel),
+            ),
             { value: SIN_DECLARAR, label: "Sin declarar" },
           ]}
         />
@@ -132,9 +134,11 @@ export function SolicitudesView() {
           onChange={(v) => setFiltro("riesgo", v)}
           opciones={[
             { value: "todos", label: "Todos" },
-            { value: "bajo", label: "Bajo" },
-            { value: "pend", label: "Pendiente de evaluación" },
-            { value: "sin", label: "Sin evaluar" },
+            { value: "LOW", label: "Bajo" },
+            { value: "MEDIUM", label: "Medio" },
+            { value: "HIGH", label: "Alto" },
+            { value: "PENDING_REVIEW", label: "Pendiente de evaluación" },
+            { value: "NOT_EVALUATED", label: "Sin evaluar" },
           ]}
         />
         <FiltroSelect
@@ -144,8 +148,9 @@ export function SolicitudesView() {
           onChange={(v) => setFiltro("estado", v)}
           opciones={[
             { value: "todos", label: "Todos" },
-            { value: "progreso", label: "En progreso" },
-            { value: "completada", label: "Completada" },
+            { value: "IN_PROGRESS", label: "En progreso" },
+            { value: "COMPLETED", label: "Completada" },
+            { value: "ABANDONED", label: "Abandonada" },
           ]}
         />
       </PanelFiltros>
@@ -161,71 +166,72 @@ export function SolicitudesView() {
           <div role="columnheader">Estado</div>
         </div>
 
-        {estado === "cargando" && (
+        {solicitudes.cargando && (
           <Cargando
             etiqueta="solicitudes"
-            className="md:min-w-[1060px]"
+            className="md:min-w-[1100px]"
             grid="g-sol"
             anchos={["110px", "70%", "90px", "110px", "60px", "120px", "90px"]}
           />
         )}
-        {estado === "error" && (
+        {solicitudes.error && (
           <ErrorCarga
             titulo="No pudimos cargar la información"
-            texto="Hubo un problema de conexión con el servidor. Tus datos no se han perdido."
-            onRetry={reintentar}
+            texto={mensajeDeError(
+              solicitudes.error,
+              "Hubo un problema con el servidor. Tus datos no se han perdido; intenta de nuevo.",
+            )}
+            onRetry={solicitudes.recargar}
           />
         )}
-        {estado === "vacio" && (
+        {solicitudes.datos && datos.length === 0 && (
           <Vacio
             titulo="Todavía no hay solicitudes"
             texto="Cuando alguien envíe su solicitud desde la app, aparecerá aquí."
           />
         )}
-        {estado === "normal" && filtradas.length === 0 && (
+        {datos.length > 0 && filtradas.length === 0 && (
           <Vacio
             titulo="No encontramos solicitudes"
             texto="Prueba con otros filtros, o quítalos para ver todas."
             onLimpiar={hayFiltros ? limpiar : undefined}
           />
         )}
-        {estado === "normal" &&
-          pag.visibles.map((r, i) => {
-            const rk = riesgoDe(r);
-            const est = estadoSolicitud(r);
-            return (
-              <div key={r.id} className="gr g-sol anim-fila" style={{ "--i": i } as CSSProperties} role="row">
-                <div role="cell">
-                  <Link
-                    href={`/solicitudes/${r.id}`}
-                    className="rowlink u"
-                    aria-label={`Abrir solicitud de ${r.nombre}`}
-                  >
-                    {numeroDe(r)}
-                  </Link>
-                </div>
-                <div role="cell" className="font-semibold">
-                  {r.nombre}
-                </div>
-                <div role="cell" data-label="Fecha" className="text-ink-soft">
-                  {fechaCorta(r)}
-                </div>
-                <div role="cell" data-label="Tipo de dinero">{r.tipo || "—"}</div>
-                <div role="cell" data-label="Monto mensual" className="font-semibold">
-                  {r.monto == null ? "—" : usd(r.monto)}
-                </div>
-                <div role="cell" data-label="Nivel de riesgo">
-                  <span className={`badge ${rk.cls}`}>{rk.label}</span>
-                </div>
-                <div role="cell" data-label="Estado">
-                  <span className={`badge ${est.cls}`}>{est.label}</span>
-                </div>
+        {pag.visibles.map((r, i) => {
+          const rk = RIESGO[r.riskLevel];
+          const est = ESTADO_SOLICITUD[r.status];
+          const nombre = r.name || "Sin nombre aún";
+          return (
+            <div key={r.id} className="gr g-sol anim-fila" style={{ "--i": i } as CSSProperties} role="row">
+              <div role="cell">
+                <Link href={`/solicitudes/${r.id}`} className="rowlink u" aria-label={`Abrir solicitud de ${nombre}`}>
+                  {r.number || SIN_NUMERO}
+                </Link>
               </div>
-            );
-          })}
+              <div role="cell" className={r.name ? "font-semibold" : "text-muted"}>
+                {nombre}
+              </div>
+              <div role="cell" data-label="Fecha" className="text-ink-soft">
+                {fechaCorta(r.date)}
+              </div>
+              <div role="cell" data-label="Tipo de dinero">
+                {r.transactionTypeLabel || "—"}
+              </div>
+              <div role="cell" data-label="Monto mensual" className="font-semibold">
+                {r.monthlyAmountRangeLabel || "—"}
+              </div>
+              <div role="cell" data-label="Nivel de riesgo">
+                <span className={`badge ${rk.cls}`}>{rk.label}</span>
+              </div>
+              <div role="cell" data-label="Estado">
+                <span className={`badge ${est.cls}`}>{est.label}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {estado === "normal" && filtradas.length > 0 && (
+      {filtradas.length > 0 && (
         <Paginacion
           etiqueta="solicitudes"
           total={pag.total}

@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api/onboarding_api.dart';
 import '../env.dart';
+import '../senales/huella_dispositivo.dart';
+import '../senales/senales.dart';
 import '../theme.dart';
 import 'aviso_privacidad.dart';
 import 'solicitud.dart';
@@ -13,12 +17,16 @@ class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({
     super.key,
     this.api,
+    this.dispositivo,
     this.simularErrorDeConexion = false,
     this.demoraEnvio = const Duration(milliseconds: 1400),
   });
 
   /// Cliente de la API; los tests pasan uno falso.
   final OnboardingApi? api;
+
+  /// Lector del dispositivo (VDI-40); los tests pasan uno falso.
+  final FuenteDispositivo? dispositivo;
 
   /// Hace fallar el primer envío para mostrar el estado de error de conexión.
   final bool simularErrorDeConexion;
@@ -59,7 +67,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   final _monto = TextEditingController();
 
   late final OnboardingApi _api = widget.api ?? OnboardingApi();
+  late final FuenteDispositivo _dispositivo = widget.dispositivo ?? HuellaDispositivo();
   var _s = Solicitud();
+  var _senales = Senales();
+  var _senalesPendientes = false;
   var _pantalla = Pantalla.bienvenida;
   final _intentado = <Pantalla>{};
   var _enviando = false;
@@ -85,6 +96,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _errorInicio = null;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
+    if (_senalesPendientes) unawaited(_enviarSenales());
   }
 
   void _continuar() {
@@ -105,6 +117,32 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   bool get _ocupado => _enviando || _preparando;
 
+  /// VDI-40: lee el dispositivo y envía su huella. Solo corre después de aceptar el aviso.
+  /// Si falla no interrumpe al cliente: las señales sirven para el score, no para continuar.
+  Future<void> _capturarDispositivo() async {
+    if (!_s.capturaPermitida) return;
+    try {
+      _senales.dispositivo = await _dispositivo.leer();
+    } on Exception catch (e) {
+      debugPrint('No se pudo leer el dispositivo: $e');
+      return;
+    }
+    await _enviarSenales();
+  }
+
+  /// Envía todas las señales capturadas; si falla, se reintenta en el siguiente cambio de pantalla.
+  Future<void> _enviarSenales() async {
+    final id = _s.id;
+    if (id == null || _senales.dispositivo == null) return;
+    _senalesPendientes = false;
+    try {
+      await _api.enviarSenales(id, _senales);
+    } on ApiException catch (e) {
+      debugPrint('No se pudieron enviar las señales: $e');
+      _senalesPendientes = true;
+    }
+  }
+
   /// Crea la solicitud en el backend al aceptar el aviso. Hasta este momento no se captura nada.
   Future<void> _iniciarSolicitud() async {
     setState(() {
@@ -121,6 +159,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _preparando = false;
       });
       _ir(Pantalla.basicos);
+      unawaited(_capturarDispositivo());
     } on ApiException {
       if (!mounted) return;
       setState(() {
@@ -156,6 +195,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
     setState(() {
       _s = Solicitud();
+      _senales = Senales();
+      _senalesPendientes = false;
       _intentado.clear();
       _errorInicio = null;
       _intentos = 0;

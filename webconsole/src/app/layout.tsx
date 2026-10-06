@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Nunito, Open_Sans } from "next/font/google";
+import { Cinzel, Nunito, Open_Sans } from "next/font/google";
 import "./globals.css";
 
 const nunito = Nunito({
@@ -14,14 +14,21 @@ const openSans = Open_Sans({
   weight: ["400", "600", "700"],
 });
 
+// Letra con serifas del nombre del banco, parecida a la del logo.
+const cinzel = Cinzel({
+  variable: "--font-cinzel",
+  subsets: ["latin"],
+  weight: ["600", "700"],
+});
+
 export const metadata: Metadata = {
-  title: "Consola administrativa",
-  description: "Consola de verificación de solicitudes de onboarding",
+  title: "Consola de verificación · Banco Tangamandapio",
+  description: "Consola de verificación de solicitudes de onboarding del Banco Tangamandapio",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${nunito.variable} ${openSans.variable} h-full antialiased`}>
+    <html lang="es" className={`${nunito.variable} ${openSans.variable} ${cinzel.variable} h-full antialiased`}>
       <body className="min-h-full">{children}</body>
     </html>
   );

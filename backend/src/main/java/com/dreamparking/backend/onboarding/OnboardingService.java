@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dreamparking.backend.catalog.CatalogService;
 import com.dreamparking.backend.catalog.IncomeSource;
+import com.dreamparking.backend.catalog.MonthlyAmountRange;
 import com.dreamparking.backend.common.InvalidInputException;
 import com.dreamparking.backend.common.InvalidStateException;
 import com.dreamparking.backend.common.NotFoundException;
@@ -76,7 +77,7 @@ public class OnboardingService {
 		recordEvent(request, RequestEventType.INCOME_REGISTERED, "Ingresos registrados");
 	}
 
-	/** Step 3: saves (or replaces) the expected activity and scores the request's risk from the monthly amount. */
+	/** Step 3: saves (or replaces) the expected activity and scores the request's risk from the monthly amount range. */
 	@Transactional
 	public RiskAssessmentResponse registerExpectedActivity(UUID requestId, ExpectedActivityRequest body) {
 		OnboardingRequest request = findInProgress(requestId);
@@ -84,12 +85,13 @@ public class OnboardingService {
 		ExpectedActivity activity = expectedActivities.findById(requestId).orElseGet(ExpectedActivity::new);
 		activity.setRequest(request);
 		activity.setTransactionType(catalogService.activeTransactionType(body.transactionTypeCode()));
-		activity.setMonthlyAmountUsd(body.monthlyAmountUsd());
+		MonthlyAmountRange range = catalogService.activeMonthlyAmountRange(body.monthlyAmountRangeCode());
+		activity.setMonthlyAmountRange(range);
 		expectedActivities.save(activity);
 
 		touch(request);
 		recordEvent(request, RequestEventType.EXPECTED_ACTIVITY_REGISTERED, "Movimiento esperado registrado");
-		return riskAssessmentService.evaluate(request, body.monthlyAmountUsd());
+		return riskAssessmentService.evaluate(request, range);
 	}
 
 	private OnboardingRequest find(UUID requestId) {
@@ -97,7 +99,7 @@ public class OnboardingService {
 			.orElseThrow(() -> new NotFoundException("Onboarding request not found: " + requestId));
 	}
 
-	private OnboardingRequest findInProgress(UUID requestId) {
+	OnboardingRequest findInProgress(UUID requestId) {
 		OnboardingRequest request = find(requestId);
 		if (request.getStatus() != RequestStatus.IN_PROGRESS) {
 			throw new InvalidStateException("Onboarding request " + requestId + " is " + request.getStatus());

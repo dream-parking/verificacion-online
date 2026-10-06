@@ -50,6 +50,13 @@ public class ConsoleUser {
 	@Column(name = "creado_en", nullable = false)
 	private Instant createdAt;
 
+	/** BCrypt hash; null while the user has no password and therefore cannot sign in. */
+	@Column(name = "clave_hash", length = 100)
+	private String passwordHash;
+
+	@Column(name = "clave_cambiada_en")
+	private Instant passwordChangedAt;
+
 	public UUID getId() {
 		return id;
 	}
@@ -96,6 +103,20 @@ public class ConsoleUser {
 
 	public Boolean getActive() {
 		return active;
+	}
+
+	public String getPasswordHash() {
+		return passwordHash;
+	}
+
+	public Instant getPasswordChangedAt() {
+		return passwordChangedAt;
+	}
+
+	/** Stores a new password hash and stamps the change time. */
+	public void changePasswordHash(String passwordHash, Instant changedAt) {
+		this.passwordHash = passwordHash;
+		this.passwordChangedAt = changedAt;
 	}
 
 	public void setActive(Boolean active) {

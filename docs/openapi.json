@@ -1,0 +1,1869 @@
+{
+  "components" : {
+    "schemas" : {
+      "AlertResponse" : {
+        "properties" : {
+          "account" : {
+            "type" : "string"
+          },
+          "assigneeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "assigneeName" : {
+            "type" : "string"
+          },
+          "criticality" : {
+            "enum" : [ "CRITICAL", "HIGH", "MEDIUM", "LOW" ],
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "raisedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "UNASSIGNED", "ASSIGNED", "IN_REVIEW", "CLOSED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CaptureSignalsRequest" : {
+        "properties" : {
+          "appVersion" : {
+            "description" : "Versión de la app",
+            "example" : "1.0.0+1",
+            "maxLength" : 20,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "approximateLocation" : {
+            "description" : "Ubicación aproximada reportada por la app",
+            "example" : "San Salvador, El Salvador",
+            "maxLength" : 120,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "countryIso" : {
+            "description" : "País, ISO 3166-1 alfa-2",
+            "example" : "SV",
+            "pattern" : "^[A-Za-z]{2}$",
+            "type" : "string"
+          },
+          "deviceFingerprint" : {
+            "description" : "Huella del dispositivo (hash normalizado)",
+            "example" : "d4f1·9a3c·e7b2",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "deviceModel" : {
+            "description" : "Modelo del dispositivo",
+            "example" : "iPhone 15",
+            "maxLength" : 80,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "operatingSystem" : {
+            "description" : "Sistema operativo",
+            "example" : "iOS",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "steps" : {
+            "description" : "Tiempo por paso del formulario",
+            "items" : {
+              "$ref" : "#/components/schemas/CaptureSignalsStepTiming"
+            },
+            "maxItems" : 5,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "typingSpeedCpm" : {
+            "description" : "Ritmo de escritura en caracteres por minuto; el servidor lo clasifica",
+            "example" : 185,
+            "format" : "int32",
+            "maximum" : 2000,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "deviceFingerprint" ],
+        "type" : "object"
+      },
+      "CaptureSignalsStepTiming" : {
+        "properties" : {
+          "attempts" : {
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "completedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "step" : {
+            "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "startedAt", "step" ],
+        "type" : "object"
+      },
+      "CatalogItem" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "maxUsd" : {
+            "type" : "number"
+          },
+          "minUsd" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "CatalogsResponse" : {
+        "properties" : {
+          "incomeRanges" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CatalogItem"
+            },
+            "type" : "array"
+          },
+          "incomeSources" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CatalogItem"
+            },
+            "type" : "array"
+          },
+          "monthlyAmountRanges" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CatalogItem"
+            },
+            "type" : "array"
+          },
+          "transactionTypes" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CatalogItem"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ChangePasswordRequest" : {
+        "properties" : {
+          "currentPassword" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "newPassword" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "currentPassword", "newPassword" ],
+        "type" : "object"
+      },
+      "ConsoleRequestApplicant" : {
+        "properties" : {
+          "dui" : {
+            "type" : "string"
+          },
+          "firstNames" : {
+            "type" : "string"
+          },
+          "lastNames" : {
+            "type" : "string"
+          },
+          "mobilePhone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestDetail" : {
+        "properties" : {
+          "applicant" : {
+            "$ref" : "#/components/schemas/ConsoleRequestApplicant"
+          },
+          "completedSteps" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "expectedActivity" : {
+            "$ref" : "#/components/schemas/ConsoleRequestExpectedActivity"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "income" : {
+            "$ref" : "#/components/schemas/ConsoleRequestIncome"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "risk" : {
+            "$ref" : "#/components/schemas/RiskAssessmentResponse"
+          },
+          "riskLevel" : {
+            "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "signals" : {
+            "$ref" : "#/components/schemas/ConsoleRequestSignals"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "type" : "string"
+          },
+          "steps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ConsoleRequestStepTime"
+            },
+            "type" : "array"
+          },
+          "submittedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "timeline" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ConsoleRequestTimelineEntry"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestExpectedActivity" : {
+        "properties" : {
+          "monthlyAmountRangeCode" : {
+            "type" : "string"
+          },
+          "monthlyAmountRangeLabel" : {
+            "type" : "string"
+          },
+          "registeredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "transactionTypeCode" : {
+            "type" : "string"
+          },
+          "transactionTypeLabel" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestIncome" : {
+        "properties" : {
+          "rangeCode" : {
+            "type" : "string"
+          },
+          "rangeLabel" : {
+            "type" : "string"
+          },
+          "registeredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "sourceCode" : {
+            "type" : "string"
+          },
+          "sourceDetail" : {
+            "type" : "string"
+          },
+          "sourceLabel" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestListItem" : {
+        "properties" : {
+          "completedSteps" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "date" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "monthlyAmountRangeLabel" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "riskLevel" : {
+            "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "type" : "string"
+          },
+          "transactionTypeLabel" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestSignals" : {
+        "properties" : {
+          "approximateLocation" : {
+            "type" : "string"
+          },
+          "device" : {
+            "type" : "string"
+          },
+          "deviceFingerprint" : {
+            "type" : "string"
+          },
+          "ip" : {
+            "type" : "string"
+          },
+          "nightTime" : {
+            "type" : "boolean"
+          },
+          "requestsFromSameDevice" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalDurationSeconds" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "typingPace" : {
+            "enum" : [ "SLOW", "NORMAL", "FAST" ],
+            "type" : "string"
+          },
+          "typingSpeedCpm" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestStepTime" : {
+        "properties" : {
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "completedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "durationSeconds" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "step" : {
+            "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestTimelineEntry" : {
+        "properties" : {
+          "actor" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "type" : {
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "REQUEST_ABANDONED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleUserResponse" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "fullName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "initials" : {
+            "type" : "string"
+          },
+          "jobTitle" : {
+            "type" : "string"
+          },
+          "role" : {
+            "enum" : [ "KYC_LEAD", "FRAUD_ANALYST", "ADMIN" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CreateUserRequest" : {
+        "properties" : {
+          "email" : {
+            "description" : "Correo institucional; es el usuario para iniciar sesión",
+            "example" : "nuevo@ceiba.example",
+            "format" : "email",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "fullName" : {
+            "example" : "Nuevo Analista",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "initialPassword" : {
+            "description" : "Contraseña inicial, de 10 a 72 caracteres; la persona debe cambiarla al entrar",
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "jobTitle" : {
+            "example" : "Analista de fraude y cumplimiento",
+            "maxLength" : 120,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "role" : {
+            "enum" : [ "KYC_LEAD", "FRAUD_ANALYST", "ADMIN" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "email", "fullName", "initialPassword", "jobTitle", "role" ],
+        "type" : "object"
+      },
+      "ExpectedActivityRequest" : {
+        "properties" : {
+          "monthlyAmountRangeCode" : {
+            "description" : "Código del rango de monto mensual (`monthlyAmountRanges` de GET /api/catalogs)",
+            "example" : "200_500",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "transactionTypeCode" : {
+            "description" : "Código del tipo de transacción (`transactionTypes` de GET /api/catalogs)",
+            "example" : "PAGO_SALARIO",
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "monthlyAmountRangeCode", "transactionTypeCode" ],
+        "type" : "object"
+      },
+      "IncomeDeclarationRequest" : {
+        "properties" : {
+          "rangeCode" : {
+            "description" : "Código del rango de ingreso (catálogo)",
+            "example" : "500_1500",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "sourceCode" : {
+            "description" : "Código de la fuente de ingreso (catálogo)",
+            "example" : "SALARIO",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "sourceDetail" : {
+            "description" : "Detalle libre; obligatorio si la fuente es OTRO",
+            "example" : "Venta de artesanías",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "rangeCode", "sourceCode" ],
+        "type" : "object"
+      },
+      "LoginRequest" : {
+        "properties" : {
+          "email" : {
+            "description" : "Correo institucional",
+            "example" : "abeltran@ceiba.example",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "password" : {
+            "description" : "Contraseña",
+            "example" : "una-clave-larga-1",
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "email", "password" ],
+        "type" : "object"
+      },
+      "LoginResponse" : {
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "description" : "Segundos de vigencia del token",
+            "example" : 28800,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "tokenType" : {
+            "example" : "Bearer",
+            "type" : "string"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/ConsoleUserResponse"
+          }
+        },
+        "type" : "object"
+      },
+      "OnboardingRequestResponse" : {
+        "properties" : {
+          "completedSteps" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "riskLevel" : {
+            "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "type" : "string"
+          },
+          "submittedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PageResponseConsoleRequestListItem" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ConsoleRequestListItem"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ProblemDetail" : {
+        "description" : "Error de la API (RFC 9457)",
+        "properties" : {
+          "detail" : {
+            "example" : "Onboarding request not found",
+            "type" : "string"
+          },
+          "instance" : {
+            "type" : "string"
+          },
+          "status" : {
+            "example" : 404,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "example" : "Not Found",
+            "type" : "string"
+          },
+          "type" : {
+            "example" : "about:blank",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ResetPasswordRequest" : {
+        "properties" : {
+          "newPassword" : {
+            "description" : "Contraseña nueva, de 10 a 72 caracteres",
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "newPassword" ],
+        "type" : "object"
+      },
+      "RiskAssessmentResponse" : {
+        "properties" : {
+          "evaluatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "evaluatedValue" : {
+            "type" : "number"
+          },
+          "explanation" : {
+            "type" : "string"
+          },
+          "level" : {
+            "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "ruleCode" : {
+            "type" : "string"
+          },
+          "ruleName" : {
+            "type" : "string"
+          },
+          "ruleThreshold" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "ScoreRuleResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "evaluatedField" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "operator" : {
+            "type" : "string"
+          },
+          "resultIfMatched" : {
+            "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "resultIfNotMatched" : {
+            "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "DRAFT", "PROVISIONAL", "CONFIRMED", "RETIRED" ],
+            "type" : "string"
+          },
+          "statusNote" : {
+            "type" : "string"
+          },
+          "threshold" : {
+            "type" : "number"
+          },
+          "validFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "UpdateUserRequest" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "fullName" : {
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "jobTitle" : {
+            "maxLength" : 120,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "role" : {
+            "enum" : [ "KYC_LEAD", "FRAUD_ANALYST", "ADMIN" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "active", "fullName", "jobTitle", "role" ],
+        "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "bearerFormat" : "JWT",
+        "description" : "Token de POST /api/console/auth/login. Solo la consola lo usa; el flujo móvil es público.",
+        "scheme" : "bearer",
+        "type" : "http"
+      }
+    }
+  },
+  "info" : {
+    "description" : "API del flujo de onboarding móvil (apertura de cuenta), del score de riesgo y de la consola administrativa.\n\n- Rutas `/api/onboarding/**` y `/api/catalogs`: públicas (app móvil).\n- Rutas `/api/console/**`: requieren `Authorization: Bearer <token>` de `POST /api/console/auth/login`.\n- Errores: `application/problem+json` con `status`, `title` y `detail`.\n- Los campos que aparecen como opcionales en los esquemas de respuesta pueden venir `null`.",
+    "title" : "Verificación Online API",
+    "version" : "v1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/api/catalogs" : {
+      "get" : {
+        "description" : "Fuentes de ingreso, rangos de ingreso y tipos de transacción, en orden de despliegue.",
+        "operationId" : "catalogCatalogs",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CatalogsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Catálogos activos",
+        "tags" : [ "Catálogos" ]
+      }
+    },
+    "/api/console/alerts" : {
+      "get" : {
+        "description" : "De la más crítica a la menos crítica y, dentro de cada criticidad, la más reciente primero. `account` busca por los últimos 4 dígitos; `from` y `to` son días (aaaa-mm-dd, hora de El Salvador), ambos inclusivos.",
+        "operationId" : "alertList",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "UNASSIGNED", "ASSIGNED", "IN_REVIEW", "CLOSED" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "assigneeId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "account",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AlertResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Alertas abiertas"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Filtro inválido"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Alertas abiertas ordenadas por criticidad",
+        "tags" : [ "Consola · Alertas" ]
+      }
+    },
+    "/api/console/alerts/{alertId}/take" : {
+      "post" : {
+        "description" : "Se la asigna al usuario de la sesión y queda en el historial de la alerta. Solo analistas de fraude y administradores.",
+        "operationId" : "alertTake",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "alertId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertResponse"
+                }
+              }
+            },
+            "description" : "La alerta quedó asignada al usuario de la sesión"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El rol del usuario no puede tomar alertas"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La alerta no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La alerta ya fue tomada por alguien más o está cerrada"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Tomar una alerta sin dueño",
+        "tags" : [ "Consola · Alertas" ]
+      }
+    },
+    "/api/console/auth/change-password" : {
+      "post" : {
+        "operationId" : "authChangePassword",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La actual no es correcta o la nueva no cumple la política"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Cambia la contraseña propia",
+        "tags" : [ "Consola · Acceso" ]
+      }
+    },
+    "/api/console/auth/login" : {
+      "post" : {
+        "description" : "Devuelve el token que se envía como `Authorization: Bearer <accessToken>`. Tras 5 intentos fallidos seguidos el correo se bloquea 15 minutos (429).",
+        "operationId" : "authLogin",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description" : "Sesión iniciada"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Correo o contraseña incorrectos (también si el usuario está inactivo o sin contraseña)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Demasiados intentos fallidos; ver `Retry-After`"
+          }
+        },
+        "summary" : "Inicia sesión",
+        "tags" : [ "Consola · Acceso" ]
+      }
+    },
+    "/api/console/auth/me" : {
+      "get" : {
+        "operationId" : "authMe",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConsoleUserResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Usuario de la sesión actual",
+        "tags" : [ "Consola · Acceso" ]
+      }
+    },
+    "/api/console/requests" : {
+      "get" : {
+        "description" : "Filtra por estado, nivel de riesgo y texto (nombre o número). `page` empieza en 0; `size` máximo 100.",
+        "operationId" : "consoleRequestList",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "riskLevel",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseConsoleRequestListItem"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Listado de solicitudes, de la más reciente a la más antigua",
+        "tags" : [ "Consola · Solicitudes" ]
+      }
+    },
+    "/api/console/requests/{requestId}" : {
+      "get" : {
+        "description" : "Datos declarados, ingresos, movimiento esperado, score y regla aplicada, señales, tiempo por paso y línea de tiempo.",
+        "operationId" : "consoleRequestDetail",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConsoleRequestDetail"
+                }
+              }
+            },
+            "description" : "Detalle de la solicitud"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Detalle de una solicitud",
+        "tags" : [ "Consola · Solicitudes" ]
+      }
+    },
+    "/api/console/score-rules" : {
+      "get" : {
+        "description" : "Hoy solo R-01 (monto mensual bajo → riesgo bajo). Los umbrales no se editan en este sprint.",
+        "operationId" : "scoreRuleInForce",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ScoreRuleResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Reglas de score vigentes y su umbral",
+        "tags" : [ "Consola · Reglas" ]
+      }
+    },
+    "/api/console/users" : {
+      "get" : {
+        "description" : "Cualquier usuario autenticado ve los activos (para asignar alertas). Con `includeInactive=true`, solo administradores.",
+        "operationId" : "consoleUserList",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "includeInactive",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ConsoleUserResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Usuarios de la consola"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "`includeInactive` sin ser administrador"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Usuarios de la consola",
+        "tags" : [ "Consola · Usuarios" ]
+      },
+      "post" : {
+        "description" : "Define el correo, el rol y una contraseña inicial que la persona debe cambiar al entrar.",
+        "operationId" : "consoleUserCreate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConsoleUserResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos o contraseña que no cumple la política"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Ya existe un usuario con ese correo"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Crea un usuario (administradores)",
+        "tags" : [ "Consola · Usuarios" ]
+      }
+    },
+    "/api/console/users/{userId}" : {
+      "put" : {
+        "description" : "Desactivar a alguien le quita el acceso de inmediato. No se puede quitar el último administrador activo.",
+        "operationId" : "consoleUserUpdate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConsoleUserResponse"
+                }
+              }
+            },
+            "description" : "Usuario actualizado"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El usuario no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Dejaría al sistema sin administrador activo"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Edita nombre, cargo, rol o estado (administradores)",
+        "tags" : [ "Consola · Usuarios" ]
+      }
+    },
+    "/api/console/users/{userId}/password" : {
+      "post" : {
+        "operationId" : "consoleUserResetPassword",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La contraseña no cumple la política"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El usuario no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Define una contraseña nueva para otro usuario (administradores)",
+        "tags" : [ "Consola · Usuarios" ]
+      }
+    },
+    "/api/onboarding/requests" : {
+      "post" : {
+        "operationId" : "onboardingStart",
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingRequestResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "summary" : "Inicia una solicitud de onboarding",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}" : {
+      "get" : {
+        "operationId" : "onboardingGet",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingRequestResponse"
+                }
+              }
+            },
+            "description" : "Resumen de la solicitud"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          }
+        },
+        "summary" : "Consulta el resumen de una solicitud",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}/expected-activity" : {
+      "put" : {
+        "description" : "Guarda o reemplaza la actividad esperada y devuelve el score calculado con el monto mensual.",
+        "operationId" : "onboardingRegisterExpectedActivity",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExpectedActivityRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RiskAssessmentResponse"
+                }
+              }
+            },
+            "description" : "Score de riesgo asignado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos o código de catálogo desconocido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud ya no está en progreso"
+          }
+        },
+        "summary" : "Paso 3: registra el movimiento esperado y asigna el score de riesgo",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}/income" : {
+      "put" : {
+        "description" : "Guarda o reemplaza la declaración. `sourceDetail` es obligatorio cuando la fuente es `OTRO`.",
+        "operationId" : "onboardingDeclareIncome",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/IncomeDeclarationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos o código de catálogo desconocido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud ya no está en progreso"
+          }
+        },
+        "summary" : "Paso 2: declara fuente y rango de ingresos",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}/risk-assessment" : {
+      "get" : {
+        "operationId" : "riskAssessmentCurrent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RiskAssessmentResponse"
+                }
+              }
+            },
+            "description" : "Score de riesgo vigente"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe o aún no tiene score"
+          }
+        },
+        "summary" : "Score de riesgo vigente de la solicitud",
+        "tags" : [ "Riesgo" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}/signals" : {
+      "put" : {
+        "description" : "Guarda o reemplaza las señales de la sesión: huella y modelo del dispositivo, ubicación aproximada, ritmo de escritura y tiempo por paso. La IP, el user agent y la hora los toma el servidor de la conexión.",
+        "operationId" : "onboardingCaptureSignals",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CaptureSignalsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud ya no está en progreso"
+          }
+        },
+        "summary" : "Captura las señales de dispositivo y comportamiento",
+        "tags" : [ "Onboarding" ]
+      }
+    }
+  },
+  "servers" : [ {
+    "description" : "Dev",
+    "url" : "https://api.dev.identidad.alambritos.online"
+  }, {
+    "description" : "QA",
+    "url" : "https://api.qa.identidad.alambritos.online"
+  }, {
+    "description" : "Local",
+    "url" : "http://localhost:8080"
+  } ],
+  "tags" : [ {
+    "description" : "Score de riesgo asignado a una solicitud",
+    "name" : "Riesgo"
+  }, {
+    "description" : "Pasos de la solicitud de apertura de cuenta (app móvil)",
+    "name" : "Onboarding"
+  }, {
+    "description" : "Inicio de sesión con correo y contraseña",
+    "name" : "Consola · Acceso"
+  }, {
+    "description" : "Listado y detalle de solicitudes para la consola administrativa",
+    "name" : "Consola · Solicitudes"
+  }, {
+    "description" : "Listas de referencia que usa el flujo de onboarding",
+    "name" : "Catálogos"
+  }, {
+    "description" : "Usuarios de la consola administrativa",
+    "name" : "Consola · Usuarios"
+  }, {
+    "description" : "Reglas de score vigentes (solo lectura)",
+    "name" : "Consola · Reglas"
+  }, {
+    "description" : "Bandeja de trabajo del analista de fraude",
+    "name" : "Consola · Alertas"
+  } ]
+}

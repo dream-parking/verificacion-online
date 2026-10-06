@@ -21,6 +21,7 @@ public class RiskAssessmentController {
 		this.riskAssessmentService = riskAssessmentService;
 	}
 
+	@ApiResponse(responseCode = "200", description = "Score de riesgo vigente")
 	@Operation(summary = "Score de riesgo vigente de la solicitud")
 	@ApiResponse(responseCode = "404", description = "La solicitud no existe o aún no tiene score", content = @Content)
 	@GetMapping("/api/onboarding/requests/{requestId}/risk-assessment")

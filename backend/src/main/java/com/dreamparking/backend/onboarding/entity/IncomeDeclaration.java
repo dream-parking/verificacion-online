@@ -21,35 +21,35 @@ import com.dreamparking.backend.catalog.entity.IncomeSource;
 
 /** Declared income (step 2), one per request. */
 @Entity
-@Table(name = "declaracion_ingresos")
+@Table(name = "income_declaration")
 public class IncomeDeclaration {
 
 	@Id
-	@Column(name = "solicitud_id")
+	@Column(name = "request_id")
 	private UUID requestId;
 
 	@MapsId
 	@OneToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "solicitud_id")
+	@JoinColumn(name = "request_id")
 	private OnboardingRequest request;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "origen_codigo", nullable = false)
+	@JoinColumn(name = "source_code", nullable = false)
 	private IncomeSource source;
 
-	@Column(name = "origen_detalle", length = 150)
+	@Column(name = "source_detail", length = 150)
 	private String sourceDetail;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "rango_codigo", nullable = false)
+	@JoinColumn(name = "range_code", nullable = false)
 	private IncomeRange range;
 
 	@CreationTimestamp
-	@Column(name = "registrado_en", nullable = false)
+	@Column(name = "registered_at", nullable = false)
 	private Instant registeredAt;
 
 	@UpdateTimestamp
-	@Column(name = "actualizado_en", nullable = false)
+	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
 	public UUID getRequestId() {

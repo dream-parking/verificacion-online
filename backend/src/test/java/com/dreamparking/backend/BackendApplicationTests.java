@@ -34,17 +34,17 @@ class BackendApplicationTests {
 		assertThat(jdbc.queryForObject(
 				"select count(*) from information_schema.schemata where schema_name = 'ceiba'", Integer.class)).isZero();
 		// 2030: año sin datos semilla, así el correlativo arranca en 1.
-		assertThat(jdbc.queryForObject("select siguiente_numero_solicitud('2030-06-01T12:00:00Z')", String.class))
+		assertThat(jdbc.queryForObject("select next_request_number('2030-06-01T12:00:00Z')", String.class))
 				.isEqualTo("SOL-2030-00001");
 	}
 
 	@Test
 	void datosSemillaCargados() {
-		assertThat(jdbc.queryForObject("select count(*) from tipo_alerta", Integer.class)).isEqualTo(9);
+		assertThat(jdbc.queryForObject("select count(*) from alert_type", Integer.class)).isEqualTo(9);
 		assertThat(jdbc.queryForObject(
-				"select nivel_riesgo::text from solicitud where numero = 'SOL-2026-00418'", String.class))
-				.isEqualTo("BAJO");
-		assertThat(jdbc.queryForObject("select count(*) from v_bandeja_alertas", Integer.class)).isEqualTo(9);
+				"select risk_level::text from onboarding_request where number = 'SOL-2026-00418'", String.class))
+				.isEqualTo("LOW");
+		assertThat(jdbc.queryForObject("select count(*) from v_alert_inbox", Integer.class)).isEqualTo(9);
 	}
 
 }

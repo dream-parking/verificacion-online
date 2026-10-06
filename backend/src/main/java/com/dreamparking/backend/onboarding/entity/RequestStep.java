@@ -18,7 +18,7 @@ import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 
 /** Time spent on one step of a request; feeds "time per step" and "total duration" in the console. */
 @Entity
-@Table(name = "paso_solicitud")
+@Table(name = "request_step")
 public class RequestStep {
 
 	@EmbeddedId
@@ -26,21 +26,21 @@ public class RequestStep {
 
 	@MapsId("requestId")
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "solicitud_id")
+	@JoinColumn(name = "request_id")
 	private OnboardingRequest request;
 
-	@Column(name = "iniciado_en", nullable = false)
+	@Column(name = "started_at", nullable = false)
 	private Instant startedAt;
 
-	@Column(name = "completado_en")
+	@Column(name = "completed_at")
 	private Instant completedAt;
 
 	/** Computed by the database from the start and completion times. */
 	@Generated(event = { EventType.INSERT, EventType.UPDATE })
-	@Column(name = "duracion_seg", insertable = false, updatable = false)
+	@Column(name = "duration_seconds", insertable = false, updatable = false)
 	private Integer durationSeconds;
 
-	@Column(name = "intentos", nullable = false)
+	@Column(name = "attempts", nullable = false)
 	private Short attempts = (short) 1;
 
 	protected RequestStep() {

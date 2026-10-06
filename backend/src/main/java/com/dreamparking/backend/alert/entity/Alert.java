@@ -6,8 +6,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,7 +20,6 @@ import jakarta.persistence.Version;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Generated;
-import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
@@ -27,12 +27,11 @@ import org.hibernate.type.SqlTypes;
 import com.dreamparking.backend.account.entity.Account;
 import com.dreamparking.backend.alert.entity.enums.AlertCriticality;
 import com.dreamparking.backend.alert.entity.enums.AlertStatus;
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.console.entity.ConsoleUser;
 
 /** Fraud/AML alert raised on an account. */
 @Entity
-@Table(name = "alerta")
+@Table(name = "alert")
 public class Alert {
 
 	@Id
@@ -41,49 +40,49 @@ public class Alert {
 	private UUID id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "cuenta_id", nullable = false)
+	@JoinColumn(name = "account_id", nullable = false)
 	private Account account;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "tipo_codigo", nullable = false)
+	@JoinColumn(name = "type_code", nullable = false)
 	private AlertType type;
 
-	@Convert(converter = AlertCriticality.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "criticidad", nullable = false, columnDefinition = "criticidad_alerta")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "criticality", nullable = false, columnDefinition = "alert_criticality")
 	private AlertCriticality criticality;
 
 	@Generated(event = {EventType.INSERT, EventType.UPDATE})
-	@Column(name = "severidad", insertable = false, updatable = false)
+	@Column(name = "severity", insertable = false, updatable = false)
 	private Short severity;
 
-	@Column(name = "motivo", nullable = false, length = 250)
+	@Column(name = "reason", nullable = false, length = 250)
 	private String reason;
 
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(name = "evidencia", nullable = false)
+	@Column(name = "evidence", nullable = false)
 	private Map<String, Object> evidence = new HashMap<>();
 
-	@Convert(converter = AlertStatus.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "estado", nullable = false, columnDefinition = "estado_alerta")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "status", nullable = false, columnDefinition = "alert_status")
 	private AlertStatus status = AlertStatus.UNASSIGNED;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "responsable_id")
+	@JoinColumn(name = "assignee_id")
 	private ConsoleUser assignee;
 
 	@CreationTimestamp
-	@Column(name = "generada_en", nullable = false)
+	@Column(name = "raised_at", nullable = false)
 	private Instant raisedAt;
 
-	@Column(name = "asignada_en")
+	@Column(name = "assigned_at")
 	private Instant assignedAt;
 
-	@Column(name = "cerrada_en")
+	@Column(name = "closed_at")
 	private Instant closedAt;
 
-	@Column(name = "resolucion", length = 30)
+	@Column(name = "resolution", length = 30)
 	private String resolution;
 
 	@Version

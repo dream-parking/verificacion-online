@@ -7,20 +7,20 @@ import jakarta.persistence.Table;
 
 /** Catalog of declared income sources (salary, own business, remittances...). */
 @Entity
-@Table(name = "cat_origen_ingreso")
+@Table(name = "income_source")
 public class IncomeSource {
 
 	@Id
-	@Column(name = "codigo", length = 30)
+	@Column(name = "code", length = 30)
 	private String code;
 
-	@Column(name = "etiqueta", nullable = false, length = 80)
+	@Column(name = "label", nullable = false, length = 80)
 	private String label;
 
-	@Column(name = "orden", nullable = false)
+	@Column(name = "sort_order", nullable = false)
 	private Short sortOrder = (short) 0;
 
-	@Column(name = "activo", nullable = false)
+	@Column(name = "active", nullable = false)
 	private Boolean active = true;
 
 	public String getCode() {

@@ -22,27 +22,27 @@ import com.dreamparking.backend.catalog.entity.PrivacyNotice;
 
 /** Privacy notice acceptance (step 1), one per request. */
 @Entity
-@Table(name = "consentimiento_privacidad")
+@Table(name = "privacy_consent")
 public class PrivacyConsent {
 
 	@Id
-	@Column(name = "solicitud_id")
+	@Column(name = "request_id")
 	private UUID requestId;
 
 	@MapsId
 	@OneToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "solicitud_id")
+	@JoinColumn(name = "request_id")
 	private OnboardingRequest request;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "aviso_id", nullable = false)
+	@JoinColumn(name = "notice_id", nullable = false)
 	private PrivacyNotice notice;
 
-	@Column(name = "acepta_senales", nullable = false)
+	@Column(name = "signals_accepted", nullable = false)
 	private Boolean signalsAccepted;
 
 	@CreationTimestamp
-	@Column(name = "aceptado_en", nullable = false)
+	@Column(name = "accepted_at", nullable = false)
 	private Instant acceptedAt;
 
 	@JdbcTypeCode(SqlTypes.INET)

@@ -4,63 +4,62 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.Immutable;
-import org.hibernate.annotations.Synchronize;
-import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Synchronize;
 import org.hibernate.type.SqlTypes;
 
 import com.dreamparking.backend.alert.entity.enums.AlertCriticality;
 import com.dreamparking.backend.alert.entity.enums.AlertStatus;
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 
 /** Open alert in the console inbox (view). */
 @Entity
 @Immutable
 // Tables the view reads: Hibernate flushes pending changes to them before querying it.
-@Synchronize({ "alerta", "cuenta", "usuario_consola" })
-@Table(name = "v_bandeja_alertas")
+@Synchronize({ "alert", "account", "console_user" })
+@Table(name = "v_alert_inbox")
 public class AlertInboxItem {
 
 	@Id
 	@Column(name = "id")
 	private UUID id;
 
-	@Convert(converter = AlertCriticality.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "criticidad", nullable = false, columnDefinition = "criticidad_alerta")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "criticality", nullable = false, columnDefinition = "alert_criticality")
 	private AlertCriticality criticality;
 
-	@Column(name = "severidad")
+	@Column(name = "severity")
 	private Short severity;
 
-	@Column(name = "cuenta", columnDefinition = "text")
+	@Column(name = "masked_account", columnDefinition = "text")
 	private String maskedAccount;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(name = "ultimos4", length = 4)
+	@Column(name = "last_four", length = 4)
 	private String lastFour;
 
-	@Column(name = "motivo", length = 250)
+	@Column(name = "reason", length = 250)
 	private String reason;
 
-	@Convert(converter = AlertStatus.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "estado", nullable = false, columnDefinition = "estado_alerta")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "status", nullable = false, columnDefinition = "alert_status")
 	private AlertStatus status;
 
-	@Column(name = "responsable", columnDefinition = "text")
+	@Column(name = "assignee_name", columnDefinition = "text")
 	private String assigneeName;
 
-	@Column(name = "responsable_id")
+	@Column(name = "assignee_id")
 	private UUID assigneeId;
 
-	@Column(name = "generada_en")
+	@Column(name = "raised_at")
 	private Instant raisedAt;
 
 	public UUID getId() {

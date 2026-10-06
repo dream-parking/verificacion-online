@@ -4,8 +4,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,18 +17,16 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.dreamparking.backend.account.entity.enums.AccountStatus;
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.customer.entity.Customer;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 
 /** Bank account opened from an onboarding request. Only a core-banking token is stored, never the number. */
 @Entity
-@Table(name = "cuenta")
+@Table(name = "account")
 public class Account {
 
 	@Id
@@ -36,27 +35,27 @@ public class Account {
 	private UUID id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "cliente_id", nullable = false)
+	@JoinColumn(name = "customer_id", nullable = false)
 	private Customer customer;
 
 	@OneToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "solicitud_id")
+	@JoinColumn(name = "request_id")
 	private OnboardingRequest request;
 
-	@Column(name = "numero_token", nullable = false, unique = true, length = 64)
+	@Column(name = "number_token", nullable = false, unique = true, length = 64)
 	private String numberToken;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(name = "ultimos4", nullable = false, length = 4)
+	@Column(name = "last_four", nullable = false, length = 4)
 	private String lastFour;
 
-	@Convert(converter = AccountStatus.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "estado", nullable = false, columnDefinition = "estado_cuenta")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "status", nullable = false, columnDefinition = "account_status")
 	private AccountStatus status = AccountStatus.ACTIVE;
 
 	@CreationTimestamp
-	@Column(name = "abierta_en", nullable = false)
+	@Column(name = "opened_at", nullable = false)
 	private Instant openedAt;
 
 	public UUID getId() {

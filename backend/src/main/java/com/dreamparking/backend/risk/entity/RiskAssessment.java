@@ -4,8 +4,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -15,16 +16,16 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.console.entity.ConsoleUser;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
 /** Result of evaluating a request's risk; only one assessment per request is current. */
 @Entity
-@Table(name = "evaluacion_riesgo")
+@Table(name = "risk_assessment")
 public class RiskAssessment {
 
 	@Id
@@ -33,33 +34,33 @@ public class RiskAssessment {
 	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "solicitud_id", nullable = false)
+	@JoinColumn(name = "request_id", nullable = false)
 	private OnboardingRequest request;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "regla_id")
+	@JoinColumn(name = "rule_id")
 	private ScoreRule rule;
 
-	@Convert(converter = RiskLevel.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "nivel", nullable = false, columnDefinition = "nivel_riesgo")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "level", nullable = false, columnDefinition = "risk_level")
 	private RiskLevel level;
 
-	@Column(name = "valor_evaluado", precision = 14, scale = 2)
+	@Column(name = "evaluated_value", precision = 14, scale = 2)
 	private BigDecimal evaluatedValue;
 
-	@Column(name = "explicacion", nullable = false, columnDefinition = "text")
+	@Column(name = "explanation", nullable = false, columnDefinition = "text")
 	private String explanation;
 
 	@CreationTimestamp
-	@Column(name = "evaluado_en", nullable = false)
+	@Column(name = "evaluated_at", nullable = false)
 	private Instant evaluatedAt;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "evaluado_por")
+	@JoinColumn(name = "evaluated_by")
 	private ConsoleUser evaluatedBy;
 
-	@Column(name = "es_vigente", nullable = false)
+	@Column(name = "is_current", nullable = false)
 	private Boolean current = true;
 
 	public Long getId() {

@@ -4,22 +4,23 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.console.entity.enums.ConsoleRole;
 
 /** User of the KYC/AML console. */
 @Entity
-@Table(name = "usuario_consola")
+@Table(name = "console_user")
 public class ConsoleUser {
 
 	@Id
@@ -30,32 +31,32 @@ public class ConsoleUser {
 	@Column(name = "email", nullable = false, unique = true, length = 150)
 	private String email;
 
-	@Column(name = "nombre", nullable = false, length = 150)
+	@Column(name = "full_name", nullable = false, length = 150)
 	private String fullName;
 
-	@Column(name = "cargo", nullable = false, length = 120)
+	@Column(name = "job_title", nullable = false, length = 120)
 	private String jobTitle;
 
-	@Column(name = "iniciales", nullable = false, length = 3)
+	@Column(name = "initials", nullable = false, length = 3)
 	private String initials;
 
-	@Convert(converter = ConsoleRole.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "rol", nullable = false, columnDefinition = "rol_consola")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "role", nullable = false, columnDefinition = "console_role")
 	private ConsoleRole role;
 
-	@Column(name = "activo", nullable = false)
+	@Column(name = "active", nullable = false)
 	private Boolean active = true;
 
 	@CreationTimestamp
-	@Column(name = "creado_en", nullable = false)
+	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
 	/** BCrypt hash; null while the user has no password and therefore cannot sign in. */
-	@Column(name = "clave_hash", length = 100)
+	@Column(name = "password_hash", length = 100)
 	private String passwordHash;
 
-	@Column(name = "clave_cambiada_en")
+	@Column(name = "password_changed_at")
 	private Instant passwordChangedAt;
 
 	public UUID getId() {

@@ -1,11 +1,12 @@
 package com.dreamparking.backend.alert.dto;
 
-import java.util.UUID;
-
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/** Closes an alert. {@code resolution} is a short code such as FALSO_POSITIVO or ESCALADA_ROS. */
-public record CloseAlertRequest(@NotNull UUID userId, @NotBlank @Size(max = 30) String resolution, String comment) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+/** Closes an alert with a short resolution code and an optional comment. */
+public record CloseAlertRequest(
+		@Schema(description = "Código de resolución", example = "FALSO_POSITIVO") @NotBlank @Size(max = 30) String resolution,
+		@Schema(description = "Comentario para el historial de la alerta", example = "Pago de aguinaldo") @Size(max = 2000) String comment) {
 }

@@ -5,11 +5,6 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-
-import com.nimbusds.jose.jwk.source.ImmutableSecret;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +17,11 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 /** Signing key, encoder and decoder of the console's access tokens (HS256). */
 @Configuration

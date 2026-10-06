@@ -5,8 +5,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,16 +17,14 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 
 /** Append-only timeline entry of an onboarding request. */
 @Entity
-@Table(name = "evento_solicitud")
+@Table(name = "request_event")
 public class RequestEvent {
 
 	@Id
@@ -34,27 +33,27 @@ public class RequestEvent {
 	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "solicitud_id", nullable = false)
+	@JoinColumn(name = "request_id", nullable = false)
 	private OnboardingRequest request;
 
-	@Convert(converter = RequestEventType.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "tipo", nullable = false, columnDefinition = "tipo_evento_sol")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "type", nullable = false, columnDefinition = "request_event_type")
 	private RequestEventType type;
 
-	@Column(name = "descripcion", nullable = false, length = 250)
+	@Column(name = "description", nullable = false, length = 250)
 	private String description;
 
 	@JdbcTypeCode(SqlTypes.JSON)
-	@Column(name = "datos", nullable = false)
+	@Column(name = "data", nullable = false)
 	private Map<String, Object> data = new HashMap<>();
 
 	@CreationTimestamp
-	@Column(name = "ocurrido_en", nullable = false)
+	@Column(name = "occurred_at", nullable = false)
 	private Instant occurredAt;
 
 	@Column(name = "actor", nullable = false, length = 60)
-	private String actor = "CLIENTE";
+	private String actor = "CUSTOMER";
 
 	public Long getId() {
 		return id;

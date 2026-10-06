@@ -1,6 +1,5 @@
 package com.dreamparking.backend.onboarding.entity;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -17,35 +16,37 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
 import com.dreamparking.backend.catalog.entity.TransactionType;
 
-/** Expected monthly account activity (step 3), one per request. Input of score rule R-01. */
+/** Expected account activity (step 3), one per request: type of money and the chosen monthly amount range. Input of score rule R-01. */
 @Entity
-@Table(name = "movimiento_esperado")
+@Table(name = "expected_activity")
 public class ExpectedActivity {
 
 	@Id
-	@Column(name = "solicitud_id")
+	@Column(name = "request_id")
 	private UUID requestId;
 
 	@MapsId
 	@OneToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "solicitud_id")
+	@JoinColumn(name = "request_id")
 	private OnboardingRequest request;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "tipo_codigo", nullable = false)
+	@JoinColumn(name = "transaction_type_code", nullable = false)
 	private TransactionType transactionType;
 
-	@Column(name = "monto_mensual_usd", nullable = false, precision = 14, scale = 2)
-	private BigDecimal monthlyAmountUsd;
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "monthly_amount_range_code", nullable = false)
+	private MonthlyAmountRange monthlyAmountRange;
 
 	@CreationTimestamp
-	@Column(name = "registrado_en", nullable = false)
+	@Column(name = "registered_at", nullable = false)
 	private Instant registeredAt;
 
 	@UpdateTimestamp
-	@Column(name = "actualizado_en", nullable = false)
+	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
 	public UUID getRequestId() {
@@ -68,12 +69,12 @@ public class ExpectedActivity {
 		this.transactionType = transactionType;
 	}
 
-	public BigDecimal getMonthlyAmountUsd() {
-		return monthlyAmountUsd;
+	public MonthlyAmountRange getMonthlyAmountRange() {
+		return monthlyAmountRange;
 	}
 
-	public void setMonthlyAmountUsd(BigDecimal monthlyAmountUsd) {
-		this.monthlyAmountUsd = monthlyAmountUsd;
+	public void setMonthlyAmountRange(MonthlyAmountRange monthlyAmountRange) {
+		this.monthlyAmountRange = monthlyAmountRange;
 	}
 
 	public Instant getRegisteredAt() {

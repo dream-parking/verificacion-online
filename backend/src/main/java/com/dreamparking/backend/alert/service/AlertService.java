@@ -1,22 +1,27 @@
 package com.dreamparking.backend.alert.service;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dreamparking.backend.account.service.AccountService;
+import com.dreamparking.backend.alert.dto.AlertDetailResponse;
 import com.dreamparking.backend.alert.dto.AlertHistoryResponse;
 import com.dreamparking.backend.alert.dto.AlertResponse;
 import com.dreamparking.backend.alert.dto.AlertTypeResponse;
 import com.dreamparking.backend.alert.dto.CloseAlertRequest;
-import com.dreamparking.backend.alert.dto.InboxItemResponse;
 import com.dreamparking.backend.alert.dto.RaiseAlertRequest;
 import com.dreamparking.backend.alert.entity.Alert;
 import com.dreamparking.backend.alert.entity.AlertHistory;
+import com.dreamparking.backend.alert.entity.AlertInboxItem;
 import com.dreamparking.backend.alert.entity.AlertType;
 import com.dreamparking.backend.alert.entity.enums.AlertStatus;
 import com.dreamparking.backend.alert.repository.AlertHistoryRepository;
@@ -38,6 +43,9 @@ import com.dreamparking.backend.console.service.ConsoleUserService;
  */
 @Service
 public class AlertService {
+
+	/** Dates of the inbox filters are calendar days in El Salvador, like the console shows them. */
+	static final ZoneId LOCAL_ZONE = ZoneId.of("America/El_Salvador");
 
 	private final AlertRepository alerts;
 
@@ -65,10 +73,39 @@ public class AlertService {
 		this.accessAuditService = accessAuditService;
 	}
 
-	/** Open alerts, most critical first and newest first within the same criticality. */
+	/**
+	 * Open alerts, most critical first and newest first within the same criticality. Every filter is optional:
+	 * {@code account} matches the account's last four digits; {@code from} and {@code to} are inclusive days.
+	 */
 	@Transactional(readOnly = true)
-	public List<InboxItemResponse> inbox() {
-		return inbox.findAllByOrderBySeverityAscRaisedAtDesc().stream().map(InboxItemResponse::of).toList();
+	public List<AlertResponse> inbox(AlertStatus status, UUID assigneeId, String account, LocalDate from,
+			LocalDate to) {
+		if (from != null && to != null && to.isBefore(from)) {
+			throw new InvalidInputException("'to' is before 'from'");
+		}
+		Specification<AlertInboxItem> spec = (root, q, cb) -> cb.conjunction();
+		if (status != null) {
+			spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status));
+		}
+		if (assigneeId != null) {
+			spec = spec.and((root, q, cb) -> cb.equal(root.get("assigneeId"), assigneeId));
+		}
+		if (account != null && !account.isBlank()) {
+			String digits = account.replaceAll("\\D", "");
+			spec = spec.and((root, q, cb) -> cb.like(root.get("lastFour"), "%" + digits + "%"));
+		}
+		if (from != null) {
+			spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("raisedAt"),
+					from.atStartOfDay(LOCAL_ZONE).toInstant()));
+		}
+		if (to != null) {
+			spec = spec.and((root, q, cb) -> cb.lessThan(root.get("raisedAt"),
+					to.plusDays(1).atStartOfDay(LOCAL_ZONE).toInstant()));
+		}
+		return inbox.findAll(spec, Sort.by(Sort.Order.asc("severity"), Sort.Order.desc("raisedAt")))
+			.stream()
+			.map(AlertResponse::of)
+			.toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -77,8 +114,8 @@ public class AlertService {
 	}
 
 	@Transactional(readOnly = true)
-	public AlertResponse get(UUID alertId) {
-		return AlertResponse.of(find(alertId));
+	public AlertDetailResponse get(UUID alertId) {
+		return AlertDetailResponse.of(find(alertId));
 	}
 
 	@Transactional(readOnly = true)
@@ -88,7 +125,7 @@ public class AlertService {
 	}
 
 	@Transactional
-	public AlertResponse raise(RaiseAlertRequest body) {
+	public AlertDetailResponse raise(RaiseAlertRequest body) {
 		AlertType type = alertTypes.findById(body.typeCode())
 			.orElseThrow(() -> new InvalidInputException("Unknown alert type: " + body.typeCode()));
 
@@ -101,7 +138,7 @@ public class AlertService {
 		alerts.saveAndFlush(alert);
 
 		recordHistory(alert, null, AlertStatus.UNASSIGNED, null, null, null);
-		return AlertResponse.of(alert);
+		return AlertDetailResponse.of(alert);
 	}
 
 	/**
@@ -114,19 +151,19 @@ public class AlertService {
 		int taken = alerts.takeIfUnassigned(alertId, user, Instant.now(), AlertStatus.ASSIGNED, AlertStatus.UNASSIGNED);
 		if (taken == 0) {
 			find(alertId);
-			throw new InvalidStateException("Alert " + alertId + " was already taken");
+			throw new InvalidStateException("Alert " + alertId + " is already assigned or closed");
 		}
 
 		Alert alert = find(alertId);
 		recordHistory(alert, AlertStatus.UNASSIGNED, AlertStatus.ASSIGNED, alert.getAssignee(), alert.getAssignee(),
 				comment);
-		accessAuditService.record(alert.getAssignee(), "TOMAR_ALERTA", "alerta", alertId.toString(), null);
-		return AlertResponse.of(alert);
+		accessAuditService.record(alert.getAssignee(), "TAKE_ALERT", "alert", alertId.toString(), null);
+		return AlertResponse.of(inbox.findById(alertId).orElseThrow());
 	}
 
 	/** The assignee starts working on the alert. */
 	@Transactional
-	public AlertResponse startReview(UUID alertId, UUID userId, String comment) {
+	public AlertDetailResponse startReview(UUID alertId, UUID userId, String comment) {
 		ConsoleUser user = consoleUserService.activeUser(userId);
 		Alert alert = find(alertId);
 		if (alert.getStatus() != AlertStatus.ASSIGNED) {
@@ -138,13 +175,13 @@ public class AlertService {
 
 		alert.setStatus(AlertStatus.IN_REVIEW);
 		recordHistory(alert, AlertStatus.ASSIGNED, AlertStatus.IN_REVIEW, alert.getAssignee(), user, comment);
-		return AlertResponse.of(alert);
+		return AlertDetailResponse.of(alert);
 	}
 
 	/** Closes the alert with a resolution. Allowed to the assignee, the KYC lead and admins. */
 	@Transactional
-	public AlertResponse close(UUID alertId, CloseAlertRequest body) {
-		ConsoleUser user = consoleUserService.activeUser(body.userId());
+	public AlertDetailResponse close(UUID alertId, UUID userId, CloseAlertRequest body) {
+		ConsoleUser user = consoleUserService.activeUser(userId);
 		Alert alert = find(alertId);
 		AlertStatus previous = alert.getStatus();
 		if (previous != AlertStatus.ASSIGNED && previous != AlertStatus.IN_REVIEW) {
@@ -159,7 +196,7 @@ public class AlertService {
 		alert.setClosedAt(Instant.now());
 		alert.setResolution(body.resolution());
 		recordHistory(alert, previous, AlertStatus.CLOSED, alert.getAssignee(), user, body.comment());
-		return AlertResponse.of(alert);
+		return AlertDetailResponse.of(alert);
 	}
 
 	private Alert find(UUID alertId) {

@@ -4,8 +4,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -14,19 +15,17 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 import com.dreamparking.backend.console.entity.ConsoleUser;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 import com.dreamparking.backend.risk.entity.enums.RuleStatus;
 
 /** Versioned score rule; only one version per code can be in force at a time. */
 @Entity
-@Table(name = "regla_score")
+@Table(name = "score_rule")
 public class ScoreRule {
 
 	@Id
@@ -34,64 +33,64 @@ public class ScoreRule {
 	@Column(name = "id")
 	private Integer id;
 
-	@Column(name = "codigo", nullable = false, length = 10)
+	@Column(name = "code", nullable = false, length = 10)
 	private String code;
 
-	@Column(name = "version", nullable = false)
+	@Column(name = "rule_version", nullable = false)
 	private Short ruleVersion = (short) 1;
 
-	@Column(name = "nombre", nullable = false, length = 120)
+	@Column(name = "name", nullable = false, length = 120)
 	private String name;
 
-	@Column(name = "descripcion", nullable = false, columnDefinition = "text")
+	@Column(name = "description", nullable = false, columnDefinition = "text")
 	private String description;
 
-	@Column(name = "campo_evaluado", nullable = false, length = 60)
+	@Column(name = "evaluated_field", nullable = false, length = 60)
 	private String evaluatedField;
 
-	@Column(name = "operador", nullable = false, length = 4)
+	@Column(name = "operator", nullable = false, length = 4)
 	private String operator;
 
-	@Column(name = "umbral", nullable = false, precision = 14, scale = 2)
+	@Column(name = "threshold", nullable = false, precision = 14, scale = 2)
 	private BigDecimal threshold;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(name = "moneda", nullable = false, length = 3)
+	@Column(name = "currency", nullable = false, length = 3)
 	private String currency = "USD";
 
-	@Convert(converter = RiskLevel.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "resultado_si", nullable = false, columnDefinition = "nivel_riesgo")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "result_if_matched", nullable = false, columnDefinition = "risk_level")
 	private RiskLevel resultIfMatched;
 
-	@Convert(converter = RiskLevel.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "resultado_no", nullable = false, columnDefinition = "nivel_riesgo")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "result_if_not_matched", nullable = false, columnDefinition = "risk_level")
 	private RiskLevel resultIfNotMatched;
 
-	@Column(name = "prioridad", nullable = false)
+	@Column(name = "priority", nullable = false)
 	private Short priority = (short) 100;
 
-	@Convert(converter = RuleStatus.JpaConverter.class)
-	@JdbcType(PgEnumJdbcType.class)
-	@Column(name = "estado", nullable = false, columnDefinition = "estado_regla")
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "status", nullable = false, columnDefinition = "rule_status")
 	private RuleStatus status = RuleStatus.DRAFT;
 
-	@Column(name = "nota_estado", length = 250)
+	@Column(name = "status_note", length = 250)
 	private String statusNote;
 
-	@Column(name = "vigente_desde", nullable = false)
+	@Column(name = "valid_from", nullable = false)
 	private Instant validFrom;
 
-	@Column(name = "vigente_hasta")
+	@Column(name = "valid_to")
 	private Instant validTo;
 
 	@UpdateTimestamp
-	@Column(name = "actualizado_en", nullable = false)
+	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "actualizado_por")
+	@JoinColumn(name = "updated_by")
 	private ConsoleUser updatedBy;
 
 	public Integer getId() {

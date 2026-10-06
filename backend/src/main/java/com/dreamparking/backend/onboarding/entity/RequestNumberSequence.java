@@ -7,14 +7,14 @@ import jakarta.persistence.Table;
 
 /** Yearly counter behind request numbers (SOL-2026-00418). */
 @Entity
-@Table(name = "secuencia_solicitud")
+@Table(name = "request_number_sequence")
 public class RequestNumberSequence {
 
 	@Id
-	@Column(name = "anio")
+	@Column(name = "year")
 	private Short year;
 
-	@Column(name = "ultimo", nullable = false)
+	@Column(name = "last_number", nullable = false)
 	private Integer lastNumber = 0;
 
 	public Short getYear() {

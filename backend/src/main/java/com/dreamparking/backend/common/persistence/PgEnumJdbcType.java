@@ -13,7 +13,8 @@ import org.hibernate.type.descriptor.jdbc.VarcharJdbcType;
 
 /**
  * Text column bound as {@link Types#OTHER}, so PostgreSQL casts the label to the column's enum type
- * in INSERT/UPDATE as well as in query parameters ({@code where status = :status}).
+ * in INSERT/UPDATE as well as in query parameters ({@code where status = :status}). A null is bound the same way:
+ * as a plain varchar it would be rejected by nullable enum columns.
  */
 public class PgEnumJdbcType extends VarcharJdbcType {
 
@@ -25,6 +26,16 @@ public class PgEnumJdbcType extends VarcharJdbcType {
 			protected void doBind(PreparedStatement st, X value, int index, WrapperOptions options)
 					throws SQLException {
 				st.setObject(index, javaType.unwrap(value, String.class, options), Types.OTHER);
+			}
+
+			@Override
+			protected void doBindNull(PreparedStatement st, int index, WrapperOptions options) throws SQLException {
+				st.setNull(index, Types.OTHER);
+			}
+
+			@Override
+			protected void doBindNull(CallableStatement st, String name, WrapperOptions options) throws SQLException {
+				st.setNull(name, Types.OTHER);
 			}
 
 			@Override

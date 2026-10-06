@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.Synchronize;
 import org.hibernate.annotations.JdbcType;
 
 import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
@@ -20,6 +21,8 @@ import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 /** Row of the console request list (view). */
 @Entity
 @Immutable
+// Tables the view reads: Hibernate flushes pending changes to them before querying it.
+@Synchronize({ "solicitud", "movimiento_esperado", "cat_tipo_movimiento" })
 @Table(name = "v_solicitud_listado")
 public class RequestListItem {
 

@@ -1,8 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type CSSProperties } from "react";
-import { Cargando, Encabezado, ErrorCarga, useEstadoDatos, Vacio } from "@/components/consola/ui";
+import type { CSSProperties } from "react";
+import {
+  Cargando,
+  Encabezado,
+  ErrorCarga,
+  FiltroSelect,
+  FiltroTexto,
+  Paginacion,
+  PanelFiltros,
+  useEstadoDatos,
+  useFiltrosPaginados,
+  Vacio,
+} from "@/components/consola/ui";
 import {
   completada,
   estadoSolicitud,
@@ -11,28 +22,54 @@ import {
   riesgoDe,
   SOLICITUDES,
   usd,
+  type Solicitud,
 } from "@/lib/consola/datos";
+
+const FILTROS_INICIALES = {
+  numero: "",
+  nombre: "",
+  fecha: "todas",
+  tipo: "todos",
+  monto: "todos",
+  riesgo: "todos",
+  estado: "todos",
+};
+
+const SIN_DECLARAR = "sin";
+
+// Opciones calculadas a partir de los datos disponibles.
+const FECHAS = [...new Set(SOLICITUDES.map((r) => r.f))];
+const TIPOS = [...new Set(SOLICITUDES.flatMap((r) => (r.tipo ? [r.tipo] : [])))].sort();
+
+const RANGOS_MONTO: Record<string, (m: number) => boolean> = {
+  "menos-500": (m) => m < 500,
+  "500-1500": (m) => m >= 500 && m < 1500,
+  "1500-mas": (m) => m >= 1500,
+};
+
+function cumple(r: Solicitud, f: typeof FILTROS_INICIALES) {
+  const numero = f.numero.trim().toLowerCase();
+  const nombre = f.nombre.trim().toLowerCase();
+  if (numero && !numeroDe(r).toLowerCase().includes(numero)) return false;
+  if (nombre && !r.nombre.toLowerCase().includes(nombre)) return false;
+  if (f.fecha !== "todas" && r.f !== f.fecha) return false;
+  if (f.tipo === SIN_DECLARAR && r.tipo) return false;
+  if (f.tipo !== "todos" && f.tipo !== SIN_DECLARAR && r.tipo !== f.tipo) return false;
+  if (f.monto === SIN_DECLARAR && r.monto != null) return false;
+  if (f.monto in RANGOS_MONTO && (r.monto == null || !RANGOS_MONTO[f.monto](r.monto))) return false;
+  if (f.riesgo !== "todos" && riesgoDe(r).key !== f.riesgo) return false;
+  if (f.estado === "progreso" && completada(r)) return false;
+  if (f.estado === "completada" && !completada(r)) return false;
+  return true;
+}
 
 export function SolicitudesView() {
   const { estado, reintentar } = useEstadoDatos();
-  const [q, setQ] = useState("");
-  const [fRiesgo, setFRiesgo] = useState("todos");
-  const [fEstado, setFEstado] = useState("todos");
+  const { filtros: f, setFiltro, limpiar, hayFiltros, tamano, setTamano, setPagina, paginar } =
+    useFiltrosPaginados(FILTROS_INICIALES);
 
-  const ql = q.trim().toLowerCase();
-  const filtradas = SOLICITUDES.filter((r) => {
-    if (ql && !r.nombre.toLowerCase().includes(ql) && !r.num.toLowerCase().includes(ql)) return false;
-    if (fRiesgo !== "todos" && riesgoDe(r).key !== fRiesgo) return false;
-    if (fEstado === "progreso" && completada(r)) return false;
-    if (fEstado === "completada" && !completada(r)) return false;
-    return true;
-  });
-  const hayFiltros = !!(ql || fRiesgo !== "todos" || fEstado !== "todos");
-  const limpiar = () => {
-    setQ("");
-    setFRiesgo("todos");
-    setFEstado("todos");
-  };
+  const filtradas = SOLICITUDES.filter((r) => cumple(r, f));
+  const pag = paginar(filtradas);
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -42,42 +79,76 @@ export function SolicitudesView() {
           : "Solicitudes de onboarding recibidas desde la app móvil."}
       </Encabezado>
 
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
-        <div className="flex-[1_1_260px] sm:max-w-[380px]">
-          <label htmlFor="q" className="lbl">
-            Buscar por nombre o número
-          </label>
-          <input
-            id="q"
-            className="fld"
-            type="search"
-            placeholder="Por ejemplo, Rivas o SOL-2026-00418"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-        <div className="min-w-[180px] flex-[0_1_220px] max-sm:basis-full">
-          <label htmlFor="f-r" className="lbl">
-            Nivel de riesgo
-          </label>
-          <select id="f-r" className="fld" value={fRiesgo} onChange={(e) => setFRiesgo(e.target.value)}>
-            <option value="todos">Todos</option>
-            <option value="bajo">Bajo</option>
-            <option value="pend">Pendiente de evaluación</option>
-            <option value="sin">Sin evaluar</option>
-          </select>
-        </div>
-        <div className="min-w-[160px] flex-[0_1_200px] max-sm:basis-full">
-          <label htmlFor="f-e" className="lbl">
-            Estado
-          </label>
-          <select id="f-e" className="fld" value={fEstado} onChange={(e) => setFEstado(e.target.value)}>
-            <option value="todos">Todos</option>
-            <option value="progreso">En progreso</option>
-            <option value="completada">Completada</option>
-          </select>
-        </div>
-      </div>
+      <PanelFiltros etiqueta="solicitudes" hayFiltros={hayFiltros} onLimpiar={limpiar}>
+        <FiltroTexto
+          id="f-num"
+          label="Solicitud"
+          placeholder="Por ejemplo, SOL-2026-00418"
+          value={f.numero}
+          onChange={(v) => setFiltro("numero", v)}
+        />
+        <FiltroTexto
+          id="f-nom"
+          label="Nombre"
+          placeholder="Por ejemplo, Rivas"
+          value={f.nombre}
+          onChange={(v) => setFiltro("nombre", v)}
+        />
+        <FiltroSelect
+          id="f-fecha"
+          label="Fecha"
+          value={f.fecha}
+          onChange={(v) => setFiltro("fecha", v)}
+          opciones={[{ value: "todas", label: "Todas" }, ...FECHAS.map((x) => ({ value: x, label: x }))]}
+        />
+        <FiltroSelect
+          id="f-tipo"
+          label="Tipo de dinero"
+          value={f.tipo}
+          onChange={(v) => setFiltro("tipo", v)}
+          opciones={[
+            { value: "todos", label: "Todos" },
+            ...TIPOS.map((x) => ({ value: x, label: x })),
+            { value: SIN_DECLARAR, label: "Sin declarar" },
+          ]}
+        />
+        <FiltroSelect
+          id="f-monto"
+          label="Monto mensual"
+          value={f.monto}
+          onChange={(v) => setFiltro("monto", v)}
+          opciones={[
+            { value: "todos", label: "Todos" },
+            { value: "menos-500", label: "Menos de USD 500" },
+            { value: "500-1500", label: "USD 500 a 1,499" },
+            { value: "1500-mas", label: "USD 1,500 o más" },
+            { value: SIN_DECLARAR, label: "Sin declarar" },
+          ]}
+        />
+        <FiltroSelect
+          id="f-r"
+          label="Nivel de riesgo"
+          value={f.riesgo}
+          onChange={(v) => setFiltro("riesgo", v)}
+          opciones={[
+            { value: "todos", label: "Todos" },
+            { value: "bajo", label: "Bajo" },
+            { value: "pend", label: "Pendiente de evaluación" },
+            { value: "sin", label: "Sin evaluar" },
+          ]}
+        />
+        <FiltroSelect
+          id="f-e"
+          label="Estado"
+          value={f.estado}
+          onChange={(v) => setFiltro("estado", v)}
+          opciones={[
+            { value: "todos", label: "Todos" },
+            { value: "progreso", label: "En progreso" },
+            { value: "completada", label: "Completada" },
+          ]}
+        />
+      </PanelFiltros>
 
       <div className="tblwrap" role="table" aria-label="Solicitudes de onboarding">
         <div className="gh g-sol" role="row">
@@ -114,12 +185,12 @@ export function SolicitudesView() {
         {estado === "normal" && filtradas.length === 0 && (
           <Vacio
             titulo="No encontramos solicitudes"
-            texto="Prueba con otro nombre o número, o quita los filtros."
+            texto="Prueba con otros filtros, o quítalos para ver todas."
             onLimpiar={hayFiltros ? limpiar : undefined}
           />
         )}
         {estado === "normal" &&
-          filtradas.map((r, i) => {
+          pag.visibles.map((r, i) => {
             const rk = riesgoDe(r);
             const est = estadoSolicitud(r);
             return (
@@ -153,6 +224,18 @@ export function SolicitudesView() {
             );
           })}
       </div>
+
+      {estado === "normal" && filtradas.length > 0 && (
+        <Paginacion
+          etiqueta="solicitudes"
+          total={pag.total}
+          pagina={pag.pagina}
+          totalPaginas={pag.totalPaginas}
+          tamano={tamano}
+          onPagina={setPagina}
+          onTamano={setTamano}
+        />
+      )}
     </div>
   );
 }

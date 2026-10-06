@@ -19,7 +19,17 @@ class BackendApplicationTests {
 	void contextLoadsAndFlywayMigrated() {
 		Integer applied = jdbc.queryForObject(
 				"select count(*) from flyway_schema_history where success", Integer.class);
-		assertThat(applied).isGreaterThanOrEqualTo(1);
+		assertThat(applied).isGreaterThanOrEqualTo(2);
+	}
+
+	@Test
+	void esquemaCeibaCreado() {
+		Integer tablas = jdbc.queryForObject(
+				"select count(*) from information_schema.tables where table_schema = 'ceiba' and table_type = 'BASE TABLE'",
+				Integer.class);
+		assertThat(tablas).isEqualTo(22);
+		assertThat(jdbc.queryForObject("select ceiba.siguiente_numero_solicitud('2026-10-05T12:00:00Z')", String.class))
+				.isEqualTo("SOL-2026-00001");
 	}
 
 }

@@ -10,29 +10,40 @@ import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.context.WebApplicationContext;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dreamparking.backend.console.ConsoleRole;
 import com.jayway.jsonpath.JsonPath;
 
 /** VDI-41 / VDI-42: device and behavior signals are stored with the request and shown in the console. */
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, TestAuth.class })
 @SpringBootTest
-@AutoConfigureMockMvc
 @ActiveProfiles("dev")
 @Transactional
 class SignalsApiTests {
 
 	@Autowired
+	WebApplicationContext context;
+
+	@Autowired
+	TestAuth auth;
+
 	MockMvc mvc;
+
+	@BeforeEach
+	void signIn() {
+		mvc = auth.mockMvcAs(context, auth.user(ConsoleRole.ADMIN));
+	}
 
 	@Autowired
 	EntityManager em;

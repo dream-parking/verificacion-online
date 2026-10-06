@@ -27,6 +27,7 @@ public record CaptureSignalsRequest(
 		@Schema(description = "Tiempo por paso del formulario") @Valid @Size(max = 5) List<StepTiming> steps) {
 
 	/** Time spent on one step of the form. */
+	@Schema(name = "CaptureSignalsStepTiming")
 	public record StepTiming(@NotNull OnboardingStep step, @NotNull Instant startedAt, Instant completedAt,
 			@Min(1) Short attempts) {
 	}

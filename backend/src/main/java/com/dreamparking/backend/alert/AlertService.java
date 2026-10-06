@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.dreamparking.backend.common.InvalidInputException;
 import com.dreamparking.backend.common.InvalidStateException;
 import com.dreamparking.backend.common.NotFoundException;
-import com.dreamparking.backend.console.ConsoleUserRepository;
 
 /** Analyst inbox: ordered, filterable list of open alerts and the "take alert" action. */
 @Service
@@ -28,15 +27,11 @@ public class AlertService {
 
 	private final AlertRepository alerts;
 
-	private final ConsoleUserRepository users;
-
 	private final EntityManager entityManager;
 
-	public AlertService(AlertInboxItemRepository inbox, AlertRepository alerts, ConsoleUserRepository users,
-			EntityManager entityManager) {
+	public AlertService(AlertInboxItemRepository inbox, AlertRepository alerts, EntityManager entityManager) {
 		this.inbox = inbox;
 		this.alerts = alerts;
-		this.users = users;
 		this.entityManager = entityManager;
 	}
 
@@ -78,9 +73,6 @@ public class AlertService {
 	/** Assigns an unassigned alert to the user; two analysts taking the same alert cannot both succeed. */
 	@Transactional
 	public AlertResponse take(UUID alertId, UUID userId) {
-		users.findById(userId)
-			.filter(user -> Boolean.TRUE.equals(user.getActive()))
-			.orElseThrow(() -> new InvalidInputException("Unknown or inactive console user: " + userId));
 		if (!alerts.existsById(alertId)) {
 			throw new NotFoundException("Alert not found: " + alertId);
 		}

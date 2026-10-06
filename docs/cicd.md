@@ -37,6 +37,7 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 - Conexión: la app lee `DB_URL`, `DB_USER` y `DB_PASSWORD` (esta última es un secret de la Container App). Flyway aplica las migraciones de `backend/src/main/resources/db/migration` al arrancar.
 - Imagen: `ghcr.io/dream-parking/verificacion-online-backend` (tags `<sha>`, `dev`, `qa`). Es **pública** para que Azure la descargue sin credenciales sin necesitar un Container Registry (de pago).
 - Deploy: `backend-deploy.yml` hace test, build, push, login OIDC con la identidad `sp-verificaciononline-github` (Contributor solo sobre `rg-verificaciononline`), actualiza la Container App y corre un smoke test a `/actuator/health/liveness`.
+- Esquema: las tablas de dominio viven en el esquema `ceiba` (`V2__esquema_ceiba.sql`). Requiere la extensión `pg_trgm`: en el servidor, Server parameters → `azure.extensions` debe incluir `PG_TRGM`, o la migración falla al arrancar.
 - Local: `docker compose up -d` en `backend/` y `./mvnw spring-boot:run`; o `./mvnw spring-boot:test-run` con Postgres desechable.
 
 ### Paso manual único: hacer público el paquete

@@ -67,6 +67,20 @@ La primera vez tarda varios minutos. Con la app abierta, en la terminal:
 | `R` | Reiniciar la app |
 | `q` | Salir |
 
+### ¿A qué API se conecta?
+
+Por defecto la app usa la API de **Dev** (`https://api.dev.identidad.alambritos.online`), así que no hace falta levantar el backend. La primera petición puede tardar hasta un minuto si el servidor estaba dormido.
+
+Para usar la API de **QA**:
+```bash
+flutter run --dart-define=APP_ENV=qa
+```
+
+Para usar el backend corriendo en tu Mac (desde el emulador de Android, `10.0.2.2` es tu Mac):
+```bash
+flutter run --dart-define=API_URL=http://10.0.2.2:8080
+```
+
 ## 5. Ver los cambios nuevos del equipo
 
 Después de que se fusione un PR a `main`:

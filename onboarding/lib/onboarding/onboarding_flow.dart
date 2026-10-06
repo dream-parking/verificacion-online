@@ -1,0 +1,801 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../env.dart';
+import '../theme.dart';
+import 'solicitud.dart';
+import 'widgets.dart';
+
+/// Flujo de apertura de cuenta: bienvenida → privacidad → 4 pasos → confirmación.
+class OnboardingFlow extends StatefulWidget {
+  const OnboardingFlow({
+    super.key,
+    this.simularErrorDeConexion = false,
+    this.demoraEnvio = const Duration(milliseconds: 1400),
+  });
+
+  /// Hace fallar el primer envío para mostrar el estado de error de conexión.
+  final bool simularErrorDeConexion;
+  final Duration demoraEnvio;
+
+  @override
+  State<OnboardingFlow> createState() => _OnboardingFlowState();
+}
+
+class _OnboardingFlowState extends State<OnboardingFlow> {
+  static const _siguiente = {
+    Pantalla.bienvenida: Pantalla.privacidad,
+    Pantalla.privacidad: Pantalla.basicos,
+    Pantalla.basicos: Pantalla.ingresos,
+    Pantalla.ingresos: Pantalla.movimiento,
+    Pantalla.movimiento: Pantalla.revision,
+  };
+  static const _anterior = {
+    Pantalla.privacidad: Pantalla.bienvenida,
+    Pantalla.basicos: Pantalla.privacidad,
+    Pantalla.ingresos: Pantalla.basicos,
+    Pantalla.movimiento: Pantalla.ingresos,
+    Pantalla.revision: Pantalla.movimiento,
+  };
+  static const _paso = {
+    Pantalla.basicos: 1,
+    Pantalla.ingresos: 2,
+    Pantalla.movimiento: 3,
+    Pantalla.revision: 4,
+  };
+  static const _numeroSolicitud = 'SOL-2026-00418';
+
+  final _scroll = ScrollController();
+  final _nombres = TextEditingController();
+  final _apellidos = TextEditingController();
+  final _dui = TextEditingController();
+  final _tel = TextEditingController();
+  final _monto = TextEditingController();
+
+  var _s = Solicitud();
+  var _pantalla = Pantalla.bienvenida;
+  final _intentado = <Pantalla>{};
+  var _enviando = false;
+  var _errorConexion = false;
+  var _intentos = 0;
+  var _copiado = false;
+
+  @override
+  void dispose() {
+    for (final c in [_scroll, _nombres, _apellidos, _dui, _tel, _monto]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _ir(Pantalla p) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _pantalla = p;
+      _errorConexion = false;
+    });
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  void _continuar() {
+    if (_pantalla == Pantalla.revision) {
+      _enviar();
+      return;
+    }
+    if (!_s.pantallaValida(_pantalla)) {
+      setState(() => _intentado.add(_pantalla));
+      return;
+    }
+    _ir(_siguiente[_pantalla]!);
+  }
+
+  Future<void> _enviar() async {
+    setState(() {
+      _enviando = true;
+      _errorConexion = false;
+    });
+    // TODO: reemplazar por la llamada al backend cuando exista el endpoint.
+    await Future<void>.delayed(widget.demoraEnvio);
+    if (!mounted) return;
+    if (widget.simularErrorDeConexion && _intentos == 0) {
+      setState(() {
+        _enviando = false;
+        _errorConexion = true;
+        _intentos = 1;
+      });
+    } else {
+      setState(() => _enviando = false);
+      _ir(Pantalla.confirmacion);
+    }
+  }
+
+  void _reiniciar() {
+    for (final c in [_nombres, _apellidos, _dui, _tel, _monto]) {
+      c.clear();
+    }
+    setState(() {
+      _s = Solicitud();
+      _intentado.clear();
+      _intentos = 0;
+      _copiado = false;
+    });
+    _ir(Pantalla.bienvenida);
+  }
+
+  /// Error visible de un campo: solo después de intentar continuar en esa pantalla.
+  String _error(String campo) {
+    if (!_intentado.contains(_pantalla) || !Solicitud.camposDe(_pantalla).contains(campo)) return '';
+    return _s.mensajes()[campo]!;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final anterior = _anterior[_pantalla];
+    final paso = _paso[_pantalla];
+
+    // En Android el botón "atrás" del sistema regresa al paso anterior en vez de cerrar la app.
+    return PopScope(
+      canPop: anterior == null && !_enviando,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && anterior != null && !_enviando) _ir(anterior);
+      },
+      child: Scaffold(
+        body: SafeArea(
+          bottom: false,
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  _encabezado(anterior),
+                  if (paso != null) ProgresoPasos(paso: paso),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: _scroll,
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: KeyedSubtree(key: ValueKey(_pantalla), child: _contenido()),
+                      ),
+                    ),
+                  ),
+                  if (_pantalla != Pantalla.confirmacion) _barraAccion(),
+                ],
+              ),
+              if (_enviando) const _Cargando(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _encabezado(Pantalla? anterior) {
+    return SizedBox(
+      height: 60,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 8, right: 12),
+        child: Row(
+          children: [
+            if (anterior != null)
+              IconButton(
+                tooltip: 'Volver al paso anterior',
+                onPressed: () => _ir(anterior),
+                icon: const Icon(Icons.arrow_back_ios_new, size: 22, color: AppColors.ink),
+              )
+            else
+              const SizedBox(width: 12),
+            const SizedBox(width: 4),
+            const Logo(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _barraAccion() {
+    final texto = switch (_pantalla) {
+      Pantalla.bienvenida => 'Empezar',
+      Pantalla.revision => 'Enviar solicitud',
+      _ => 'Continuar',
+    };
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 12, 24, 20 + MediaQuery.paddingOf(context).bottom),
+      child: BotonPrimario(texto: texto, onPressed: _enviando ? null : _continuar),
+    );
+  }
+
+  Widget _contenido() => switch (_pantalla) {
+        Pantalla.bienvenida => const _Bienvenida(),
+        Pantalla.privacidad => _privacidad(),
+        Pantalla.basicos => _basicos(),
+        Pantalla.ingresos => _ingresos(),
+        Pantalla.movimiento => _movimiento(),
+        Pantalla.revision => _revision(),
+        Pantalla.confirmacion => _confirmacion(),
+      };
+
+  // ---------------------------------------------------------------- 2. Privacidad
+
+  Widget _privacidad() {
+    final error = _error('aceptado');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _EtiquetaProvisional(),
+          const SizedBox(height: 14),
+          const Titulo('Cuidamos tu cuenta desde el primer paso'),
+          const SizedBox(height: 12),
+          const Text(
+            'Mientras llenas tu solicitud, recopilamos algunos datos para protegerte contra el fraude:',
+            style: AppText.body,
+          ),
+          const SizedBox(height: 20),
+          for (final (icono, titulo, desc) in const [
+            (
+              Icons.place_outlined,
+              'Tu ubicación aproximada',
+              'La ciudad desde donde haces la solicitud, no tu dirección exacta.'
+            ),
+            (
+              Icons.smartphone_outlined,
+              'El tipo de dispositivo',
+              'Modelo de teléfono y sistema, para reconocer si es el mismo en otra ocasión.'
+            ),
+            (
+              Icons.touch_app_outlined,
+              'Cómo usas la aplicación',
+              'Por ejemplo, el tiempo que tardas en cada paso y tu ritmo al escribir.'
+            ),
+          ]) ...[
+            FilaIcono(
+              leading: Icon(icono, size: 32, color: AppColors.blue),
+              titulo: titulo,
+              descripcion: desc,
+            ),
+            const SizedBox(height: 16),
+          ],
+          const SizedBox(height: 8),
+          const Text('Solo usamos esta información para proteger tu cuenta.', style: AppText.body),
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: () => setState(() => _s.aceptado = !_s.aceptado),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 56),
+              child: Row(
+                children: [
+                  Transform.scale(
+                    scale: 1.3,
+                    child: Checkbox(
+                      value: _s.aceptado,
+                      onChanged: (v) => setState(() => _s.aceptado = v ?? false),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('He leído y acepto el aviso de privacidad.', style: AppText.body)),
+                ],
+              ),
+            ),
+          ),
+          if (error.isNotEmpty) TextoError(error),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------- 3. Datos básicos
+
+  Widget _basicos() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+      child: AutofillGroup(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Titulo('Cuéntanos quién eres'),
+            const SizedBox(height: 20),
+            CampoTexto(
+              controller: _nombres,
+              etiqueta: 'Nombres',
+              placeholder: 'Por ejemplo, Marta Alejandra',
+              autofill: const [AutofillHints.givenName],
+              error: _error('nombres'),
+              onChanged: (v) => setState(() => _s.nombres = v),
+            ),
+            const SizedBox(height: 20),
+            CampoTexto(
+              controller: _apellidos,
+              etiqueta: 'Apellidos',
+              placeholder: 'Por ejemplo, Rivas Cruz',
+              autofill: const [AutofillHints.familyName],
+              error: _error('apellidos'),
+              onChanged: (v) => setState(() => _s.apellidos = v),
+            ),
+            const SizedBox(height: 20),
+            CampoTexto(
+              controller: _dui,
+              etiqueta: 'Número de DUI',
+              placeholder: '00000000-0',
+              teclado: TextInputType.number,
+              formatters: [mascara(formatearDui)],
+              error: _error('dui'),
+              onChanged: (v) => setState(() => _s.dui = v),
+            ),
+            const SizedBox(height: 20),
+            CampoTexto(
+              controller: _tel,
+              etiqueta: 'Teléfono celular',
+              placeholder: '0000-0000',
+              teclado: TextInputType.phone,
+              autofill: const [AutofillHints.telephoneNumberNational],
+              formatters: [mascara(formatearTel)],
+              error: _error('tel'),
+              onChanged: (v) => setState(() => _s.tel = v),
+            ),
+            if (appEnv != 'prod') ...[
+              const SizedBox(height: 12),
+              BotonEnlace(texto: 'Rellenar con datos de ejemplo (demo)', onPressed: _rellenarDemo),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _rellenarDemo() {
+    _nombres.text = 'Marta Alejandra';
+    _apellidos.text = 'Rivas Cruz';
+    _dui.text = '04812377-5';
+    _tel.text = '7845-2310';
+    setState(() {
+      _s
+        ..nombres = _nombres.text
+        ..apellidos = _apellidos.text
+        ..dui = _dui.text
+        ..tel = _tel.text;
+    });
+  }
+
+  // ---------------------------------------------------------------- 4. Ingresos
+
+  Widget _ingresos() {
+    final errOrigen = _error('origen');
+    final errNivel = _error('nivel');
+    return Column(
+      children: [
+        const Cabecera(
+          color: AppColors.skyblue,
+          eyebrow: 'Tus ingresos',
+          titulo: '¿De dónde viene tu dinero?',
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Aviso(
+                destacado: '¿Por qué lo preguntamos?',
+                texto: 'La ley exige que el banco conozca el origen de tus ingresos. '
+                    'Se llama «Conozca a su Cliente».',
+              ),
+              const SizedBox(height: 24),
+              const Subtitulo('Origen de tus ingresos'),
+              const SizedBox(height: 12),
+              ..._opciones(origenesIngreso, _s.origen, (v) => _s.origen = v),
+              if (errOrigen.isNotEmpty) TextoError(errOrigen),
+              const SizedBox(height: 28),
+              const Subtitulo('¿Cuánto ganas al mes?'),
+              const SizedBox(height: 12),
+              ..._opciones(nivelesIngreso, _s.nivel, (v) => _s.nivel = v),
+              if (errNivel.isNotEmpty) TextoError(errNivel),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _opciones(List<Opcion> lista, String actual, void Function(String) elegir) {
+    return [
+      for (final o in lista)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: OpcionTarjeta(
+            titulo: o.etiqueta,
+            descripcion: o.descripcion,
+            seleccionada: actual == o.valor,
+            onTap: () => setState(() => elegir(o.valor)),
+          ),
+        ),
+    ];
+  }
+
+  // ---------------------------------------------------------------- 5. Movimiento esperado
+
+  Widget _movimiento() {
+    final errTipo = _error('tipo');
+    final errMonto = _error('monto');
+    return Column(
+      children: [
+        const Cabecera(
+          color: AppColors.pink,
+          eyebrow: 'El dinero de tu cuenta',
+          titulo: '¿Qué dinero pasará por esta cuenta?',
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Aviso(
+                destacado: 'No es lo mismo que tus ingresos.',
+                texto: 'Aquí nos dices qué dinero esperas mover en esta cuenta cada mes.',
+              ),
+              const SizedBox(height: 24),
+              const Subtitulo('Tipo de dinero que manejarás'),
+              const SizedBox(height: 12),
+              ..._opciones(tiposMovimiento, _s.tipo, (v) => _s.tipo = v),
+              if (errTipo.isNotEmpty) TextoError(errTipo),
+              const SizedBox(height: 28),
+              const Subtitulo('Monto mensual estimado'),
+              const SizedBox(height: 4),
+              const Text(
+                'Un cálculo aproximado de lo que moverás en un mes, en dólares.',
+                style: AppText.small,
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text('USD', style: AppText.heading(20, color: AppColors.muted)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: CampoTexto(
+                      controller: _monto,
+                      placeholder: 'Por ejemplo, 320',
+                      teclado: TextInputType.number,
+                      formatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(7),
+                      ],
+                      error: '',
+                      onChanged: (v) => setState(() => _s.monto = v),
+                    ),
+                  ),
+                ],
+              ),
+              if (errMonto.isNotEmpty) TextoError(errMonto),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------- 6. Revisión
+
+  Widget _revision() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Titulo('Revisa tu solicitud'),
+          const SizedBox(height: 6),
+          const Text('Si algo no está bien, puedes corregirlo antes de enviar.', style: AppText.bodyMuted),
+          const SizedBox(height: 20),
+          if (_errorConexion) ...[
+            _ErrorConexion(onReintentar: _enviar),
+            const SizedBox(height: 20),
+          ],
+          _Resumen(
+            titulo: 'Datos básicos',
+            semanticaEditar: 'Editar datos básicos',
+            linea1: _s.nombreCompleto,
+            linea2: 'DUI ${_s.dui} · Cel. ${_s.tel}',
+            onEditar: () => _ir(Pantalla.basicos),
+          ),
+          const SizedBox(height: 14),
+          _Resumen(
+            titulo: 'Tus ingresos',
+            semanticaEditar: 'Editar ingresos',
+            linea1: etiquetaDe(origenesIngreso, _s.origen),
+            linea2: '${etiquetaDe(nivelesIngreso, _s.nivel)} al mes',
+            onEditar: () => _ir(Pantalla.ingresos),
+          ),
+          const SizedBox(height: 14),
+          _Resumen(
+            titulo: 'Dinero de tu cuenta',
+            semanticaEditar: 'Editar movimiento esperado',
+            linea1: etiquetaDe(tiposMovimiento, _s.tipo),
+            linea2: 'Aprox. USD ${formatearMonto(_s.monto)} al mes',
+            onEditar: () => _ir(Pantalla.movimiento),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------- 7. Confirmación
+
+  Widget _confirmacion() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 16, 24, 32 + MediaQuery.paddingOf(context).bottom),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: const BoxDecoration(color: AppColors.yellow, shape: BoxShape.circle),
+            child: const Icon(Icons.check_rounded, size: 40, color: AppColors.ink),
+          ),
+          const SizedBox(height: 20),
+          const Titulo('¡Recibimos tu solicitud!', size: 32),
+          const SizedBox(height: 8),
+          const Text('Te avisaremos cuando tu cuenta esté lista.', style: AppText.body),
+          const SizedBox(height: 20),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.neutral100,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Tu número de solicitud', style: AppText.label),
+                const SizedBox(height: 2),
+                Text(
+                  _numeroSolicitud,
+                  style: AppText.heading(28).copyWith(letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 12),
+                Semantics(
+                  liveRegion: true,
+                  child: BotonSecundario(
+                    texto: _copiado ? '¡Número copiado!' : 'Copiar número',
+                    onPressed: () async {
+                      await Clipboard.setData(const ClipboardData(text: _numeroSolicitud));
+                      if (mounted) setState(() => _copiado = true);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Subtitulo('¿Qué sigue?', size: 20),
+          const SizedBox(height: 12),
+          for (final (i, t) in const [
+            (1, 'Revisamos tu solicitud con calma.'),
+            (2, 'Te avisaremos cuando tu cuenta esté lista.'),
+            (3, 'Guarda tu número de solicitud por si necesitas consultarlo.'),
+          ]) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Numero(i, size: 28),
+                const SizedBox(width: 12),
+                Expanded(child: Text(t, style: AppText.body)),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 16),
+          const Divider(color: AppColors.border, height: 1),
+          const SizedBox(height: 12),
+          Center(child: BotonEnlace(texto: 'Volver al inicio', onPressed: _reiniciar)),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- 1. Bienvenida
+
+class _Bienvenida extends StatelessWidget {
+  const _Bienvenida();
+
+  static const _pasos = [
+    ('Datos básicos', 'Tu nombre, DUI y celular.'),
+    ('Tus ingresos', 'De dónde viene tu dinero y cuánto ganas.'),
+    ('El dinero de tu cuenta', 'Qué dinero esperas mover cada mes.'),
+    ('Revisar y enviar', 'Confirmas todo antes de mandarlo.'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          color: AppColors.orange,
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Abre tu cuenta en línea', style: AppText.heading(16).copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              Semantics(
+                header: true,
+                child: Text('Tu cuenta, desde tu teléfono.', style: AppText.heading(36, height: 1.1)),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Sin filas y sin ir a una agencia. Te toma unos 5 minutos.',
+                style: TextStyle(fontSize: 18, height: 26 / 18, color: AppColors.ink),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: const ShapeDecoration(color: Colors.white, shape: StadiumBorder()),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.schedule, size: 20, color: AppColors.ink),
+                    const SizedBox(width: 8),
+                    Text('Unos 5 minutos', style: AppText.heading(16)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Subtitulo('Esto es lo que te vamos a pedir', size: 22),
+              const SizedBox(height: 16),
+              for (var i = 0; i < _pasos.length; i++) ...[
+                FilaIcono(leading: Numero(i + 1), titulo: _pasos[i].$1, descripcion: _pasos[i].$2),
+                const SizedBox(height: 14),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EtiquetaProvisional extends StatelessWidget {
+  const _EtiquetaProvisional();
+
+  @override
+  Widget build(BuildContext context) {
+    // Recuadro punteado del diseño; se aproxima con borde sólido gris.
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.muted),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Text('Texto provisional · pendiente de revisión legal', style: AppText.small),
+    );
+  }
+}
+
+class _Resumen extends StatelessWidget {
+  const _Resumen({
+    required this.titulo,
+    required this.semanticaEditar,
+    required this.linea1,
+    required this.linea2,
+    required this.onEditar,
+  });
+
+  final String titulo;
+  final String semanticaEditar;
+  final String linea1;
+  final String linea2;
+  final VoidCallback onEditar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: Subtitulo(titulo)),
+              BotonEnlace(texto: 'Editar', semanticLabel: semanticaEditar, onPressed: onEditar),
+            ],
+          ),
+          Text(linea1, style: AppText.body),
+          Text(linea2, style: AppText.bodyMuted),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorConexion extends StatelessWidget {
+  const _ErrorConexion({required this.onReintentar});
+
+  final VoidCallback onReintentar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.errorBg,
+          border: Border.all(color: AppColors.error, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('No pudimos enviar tu solicitud', style: TextStyle(
+              fontSize: 16, height: 1.5, fontWeight: FontWeight.w700, color: AppColors.errorDark,
+            )),
+            const SizedBox(height: 2),
+            const Text(
+              'Parece que se perdió la conexión. Tus datos siguen aquí. Revisa tu internet e inténtalo de nuevo.',
+              style: AppText.body,
+            ),
+            const SizedBox(height: 12),
+            BotonSecundario(texto: 'Reintentar', onPressed: onReintentar),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Cargando extends StatelessWidget {
+  const _Cargando();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.white.withValues(alpha: 0.92),
+        child: Semantics(
+          liveRegion: true,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(
+                  strokeWidth: 5,
+                  color: AppColors.blue,
+                  backgroundColor: AppColors.border,
+                  strokeCap: StrokeCap.round,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Enviando tu solicitud…', style: AppText.heading(20)),
+              const SizedBox(height: 16),
+              const Text('No cierres la aplicación.', style: AppText.bodyMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

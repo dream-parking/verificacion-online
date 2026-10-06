@@ -23,4 +23,4 @@ Cada recurso creado se registra en [`azure-resources.csv`](azure-resources.csv).
 
 - Container Apps (consumo, escala a cero) y el registro en GHCR público: 0 USD dentro de la franja gratis.
 - Se evitó Azure Container Registry (causa del costo de jul-ago: 2.85 USD).
-- PostgreSQL Flexible Server B1ms 32 GiB: **costo condicionado**, ver `docs/cicd.md`.
+- PostgreSQL Flexible Server B1ms 32 GiB: 0 USD verificado (oferta gratis de 12 meses aplicada), ver `docs/cicd.md`.

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../api/onboarding_api.dart';
 import '../env.dart';
 import '../theme.dart';
+import 'aviso_privacidad.dart';
 import 'solicitud.dart';
 import 'widgets.dart';
 
@@ -10,9 +12,13 @@ import 'widgets.dart';
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({
     super.key,
+    this.api,
     this.simularErrorDeConexion = false,
     this.demoraEnvio = const Duration(milliseconds: 1400),
   });
+
+  /// Cliente de la API; los tests pasan uno falso.
+  final OnboardingApi? api;
 
   /// Hace fallar el primer envío para mostrar el estado de error de conexión.
   final bool simularErrorDeConexion;
@@ -52,10 +58,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   final _tel = TextEditingController();
   final _monto = TextEditingController();
 
+  late final OnboardingApi _api = widget.api ?? OnboardingApi();
   var _s = Solicitud();
   var _pantalla = Pantalla.bienvenida;
   final _intentado = <Pantalla>{};
   var _enviando = false;
+  var _preparando = false;
+  String? _errorInicio;
   var _errorConexion = false;
   var _intentos = 0;
   var _copiado = false;
@@ -73,6 +82,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     setState(() {
       _pantalla = p;
       _errorConexion = false;
+      _errorInicio = null;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
@@ -86,7 +96,38 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       setState(() => _intentado.add(_pantalla));
       return;
     }
+    if (_pantalla == Pantalla.privacidad && !_s.capturaPermitida) {
+      _iniciarSolicitud();
+      return;
+    }
     _ir(_siguiente[_pantalla]!);
+  }
+
+  bool get _ocupado => _enviando || _preparando;
+
+  /// Crea la solicitud en el backend al aceptar el aviso. Hasta este momento no se captura nada.
+  Future<void> _iniciarSolicitud() async {
+    setState(() {
+      _preparando = true;
+      _errorInicio = null;
+    });
+    try {
+      final id = await _api.iniciarSolicitud();
+      if (!mounted) return;
+      setState(() {
+        _s
+          ..id = id
+          ..avisoAceptadoEn = DateTime.now();
+        _preparando = false;
+      });
+      _ir(Pantalla.basicos);
+    } on ApiException {
+      if (!mounted) return;
+      setState(() {
+        _preparando = false;
+        _errorInicio = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+      });
+    }
   }
 
   Future<void> _enviar() async {
@@ -116,6 +157,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     setState(() {
       _s = Solicitud();
       _intentado.clear();
+      _errorInicio = null;
       _intentos = 0;
       _copiado = false;
     });
@@ -135,9 +177,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
     // En Android el botón "atrás" del sistema regresa al paso anterior en vez de cerrar la app.
     return PopScope(
-      canPop: anterior == null && !_enviando,
+      canPop: anterior == null && !_ocupado,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && anterior != null && !_enviando) _ir(anterior);
+        if (!didPop && anterior != null && !_ocupado) _ir(anterior);
       },
       child: Scaffold(
         body: SafeArea(
@@ -161,7 +203,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   if (_pantalla != Pantalla.confirmacion) _barraAccion(),
                 ],
               ),
-              if (_enviando) const _Cargando(),
+              if (_enviando)
+                const _Cargando(titulo: 'Enviando tu solicitud…', detalle: 'No cierres la aplicación.'),
+              if (_preparando)
+                const _Cargando(titulo: 'Preparando tu solicitud…', detalle: 'Esto puede tardar unos segundos.'),
             ],
           ),
         ),
@@ -176,7 +221,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         padding: const EdgeInsets.only(left: 8, right: 12),
         child: Row(
           children: [
-            if (anterior != null)
+            if (anterior != null && !_ocupado)
               IconButton(
                 tooltip: 'Volver al paso anterior',
                 onPressed: () => _ir(anterior),
@@ -204,7 +249,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       padding: EdgeInsets.fromLTRB(24, 12, 24, 20 + MediaQuery.paddingOf(context).bottom),
-      child: BotonPrimario(texto: texto, onPressed: _enviando ? null : _continuar),
+      child: BotonPrimario(texto: texto, onPressed: _ocupado ? null : _continuar),
     );
   }
 
@@ -222,37 +267,21 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   Widget _privacidad() {
     final error = _error('aceptado');
+    final yaAceptado = _s.capturaPermitida;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _EtiquetaProvisional(),
-          const SizedBox(height: 14),
-          const Titulo('Cuidamos tu cuenta desde el primer paso'),
+          if (AvisoPrivacidad.esProvisional) ...[
+            const _EtiquetaProvisional(),
+            const SizedBox(height: 14),
+          ],
+          const Titulo(AvisoPrivacidad.titulo),
           const SizedBox(height: 12),
-          const Text(
-            'Mientras llenas tu solicitud, recopilamos algunos datos para protegerte contra el fraude:',
-            style: AppText.body,
-          ),
+          const Text(AvisoPrivacidad.introduccion, style: AppText.body),
           const SizedBox(height: 20),
-          for (final (icono, titulo, desc) in const [
-            (
-              Icons.place_outlined,
-              'Tu ubicación aproximada',
-              'La ciudad desde donde haces la solicitud, no tu dirección exacta.'
-            ),
-            (
-              Icons.smartphone_outlined,
-              'El tipo de dispositivo',
-              'Modelo de teléfono y sistema, para reconocer si es el mismo en otra ocasión.'
-            ),
-            (
-              Icons.touch_app_outlined,
-              'Cómo usas la aplicación',
-              'Por ejemplo, el tiempo que tardas en cada paso y tu ritmo al escribir.'
-            ),
-          ]) ...[
+          for (final (icono, titulo, desc) in AvisoPrivacidad.senales) ...[
             FilaIcono(
               leading: Icon(icono, size: 32, color: AppColors.blue),
               titulo: titulo,
@@ -261,10 +290,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             const SizedBox(height: 16),
           ],
           const SizedBox(height: 8),
-          const Text('Solo usamos esta información para proteger tu cuenta.', style: AppText.body),
+          const Text(AvisoPrivacidad.cierre, style: AppText.body),
           const SizedBox(height: 16),
+          // Una vez creada la solicitud el consentimiento ya se registró: no se puede desmarcar.
           InkWell(
-            onTap: () => setState(() => _s.aceptado = !_s.aceptado),
+            onTap: yaAceptado ? null : () => setState(() => _s.aceptado = !_s.aceptado),
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 56),
               child: Row(
@@ -273,16 +303,24 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     scale: 1.3,
                     child: Checkbox(
                       value: _s.aceptado,
-                      onChanged: (v) => setState(() => _s.aceptado = v ?? false),
+                      onChanged: yaAceptado ? null : (v) => setState(() => _s.aceptado = v ?? false),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(child: Text('He leído y acepto el aviso de privacidad.', style: AppText.body)),
+                  const Expanded(child: Text(AvisoPrivacidad.aceptacion, style: AppText.body)),
                 ],
               ),
             ),
           ),
           if (error.isNotEmpty) TextoError(error),
+          if (_errorInicio != null) ...[
+            const SizedBox(height: 16),
+            _ErrorConexion(
+              titulo: 'No pudimos iniciar tu solicitud',
+              mensaje: _errorInicio!,
+              onReintentar: _iniciarSolicitud,
+            ),
+          ],
         ],
       ),
     );
@@ -489,7 +527,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           const Text('Si algo no está bien, puedes corregirlo antes de enviar.', style: AppText.bodyMuted),
           const SizedBox(height: 20),
           if (_errorConexion) ...[
-            _ErrorConexion(onReintentar: _enviar),
+            _ErrorConexion(
+              titulo: 'No pudimos enviar tu solicitud',
+              mensaje: 'Parece que se perdió la conexión. Tus datos siguen aquí. '
+                  'Revisa tu internet e inténtalo de nuevo.',
+              onReintentar: _enviar,
+            ),
             const SizedBox(height: 20),
           ],
           _Resumen(
@@ -729,8 +772,10 @@ class _Resumen extends StatelessWidget {
 }
 
 class _ErrorConexion extends StatelessWidget {
-  const _ErrorConexion({required this.onReintentar});
+  const _ErrorConexion({required this.titulo, required this.mensaje, required this.onReintentar});
 
+  final String titulo;
+  final String mensaje;
   final VoidCallback onReintentar;
 
   @override
@@ -748,14 +793,11 @@ class _ErrorConexion extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('No pudimos enviar tu solicitud', style: TextStyle(
+            Text(titulo, style: const TextStyle(
               fontSize: 16, height: 1.5, fontWeight: FontWeight.w700, color: AppColors.errorDark,
             )),
             const SizedBox(height: 2),
-            const Text(
-              'Parece que se perdió la conexión. Tus datos siguen aquí. Revisa tu internet e inténtalo de nuevo.',
-              style: AppText.body,
-            ),
+            Text(mensaje, style: AppText.body),
             const SizedBox(height: 12),
             BotonSecundario(texto: 'Reintentar', onPressed: onReintentar),
           ],
@@ -766,7 +808,10 @@ class _ErrorConexion extends StatelessWidget {
 }
 
 class _Cargando extends StatelessWidget {
-  const _Cargando();
+  const _Cargando({required this.titulo, required this.detalle});
+
+  final String titulo;
+  final String detalle;
 
   @override
   Widget build(BuildContext context) {
@@ -789,9 +834,9 @@ class _Cargando extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Enviando tu solicitud…', style: AppText.heading(20)),
+              Text(titulo, style: AppText.heading(20)),
               const SizedBox(height: 16),
-              const Text('No cierres la aplicación.', style: AppText.bodyMuted),
+              Text(detalle, style: AppText.bodyMuted),
             ],
           ),
         ),

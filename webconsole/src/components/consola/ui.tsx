@@ -40,9 +40,9 @@ export function KeyValue({ items, className = "" }: { items: Par[]; className?: 
   );
 }
 
-export function Cargando({ etiqueta, minWidth, anchos, grid }: { etiqueta: string; minWidth: number; anchos: string[]; grid: string }) {
+export function Cargando({ etiqueta, anchos, grid, className = "" }: { etiqueta: string; anchos: string[]; grid: string; className?: string }) {
   return (
-    <div role="status" aria-label={`Cargando ${etiqueta}`} style={{ minWidth }}>
+    <div role="status" aria-label={`Cargando ${etiqueta}`} className={className}>
       {[1, 2, 3, 4, 5, 6].map((i) => (
         <div key={i} className={`gr ${grid} min-w-0`}>
           {anchos.map((w, j) => (

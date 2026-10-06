@@ -41,7 +41,7 @@ export default async function DetalleSolicitudPage({ params }: PageProps<"/solic
   const d = detalleDe(r);
 
   return (
-    <div className="flex min-w-0 flex-col gap-5">
+    <div className="anim-escalonado flex min-w-0 flex-col gap-5">
       <div>
         <Link href="/solicitudes" className="btn2">
           ‹ Volver a solicitudes
@@ -50,7 +50,7 @@ export default async function DetalleSolicitudPage({ params }: PageProps<"/solic
 
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div>
-          <h1 className="mt-0 mb-1 font-display text-[30px] leading-[1.1] font-extrabold">{r.nombre}</h1>
+          <h1 className="mt-0 mb-1 font-display text-[26px] leading-[1.1] font-extrabold md:text-[30px]">{r.nombre}</h1>
           <div className="text-base leading-6 text-ink-soft">
             Solicitud <strong className="text-ink">{d.numero}</strong> · {d.fecha}
           </div>
@@ -61,7 +61,7 @@ export default async function DetalleSolicitudPage({ params }: PageProps<"/solic
         </div>
       </div>
 
-      <div className="flex flex-wrap items-stretch gap-5">
+      <div className="anim-escalonado flex flex-wrap items-stretch gap-5">
         <Tarjeta id="h-basicos" titulo="Datos básicos" className="flex-[1_1_420px]">
           <KeyValue items={d.basicos} />
         </Tarjeta>
@@ -126,10 +126,10 @@ export default async function DetalleSolicitudPage({ params }: PageProps<"/solic
       </Tarjeta>
 
       <Tarjeta id="h-tl" titulo="Línea de tiempo">
-        <ol className="m-0 flex list-none flex-col p-0">
+        <ol className="anim-escalonado m-0 flex list-none flex-col p-0">
           {d.timeline.map((e) => (
-            <li key={e.t + e.e} className="flex min-h-10 items-center gap-3.5">
-              <time className="flex-[0_0_150px] text-sm leading-5 text-ink-soft tabular-nums">{e.t}</time>
+            <li key={e.t + e.e} className="grid min-h-10 grid-cols-[12px_1fr] items-center gap-x-3.5 py-1.5 sm:flex sm:py-0">
+              <time className="col-start-2 text-sm leading-5 sm:flex-[0_0_150px] text-ink-soft tabular-nums">{e.t}</time>
               <span className="size-3 flex-none rounded-full bg-blue" aria-hidden="true" />
               <span className="text-[15px] leading-[22px]">{e.e}</span>
             </li>

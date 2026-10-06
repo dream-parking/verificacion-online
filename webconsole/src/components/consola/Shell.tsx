@@ -40,7 +40,9 @@ function SelectorRol({ id, oscuro = false }: { id: string; oscuro?: boolean }) {
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { usuario, alertas } = useConsola();
+  // menuAbierto: menú desplegable en móvil y tableta. colapsado: barra lateral oculta en escritorio.
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [colapsado, setColapsado] = useState(false);
   const sinAsignar = alertas.filter((x) => x.estado === "Sin asignar").length;
 
   // En pantallas pequeñas el menú lateral se cierra con Escape.
@@ -64,60 +66,75 @@ export function Shell({ children }: { children: ReactNode }) {
         <div className="anim-aparecer fixed inset-0 z-40 bg-black/40 lg:hidden" aria-hidden="true" onClick={() => setMenuAbierto(false)} />
       )}
 
-      {/* Barra lateral: fija en escritorio, desplegable en móvil y tableta */}
+      {/* Barra lateral: fija en escritorio (se puede ocultar), desplegable en móvil y tableta.
+          El contenido interior mantiene su ancho para no reacomodarse mientras se anima. */}
       <nav
         id="menu-principal"
         aria-label="Navegación principal"
-        className={`fixed inset-y-0 left-0 z-50 flex w-[248px] flex-col overflow-y-auto bg-dark text-white transition-[transform,visibility] duration-300 ease-out-soft lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:flex-none lg:translate-x-0 lg:visible ${
+        className={`fixed inset-y-0 left-0 z-50 w-[248px] overflow-hidden bg-dark text-white transition-[transform,visibility,width] duration-300 ease-out-soft lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:flex-none lg:translate-x-0 ${
           menuAbierto ? "visible translate-x-0" : "invisible -translate-x-full"
-        }`}
+        } ${colapsado ? "lg:invisible lg:w-0" : "lg:visible"}`}
       >
-        <div className="flex items-center justify-between px-5 pt-[22px] pb-6">
-          <Logo />
-          <button
-            type="button"
-            className="flex size-11 items-center justify-center rounded-full text-white hover:bg-dark-hover lg:hidden"
-            aria-label="Cerrar menú"
-            onClick={() => setMenuAbierto(false)}
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          {nav.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className="nav-item"
-              aria-current={pathname.startsWith(n.href) ? "page" : undefined}
+        <div className="flex h-full w-[248px] flex-col overflow-y-auto">
+          <div className="flex items-center justify-between px-5 pt-[22px] pb-6">
+            <Logo />
+            <button
+              type="button"
+              className="flex size-11 items-center justify-center rounded-full text-white hover:bg-dark-hover lg:hidden"
+              aria-label="Cerrar menú"
               onClick={() => setMenuAbierto(false)}
             >
-              <span>{n.label}</span>
-              {n.badge > 0 && (
-                <span key={n.badge} className="nav-badge anim-rebote" aria-label={`${n.badge} alertas sin asignar`}>
-                  {n.badge}
-                </span>
-              )}
-            </Link>
-          ))}
-        </div>
-        <div className="flex-1" />
-        <div className="border-t border-dark-line p-5 md:hidden">
-          <SelectorRol id="rol-menu" oscuro />
-        </div>
-        {ONBOARDING_URL && (
-          <div className="flex flex-col gap-2.5 border-t border-dark-line p-5">
-            <span className="text-[13px] text-line-mid">Atajo de la demostración</span>
-            <a
-              href={ONBOARDING_URL}
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-white px-4 font-display text-sm font-bold uppercase text-white no-underline"
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="-mr-2 hidden size-11 items-center justify-center rounded-full text-white hover:bg-dark-hover lg:flex"
+              aria-label="Ocultar menú lateral"
+              aria-controls="menu-principal"
+              aria-expanded={!colapsado}
+              onClick={() => setColapsado(true)}
             >
-              Ver app móvil
-            </a>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+            </button>
           </div>
-        )}
+          <div className="flex flex-col gap-0.5">
+            {nav.map((n) => (
+              <Link
+                key={n.href}
+                href={n.href}
+                className="nav-item"
+                aria-current={pathname.startsWith(n.href) ? "page" : undefined}
+                onClick={() => setMenuAbierto(false)}
+              >
+                <span>{n.label}</span>
+                {n.badge > 0 && (
+                  <span key={n.badge} className="nav-badge anim-rebote" aria-label={`${n.badge} alertas sin asignar`}>
+                    {n.badge}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+          <div className="flex-1" />
+          <div className="border-t border-dark-line p-5 md:hidden">
+            <SelectorRol id="rol-menu" oscuro />
+          </div>
+          {ONBOARDING_URL && (
+            <div className="flex flex-col gap-2.5 border-t border-dark-line p-5">
+              <span className="text-[13px] text-line-mid">Atajo de la demostración</span>
+              <a
+                href={ONBOARDING_URL}
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-white px-4 font-display text-sm font-bold uppercase text-white no-underline"
+              >
+                Ver app móvil
+              </a>
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Columna principal */}
@@ -131,6 +148,18 @@ export function Shell({ children }: { children: ReactNode }) {
               aria-expanded={menuAbierto}
               aria-controls="menu-principal"
               onClick={() => setMenuAbierto(true)}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="-ml-2 hidden size-11 flex-none items-center justify-center rounded-full hover:bg-soft lg:flex"
+              aria-label={colapsado ? "Mostrar menú lateral" : "Ocultar menú lateral"}
+              aria-expanded={!colapsado}
+              aria-controls="menu-principal"
+              onClick={() => setColapsado((c) => !c)}
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                 <path d="M4 7h16M4 12h16M4 17h16" />

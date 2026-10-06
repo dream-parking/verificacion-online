@@ -3,13 +3,17 @@ package com.dreamparking.backend.risk;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** Risk score of a request and why it was assigned. {@code ruleCode} is null when no rule applied. */
-public record RiskAssessmentResponse(RiskLevel level, String ruleCode, BigDecimal evaluatedValue, String explanation,
-		Instant evaluatedAt) {
+/**
+ * Risk score of a request and why it was assigned. The rule fields ({@code ruleCode}, {@code ruleName},
+ * {@code ruleThreshold}) are null when no rule applied; the threshold is the one of the rule version that was applied.
+ */
+public record RiskAssessmentResponse(RiskLevel level, String ruleCode, String ruleName, BigDecimal ruleThreshold,
+		BigDecimal evaluatedValue, String explanation, Instant evaluatedAt) {
 
-	static RiskAssessmentResponse of(RiskAssessment assessment) {
+	public static RiskAssessmentResponse of(RiskAssessment assessment) {
 		ScoreRule rule = assessment.getRule();
 		return new RiskAssessmentResponse(assessment.getLevel(), rule == null ? null : rule.getCode(),
+				rule == null ? null : rule.getName(), rule == null ? null : rule.getThreshold(),
 				assessment.getEvaluatedValue(), assessment.getExplanation(), assessment.getEvaluatedAt());
 	}
 

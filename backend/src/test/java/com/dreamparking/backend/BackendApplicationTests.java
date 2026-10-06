@@ -30,7 +30,7 @@ class BackendApplicationTests {
 				"select count(*) from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'"
 						+ " and table_name <> 'flyway_schema_history'",
 				Integer.class);
-		assertThat(tablas).isEqualTo(22);
+		assertThat(tablas).isEqualTo(23);
 		assertThat(jdbc.queryForObject(
 				"select count(*) from information_schema.schemata where schema_name = 'ceiba'", Integer.class)).isZero();
 		// 2030: año sin datos semilla, así el correlativo arranca en 1.
@@ -44,7 +44,7 @@ class BackendApplicationTests {
 		assertThat(jdbc.queryForObject(
 				"select nivel_riesgo::text from solicitud where numero = 'SOL-2026-00418'", String.class))
 				.isEqualTo("BAJO");
-		assertThat(jdbc.queryForObject("select count(*) from v_bandeja_alertas", Integer.class)).isEqualTo(1);
+		assertThat(jdbc.queryForObject("select count(*) from v_bandeja_alertas", Integer.class)).isEqualTo(9);
 	}
 
 }

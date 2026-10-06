@@ -10,28 +10,38 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.context.WebApplicationContext;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dreamparking.backend.console.ConsoleRole;
 import com.jayway.jsonpath.JsonPath;
 
 /** Console read side (request list and detail, rule view) and the analyst inbox (VDI-56, VDI-57, VDI-61, VDI-62, VDI-63). */
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, TestAuth.class })
 @SpringBootTest
-@AutoConfigureMockMvc
 @ActiveProfiles("dev")
 @Transactional
 class ConsoleApiTests {
 
 	@Autowired
+	WebApplicationContext context;
+
+	@Autowired
+	TestAuth auth;
+
 	MockMvc mvc;
+
+	@BeforeEach
+	void signIn() {
+		mvc = auth.mockMvcAs(context, auth.user(ConsoleRole.ADMIN));
+	}
 
 	// ---- Requests
 
@@ -158,42 +168,23 @@ class ConsoleApiTests {
 
 	@Test
 	void takesAnUnassignedAlertOnlyOnce() throws Exception {
-		String ana = userId("abeltran@ceiba.example");
-		String luis = userId("lbarahona@ceiba.example");
-		String alertId = JsonPath.read(mvc.perform(get("/api/console/alerts").param("account", "1156"))
-			.andReturn()
-			.getResponse()
-			.getContentAsString(), "$[0].id");
+		var ana = auth.user(ConsoleRole.FRAUD_ANALYST);
+		var luis = auth.user(ConsoleRole.FRAUD_ANALYST);
+		String alertId = unassignedAlertId();
 
-		mvc.perform(post("/api/console/alerts/{id}/take", alertId).contentType(MediaType.APPLICATION_JSON)
-			.content("{\"userId\": \"" + ana + "\"}"))
+		auth.mockMvcAs(context, ana).perform(post("/api/console/alerts/{id}/take", alertId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("ASSIGNED"))
-			.andExpect(jsonPath("$.assigneeName").value("Ana Beltrán"));
+			.andExpect(jsonPath("$.assigneeId").value(ana.getId().toString()))
+			.andExpect(jsonPath("$.assigneeName").value("Usuario de Prueba"));
 
-		mvc.perform(post("/api/console/alerts/{id}/take", alertId).contentType(MediaType.APPLICATION_JSON)
-			.content("{\"userId\": \"" + luis + "\"}"))
+		auth.mockMvcAs(context, luis).perform(post("/api/console/alerts/{id}/take", alertId))
 			.andExpect(status().isConflict());
 	}
 
 	@Test
-	void rejectsInvalidTakeRequests() throws Exception {
-		String ana = userId("abeltran@ceiba.example");
-
-		mvc.perform(post("/api/console/alerts/{id}/take", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
-			.content("{\"userId\": \"" + ana + "\"}"))
-			.andExpect(status().isNotFound());
-
-		String alertId = JsonPath.read(mvc.perform(get("/api/console/alerts").param("account", "1156"))
-			.andReturn()
-			.getResponse()
-			.getContentAsString(), "$[0].id");
-		mvc.perform(post("/api/console/alerts/{id}/take", alertId).contentType(MediaType.APPLICATION_JSON)
-			.content("{\"userId\": \"" + UUID.randomUUID() + "\"}"))
-			.andExpect(status().isBadRequest());
-		mvc.perform(post("/api/console/alerts/{id}/take", alertId).contentType(MediaType.APPLICATION_JSON)
-			.content("{}"))
-			.andExpect(status().isBadRequest());
+	void takingAnUnknownAlertIsNotFound() throws Exception {
+		mvc.perform(post("/api/console/alerts/{id}/take", UUID.randomUUID())).andExpect(status().isNotFound());
 	}
 
 	// ---- Users
@@ -202,13 +193,15 @@ class ConsoleApiTests {
 	void listsActiveConsoleUsers() throws Exception {
 		mvc.perform(get("/api/console/users"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$", hasSize(4)))
+			.andExpect(jsonPath("$", hasSize(5))) // the 4 demo users and the administrator signed in for this test
 			.andExpect(jsonPath("$[?(@.email=='grosales@ceiba.example')].role").value("KYC_LEAD"));
 	}
 
-	private String userId(String email) throws Exception {
-		String body = mvc.perform(get("/api/console/users")).andReturn().getResponse().getContentAsString();
-		return JsonPath.<java.util.List<String>>read(body, "$[?(@.email=='" + email + "')].id").get(0);
+	private String unassignedAlertId() throws Exception {
+		return JsonPath.read(mvc.perform(get("/api/console/alerts").param("account", "1156"))
+			.andReturn()
+			.getResponse()
+			.getContentAsString(), "$[0].id");
 	}
 
 }

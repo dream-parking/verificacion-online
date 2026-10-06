@@ -3,6 +3,7 @@ package com.dreamparking.backend.risk;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/console/score-rules")
 @Tag(name = "Consola · Reglas", description = "Reglas de score vigentes (solo lectura)")
+@SecurityRequirement(name = "bearerAuth")
 public class ScoreRuleController {
 
 	private final ScoreRuleRepository rules;

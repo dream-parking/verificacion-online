@@ -3,6 +3,7 @@ package com.dreamparking.backend.onboarding;
 import java.util.UUID;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,6 +45,7 @@ public class OnboardingController {
 		return onboardingService.start();
 	}
 
+	@ApiResponse(responseCode = "200", description = "Resumen de la solicitud")
 	@Operation(summary = "Consulta el resumen de una solicitud")
 	@ApiResponse(responseCode = "404", description = "La solicitud no existe", content = @Content)
 	@GetMapping("/{requestId}")
@@ -63,6 +65,7 @@ public class OnboardingController {
 	}
 
 	/** Returns the risk score assigned from the declared monthly amount. */
+	@ApiResponse(responseCode = "200", description = "Score de riesgo asignado")
 	@Operation(summary = "Paso 3: registra el movimiento esperado y asigna el score de riesgo",
 			description = "Guarda o reemplaza la actividad esperada y devuelve el score calculado con el monto mensual.")
 	@ApiResponse(responseCode = "400", description = "Datos inválidos o código de catálogo desconocido", content = @Content)
@@ -83,7 +86,7 @@ public class OnboardingController {
 	@PutMapping("/{requestId}/signals")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void captureSignals(@PathVariable UUID requestId, @Valid @RequestBody CaptureSignalsRequest body,
-			HttpServletRequest http, @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
+			HttpServletRequest http, @Parameter(hidden = true) @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
 		signalsService.capture(requestId, body, http.getRemoteAddr(), userAgent);
 	}
 

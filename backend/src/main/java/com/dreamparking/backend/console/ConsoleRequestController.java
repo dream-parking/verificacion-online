@@ -5,6 +5,7 @@ import java.util.UUID;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +21,7 @@ import com.dreamparking.backend.risk.RiskLevel;
 @RestController
 @RequestMapping("/api/console/requests")
 @Tag(name = "Consola · Solicitudes", description = "Listado y detalle de solicitudes para la consola administrativa")
+@SecurityRequirement(name = "bearerAuth")
 public class ConsoleRequestController {
 
 	private final ConsoleRequestService service;
@@ -37,6 +39,7 @@ public class ConsoleRequestController {
 		return service.list(status, riskLevel, q, page, size);
 	}
 
+	@ApiResponse(responseCode = "200", description = "Detalle de la solicitud")
 	@Operation(summary = "Detalle de una solicitud",
 			description = "Datos declarados, ingresos, movimiento esperado, score y regla aplicada, señales, tiempo por paso y línea de tiempo.")
 	@ApiResponse(responseCode = "404", description = "La solicitud no existe", content = @Content)

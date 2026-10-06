@@ -1,3 +1,6 @@
 .idea/
 .DS_Store
 .local/
+
+# Credenciales de usuarios de la consola (nunca al repositorio)
+/docs/usuarios-consola.csv

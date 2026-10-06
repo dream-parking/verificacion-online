@@ -19,7 +19,10 @@ Dominio base: `identidad.alambritos.online` (DNS en Namecheap). Convención: `<a
 | QA | https://console.qa.identidad.alambritos.online | `console.qa.identidad` → `green-field-020ffdc10.6.azurestaticapps.net` |
 | Prod (reservado) | `console.identidad.alambritos.online` | pendiente: tercer SWA Free |
 
-Reservados sin DNS aún: `api.*` y `onboarding.*` con el mismo patrón por ambiente.
+| Backend Dev | https://api.dev.identidad.alambritos.online | `api.dev.identidad` → FQDN de `ca-verificaciononline-api-dev`, más TXT `asuid.api.dev.identidad` |
+| Backend QA | https://api.qa.identidad.alambritos.online | `api.qa.identidad` → FQDN de `ca-verificaciononline-api-qa`, más TXT `asuid.api.qa.identidad` |
+
+Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS aún: `onboarding.*` y todo lo de Prod con el mismo patrón por ambiente.
 
 ## Backend (Spring Boot, `backend/`)
 

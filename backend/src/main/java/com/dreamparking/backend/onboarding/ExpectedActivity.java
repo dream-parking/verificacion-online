@@ -1,5 +1,6 @@
 package com.dreamparking.backend.onboarding;
 
+import com.dreamparking.backend.catalog.MonthlyAmountRange;
 import com.dreamparking.backend.catalog.TransactionType;
 
 import jakarta.persistence.Column;
@@ -12,14 +13,13 @@ import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/** Expected monthly account activity (step 3), one per request. Input of score rule R-01. */
+/** Expected account activity (step 3), one per request: type of money and the chosen monthly amount range. Input of score rule R-01. */
 @Entity
 @Table(name = "movimiento_esperado")
 public class ExpectedActivity {
@@ -37,8 +37,9 @@ public class ExpectedActivity {
 	@JoinColumn(name = "tipo_codigo", nullable = false)
 	private TransactionType transactionType;
 
-	@Column(name = "monto_mensual_usd", nullable = false, precision = 14, scale = 2)
-	private BigDecimal monthlyAmountUsd;
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "rango_monto_codigo", nullable = false)
+	private MonthlyAmountRange monthlyAmountRange;
 
 	@CreationTimestamp
 	@Column(name = "registrado_en", nullable = false)
@@ -68,12 +69,12 @@ public class ExpectedActivity {
 		this.transactionType = transactionType;
 	}
 
-	public BigDecimal getMonthlyAmountUsd() {
-		return monthlyAmountUsd;
+	public MonthlyAmountRange getMonthlyAmountRange() {
+		return monthlyAmountRange;
 	}
 
-	public void setMonthlyAmountUsd(BigDecimal monthlyAmountUsd) {
-		this.monthlyAmountUsd = monthlyAmountUsd;
+	public void setMonthlyAmountRange(MonthlyAmountRange monthlyAmountRange) {
+		this.monthlyAmountRange = monthlyAmountRange;
 	}
 
 	public Instant getRegisteredAt() {

@@ -9,7 +9,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -38,8 +37,8 @@ public class RequestListItem {
 	@Column(name = "tipo_dinero", length = 80)
 	private String transactionTypeLabel;
 
-	@Column(name = "monto_mensual_usd", precision = 14, scale = 2)
-	private BigDecimal monthlyAmountUsd;
+	@Column(name = "rango_monto_mensual", length = 80)
+	private String monthlyAmountRangeLabel;
 
 	@Convert(converter = RiskLevel.JpaConverter.class)
 	@JdbcType(PgEnumJdbcType.class)
@@ -74,8 +73,8 @@ public class RequestListItem {
 		return transactionTypeLabel;
 	}
 
-	public BigDecimal getMonthlyAmountUsd() {
-		return monthlyAmountUsd;
+	public String getMonthlyAmountRangeLabel() {
+		return monthlyAmountRangeLabel;
 	}
 
 	public RiskLevel getRiskLevel() {

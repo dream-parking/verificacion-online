@@ -6,11 +6,13 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dreamparking.backend.catalog.MonthlyAmountRange;
 import com.dreamparking.backend.common.NotFoundException;
 import com.dreamparking.backend.onboarding.OnboardingRequest;
 import com.dreamparking.backend.onboarding.RequestEvent;
@@ -18,7 +20,7 @@ import com.dreamparking.backend.onboarding.RequestEventRepository;
 import com.dreamparking.backend.onboarding.RequestEventType;
 
 /**
- * Risk score engine. Applies rule R-01: a declared monthly amount below the threshold scores
+ * Risk score engine. Applies rule R-01: a declared monthly amount range that does not go above the threshold scores
  * {@link RiskLevel#LOW}; anything else stays pending review, since R-01 only assigns low risk.
  * Same behavior as the {@code evaluar_riesgo} database function.
  */
@@ -42,30 +44,36 @@ public class RiskAssessmentService {
 		this.events = events;
 	}
 
-	/** Scores the request from its declared monthly amount ({@code null} while not declared yet). */
+	/**
+	 * Scores the request from its declared monthly amount range ({@code null} while not declared yet). The value
+	 * evaluated is the top of the range; a range with no top ("more than…") is never low risk.
+	 */
 	@Transactional
-	public RiskAssessmentResponse evaluate(OnboardingRequest request, BigDecimal monthlyAmountUsd) {
+	public RiskAssessmentResponse evaluate(OnboardingRequest request, MonthlyAmountRange range) {
 		ScoreRule rule = rules.findInForce(LOW_AMOUNT_RULE).orElse(null);
 
 		RiskAssessment assessment = new RiskAssessment();
 		assessment.setRequest(request);
-		assessment.setEvaluatedValue(monthlyAmountUsd);
-		if (monthlyAmountUsd == null) {
+		if (range == null) {
 			assessment.setLevel(RiskLevel.NOT_EVALUATED);
 			assessment.setExplanation(
 					"La solicitud sigue en progreso: todavía no hay un monto declarado que evaluar.");
 		}
-		else if (rule != null && monthlyAmountUsd.compareTo(rule.getThreshold()) < 0) {
-			assessment.setLevel(rule.getResultIfMatched());
-			assessment.setRule(rule);
-			assessment.setExplanation("Monto mensual declarado de USD %s, menor al umbral de USD %s, riesgo bajo."
-				.formatted(usd(monthlyAmountUsd), usd(rule.getThreshold())));
-		}
 		else {
-			assessment.setLevel(rule == null ? RiskLevel.PENDING_REVIEW : rule.getResultIfNotMatched());
-			assessment.setExplanation(("Monto mensual declarado de USD %s, igual o mayor al umbral de USD %s. "
-					+ "La regla vigente solo asigna riesgo bajo, así que este caso queda pendiente de evaluación.")
-				.formatted(usd(monthlyAmountUsd), usd(rule == null ? DEFAULT_THRESHOLD : rule.getThreshold())));
+			assessment.setEvaluatedValue(range.getMaxUsd() != null ? range.getMaxUsd() : range.getMinUsd());
+			if (rule != null && range.getMaxUsd() != null && range.getMaxUsd().compareTo(rule.getThreshold()) <= 0) {
+				assessment.setLevel(rule.getResultIfMatched());
+				assessment.setRule(rule);
+				assessment.setExplanation(
+						"Monto mensual declarado en el rango «%s», que no supera el umbral de USD %s, riesgo bajo."
+							.formatted(range.getLabel(), usd(rule.getThreshold())));
+			}
+			else {
+				assessment.setLevel(rule == null ? RiskLevel.PENDING_REVIEW : rule.getResultIfNotMatched());
+				assessment.setExplanation(("Monto mensual declarado en el rango «%s», que supera el umbral de USD %s. "
+						+ "La regla vigente solo asigna riesgo bajo, así que este caso queda pendiente de evaluación.")
+					.formatted(range.getLabel(), usd(rule == null ? DEFAULT_THRESHOLD : rule.getThreshold())));
+			}
 		}
 
 		assessments.retireCurrent(request.getId());
@@ -78,10 +86,16 @@ public class RiskAssessmentService {
 			event.setType(RequestEventType.SCORE_ASSIGNED);
 			event.setDescription("Score de riesgo asignado: bajo (regla " + LOW_AMOUNT_RULE + ")");
 			event.setActor("SISTEMA");
-			event.setData(Map.of("regla", LOW_AMOUNT_RULE, "monto", monthlyAmountUsd));
+			event.setData(Map.of("regla", LOW_AMOUNT_RULE, "rango", range.getCode()));
 			events.save(event);
 		}
 		return RiskAssessmentResponse.of(assessment);
+	}
+
+	/** Current assessment of the request, or empty while it has none. */
+	@Transactional(readOnly = true)
+	public Optional<RiskAssessmentResponse> findCurrent(UUID requestId) {
+		return assessments.findByRequestIdAndCurrentTrue(requestId).map(RiskAssessmentResponse::of);
 	}
 
 	@Transactional(readOnly = true)

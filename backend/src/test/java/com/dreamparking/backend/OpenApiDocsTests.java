@@ -31,7 +31,20 @@ class OpenApiDocsTests {
 			.andExpect(jsonPath("$.paths['/api/onboarding/requests']").exists())
 			.andExpect(jsonPath("$.paths['/api/onboarding/requests/{requestId}/income']").exists())
 			.andExpect(jsonPath("$.paths['/api/onboarding/requests/{requestId}/expected-activity']").exists())
-			.andExpect(jsonPath("$.paths['/api/onboarding/requests/{requestId}/risk-assessment']").exists());
+			.andExpect(jsonPath("$.paths['/api/onboarding/requests/{requestId}/risk-assessment']").exists())
+			.andExpect(jsonPath("$.paths['/api/onboarding/requests/{requestId}/signals']").exists());
+	}
+
+	@Test
+	void apiDocsDescribeTheConsoleEndpoints() throws Exception {
+		mvc.perform(get("/v3/api-docs"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.paths['/api/console/requests']").exists())
+			.andExpect(jsonPath("$.paths['/api/console/requests/{requestId}']").exists())
+			.andExpect(jsonPath("$.paths['/api/console/score-rules']").exists())
+			.andExpect(jsonPath("$.paths['/api/console/alerts']").exists())
+			.andExpect(jsonPath("$.paths['/api/console/alerts/{alertId}/take']").exists())
+			.andExpect(jsonPath("$.paths['/api/console/users']").exists());
 	}
 
 	@Test

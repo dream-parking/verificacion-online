@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -7,18 +9,30 @@ import 'package:onboarding/api/onboarding_api.dart';
 import 'package:onboarding/main.dart';
 import 'package:onboarding/onboarding/onboarding_flow.dart';
 import 'package:onboarding/onboarding/solicitud.dart';
+import 'package:onboarding/senales/huella_dispositivo.dart';
 
-/// API falsa: responde `POST /api/onboarding/requests` y cuenta las llamadas.
+/// API falsa: responde `POST /api/onboarding/requests` y `PUT .../signals`, y guarda las llamadas.
 class ApiFalsa {
-  ApiFalsa({this.fallarPrimeras = 0});
+  ApiFalsa({this.fallarPrimeras = 0, this.fallarSenales = 0});
 
   int fallarPrimeras;
+  int fallarSenales;
   final llamadas = <http.Request>[];
+
+  List<http.Request> get creaciones => llamadas.where((r) => r.method == 'POST').toList();
+  List<http.Request> get senales => llamadas.where((r) => r.url.path.endsWith('/signals')).toList();
 
   OnboardingApi get api => OnboardingApi(
         baseUrl: 'https://api.test',
         client: MockClient((req) async {
           llamadas.add(req);
+          if (req.url.path.endsWith('/signals')) {
+            if (fallarSenales > 0) {
+              fallarSenales--;
+              return http.Response('', 503);
+            }
+            return http.Response('', 204);
+          }
           if (fallarPrimeras > 0) {
             fallarPrimeras--;
             return http.Response('{"status":503,"detail":"Servicio no disponible"}', 503);
@@ -26,6 +40,22 @@ class ApiFalsa {
           return http.Response('{"id":"11111111-2222-3333-4444-555555555555","status":"IN_PROGRESS"}', 201);
         }),
       );
+}
+
+/// Dispositivo falso: cuenta cuántas veces se leyó.
+class DispositivoFalso implements FuenteDispositivo {
+  var lecturas = 0;
+
+  @override
+  Future<DatosDispositivo> leer() async {
+    lecturas++;
+    return const DatosDispositivo(
+      huella: 'd4f1·9a3c·e7b2',
+      modelo: 'Google Pixel 9',
+      sistemaOperativo: 'Android 16',
+      versionApp: '1.0.0+1',
+    );
+  }
 }
 
 void main() {
@@ -87,6 +117,7 @@ void main() {
       await tester.pumpWidget(OnboardingApp(
         home: OnboardingFlow(
           api: ApiFalsa().api,
+          dispositivo: DispositivoFalso(),
           simularErrorDeConexion: true,
           demoraEnvio: const Duration(milliseconds: 10),
         ),
@@ -136,7 +167,7 @@ void main() {
     });
 
     testWidgets('la flecha de volver regresa al paso anterior', (tester) async {
-      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: ApiFalsa().api)));
+      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: ApiFalsa().api, dispositivo: DispositivoFalso())));
       await tocar(tester, find.text('EMPEZAR'));
       expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
       await tocar(tester, find.byTooltip('Volver al paso anterior'));
@@ -146,24 +177,23 @@ void main() {
     group('aviso de privacidad (VDI-45)', () {
       testWidgets('no crea la solicitud hasta aceptar el aviso', (tester) async {
         final falsa = ApiFalsa();
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api)));
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
         await tocar(tester, find.text('EMPEZAR'));
         expect(find.text('Texto provisional · pendiente de revisión legal'), findsOneWidget);
 
         await continuar(tester);
-        expect(falsa.llamadas, isEmpty);
+        expect(falsa.creaciones, isEmpty);
 
         await tocar(tester, find.byType(Checkbox));
         await continuar(tester);
-        expect(falsa.llamadas, hasLength(1));
-        expect(falsa.llamadas.single.method, 'POST');
-        expect(falsa.llamadas.single.url.path, '/api/onboarding/requests');
+        expect(falsa.creaciones, hasLength(1));
+        expect(falsa.creaciones.single.url.path, '/api/onboarding/requests');
         expect(find.text('Paso 1 de 4'), findsOneWidget);
       });
 
       testWidgets('al volver, el aviso queda aceptado y no se crea otra solicitud', (tester) async {
         final falsa = ApiFalsa();
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api)));
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
         await tocar(tester, find.text('EMPEZAR'));
         await tocar(tester, find.byType(Checkbox));
         await continuar(tester);
@@ -175,12 +205,12 @@ void main() {
 
         await continuar(tester);
         expect(find.text('Paso 1 de 4'), findsOneWidget);
-        expect(falsa.llamadas, hasLength(1));
+        expect(falsa.creaciones, hasLength(1));
       });
 
       testWidgets('si falla la conexión muestra el error y permite reintentar', (tester) async {
         final falsa = ApiFalsa(fallarPrimeras: 1);
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api)));
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
         await tocar(tester, find.text('EMPEZAR'));
         await tocar(tester, find.byType(Checkbox));
         await continuar(tester);
@@ -190,7 +220,52 @@ void main() {
 
         await tocar(tester, find.text('REINTENTAR'));
         expect(find.text('Paso 1 de 4'), findsOneWidget);
-        expect(falsa.llamadas, hasLength(2));
+        expect(falsa.creaciones, hasLength(2));
+      });
+    });
+
+    group('huella del dispositivo (VDI-40)', () {
+      testWidgets('no lee el dispositivo antes de aceptar el aviso', (tester) async {
+        final falsa = ApiFalsa();
+        final dispositivo = DispositivoFalso();
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: dispositivo)));
+        await tocar(tester, find.text('EMPEZAR'));
+        await continuar(tester);
+        expect(dispositivo.lecturas, 0);
+        expect(falsa.senales, isEmpty);
+      });
+
+      testWidgets('al aceptar envía la huella, el modelo, el sistema y la versión', (tester) async {
+        final falsa = ApiFalsa();
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
+        await tocar(tester, find.text('EMPEZAR'));
+        await tocar(tester, find.byType(Checkbox));
+        await continuar(tester);
+
+        expect(falsa.senales, hasLength(1));
+        final req = falsa.senales.single;
+        expect(req.method, 'PUT');
+        expect(req.url.path, '/api/onboarding/requests/11111111-2222-3333-4444-555555555555/signals');
+        expect(jsonDecode(req.body), {
+          'deviceFingerprint': 'd4f1·9a3c·e7b2',
+          'deviceModel': 'Google Pixel 9',
+          'operatingSystem': 'Android 16',
+          'appVersion': '1.0.0+1',
+        });
+      });
+
+      testWidgets('si falla el envío no bloquea y se reintenta en la siguiente pantalla', (tester) async {
+        final falsa = ApiFalsa(fallarSenales: 1);
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
+        await tocar(tester, find.text('EMPEZAR'));
+        await tocar(tester, find.byType(Checkbox));
+        await continuar(tester);
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+        expect(falsa.senales, hasLength(1));
+
+        await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await continuar(tester);
+        expect(falsa.senales, hasLength(2));
       });
     });
   });

@@ -22,22 +22,18 @@
   --font-display: var(--font-nunito), sans-serif;
 }
 
-body {
-  margin: 0;
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-}
+/* En una capa para que las clases de componentes (.btn, .fld…) puedan sobrescribirlo. */
+@layer base {
+  body {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
 
-button,
-select,
-input {
-  font-family: inherit;
-}
-
-:focus-visible {
-  outline: 3px solid var(--color-blue);
-  outline-offset: 2px;
+  :focus-visible {
+    outline: 3px solid var(--color-blue);
+    outline-offset: 2px;
+  }
 }
 
 @layer components {
@@ -302,5 +298,197 @@ input {
     line-height: 22px;
     font-weight: 600;
     overflow-wrap: anywhere;
+  }
+
+  /* Móvil: cada fila de tabla se muestra como tarjeta; las celdas con
+     data-label muestran su encabezado a la izquierda. */
+  @media (width < 48rem) {
+    .tblwrap {
+      overflow-x: visible;
+    }
+    .gh {
+      display: none;
+    }
+    .gr {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      min-width: 0;
+      padding: 14px 16px;
+    }
+    .gr > [data-label] {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      text-align: right;
+    }
+    .gr > [data-label]::before {
+      content: attr(data-label);
+      flex: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-muted);
+      text-align: left;
+    }
+    .kv {
+      grid-template-columns: minmax(100px, 130px) 1fr;
+    }
+  }
+}
+
+/* ---- Animaciones ----
+   Las entradas usan fill-mode "backwards": al terminar no dejan un transform
+   aplicado, que rompería los elementos position: fixed dentro de la página. */
+@theme {
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes aparecer-arriba {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes entrar-derecha {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes entrar-abajo {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes rebote {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes brillo {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@layer components {
+  /* Transiciones de los elementos interactivos */
+  .btn,
+  .btn2,
+  .tab,
+  .nav-item {
+    transition:
+      background-color 160ms ease-out,
+      color 160ms ease-out,
+      border-color 160ms ease-out,
+      box-shadow 160ms ease-out,
+      transform 120ms ease-out;
+  }
+  .btn:hover {
+    box-shadow: 0 4px 14px rgb(253 218 36 / 0.45);
+  }
+  .btn:active,
+  .btn2:active,
+  .tab:active {
+    transform: scale(0.97);
+  }
+  .nav-item:hover:not([aria-current="page"]) {
+    padding-left: 20px;
+  }
+  .nav-item {
+    transition-property: background-color, color, border-color, padding;
+  }
+  .fld {
+    transition: border-color 160ms ease-out;
+  }
+  .gr {
+    transition: background-color 140ms ease-out;
+  }
+  .card {
+    transition: box-shadow 200ms ease-out;
+  }
+  .card:hover {
+    box-shadow: 0 6px 20px rgb(26 27 26 / 0.06);
+  }
+
+  /* Entrada de cada página */
+  .anim-pagina {
+    animation: aparecer-arriba 360ms var(--ease-out-soft) backwards;
+  }
+
+  /* Hijos que aparecen uno tras otro */
+  .anim-escalonado > * {
+    animation: aparecer-arriba 420ms var(--ease-out-soft) backwards;
+  }
+  .anim-escalonado > :nth-child(2) { animation-delay: 50ms; }
+  .anim-escalonado > :nth-child(3) { animation-delay: 100ms; }
+  .anim-escalonado > :nth-child(4) { animation-delay: 150ms; }
+  .anim-escalonado > :nth-child(5) { animation-delay: 200ms; }
+  .anim-escalonado > :nth-child(6) { animation-delay: 250ms; }
+  .anim-escalonado > :nth-child(7) { animation-delay: 300ms; }
+  .anim-escalonado > :nth-child(n + 8) { animation-delay: 350ms; }
+
+  /* Filas de tabla: el retraso lo da --i (posición de la fila) */
+  .anim-fila {
+    animation: aparecer-arriba 380ms var(--ease-out-soft) backwards;
+    animation-delay: calc(min(var(--i, 0), 12) * 35ms);
+  }
+
+  .anim-aparecer {
+    animation: aparecer 200ms ease-out backwards;
+  }
+  .anim-rebote {
+    animation: rebote 360ms var(--ease-out-soft) backwards;
+  }
+  .anim-aviso {
+    animation: aparecer-arriba 320ms var(--ease-out-soft) backwards;
+  }
+
+  /* Vista previa: sube desde abajo en móvil, entra por la derecha en tableta */
+  .anim-panel {
+    animation: entrar-abajo 320ms var(--ease-out-soft) backwards;
+  }
+  @media (width >= 40rem) {
+    .anim-panel {
+      animation-name: entrar-derecha;
+    }
+  }
+  @media (width >= 80rem) {
+    .anim-panel {
+      animation: aparecer-arriba 320ms var(--ease-out-soft) backwards;
+    }
+  }
+
+  /* Esqueletos de carga con brillo */
+  .skel {
+    background: linear-gradient(90deg, #e8e8e8 0%, #f4f4f4 40%, #e8e8e8 80%) 0 0 / 200% 100%;
+    animation: brillo 1.4s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useConsola } from "@/components/consola/ConsolaProvider";
 import { Cargando, Encabezado, ErrorCarga, KeyValue, useEstadoDatos, Vacio } from "@/components/consola/ui";
 import { CRITICIDAD, ESTADO_ALERTA, SEVERIDAD, type Alerta } from "@/lib/consola/datos";
@@ -51,6 +51,7 @@ function Bandeja() {
   };
   const tomar = (id: string) => setToast(tomarAlerta(id));
   const seleccionada = alertas.find((x) => x.id === selId);
+  const cerrarPreview = useCallback(() => setSelId(""), []);
 
   let vacioTitulo = "No hay alertas con esos filtros";
   let vacioTexto = "Cambia o quita los filtros para ver más alertas.";
@@ -78,13 +79,13 @@ function Bandeja() {
         {tabs.map((t) => (
           <button key={t.key} type="button" className="tab" aria-pressed={tab === t.key} onClick={() => setTab(t.key)}>
             {t.label}
-            <span className="font-extrabold">{t.count}</span>
+            <span key={t.count} className="anim-rebote font-extrabold">{t.count}</span>
           </button>
         ))}
       </div>
 
       <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
-        <div className="max-w-[300px] flex-[1_1_220px]">
+        <div className="flex-[1_1_220px] sm:max-w-[300px]">
           <label htmlFor="a-q" className="lbl">
             Buscar por cuenta
           </label>
@@ -97,7 +98,7 @@ function Bandeja() {
             onChange={(e) => setAQ(e.target.value)}
           />
         </div>
-        <div className="min-w-[150px] flex-[0_1_180px]">
+        <div className="min-w-[150px] flex-[0_1_180px] max-sm:basis-full">
           <label htmlFor="a-e" className="lbl">
             Estado
           </label>
@@ -108,7 +109,7 @@ function Bandeja() {
             <option value="En revisión">En revisión</option>
           </select>
         </div>
-        <div className="min-w-[150px] flex-[0_1_180px]">
+        <div className="min-w-[150px] flex-[0_1_180px] max-sm:basis-full">
           <label htmlFor="a-c" className="lbl">
             Criticidad
           </label>
@@ -120,7 +121,7 @@ function Bandeja() {
             <option value="Baja">Baja</option>
           </select>
         </div>
-        <div className="min-w-[170px] flex-[0_1_200px]">
+        <div className="min-w-[170px] flex-[0_1_200px] max-sm:basis-full">
           <label htmlFor="a-f" className="lbl">
             Fecha
           </label>
@@ -134,15 +135,16 @@ function Bandeja() {
 
       {toast && (
         <div
+          key={toast}
           role="status"
-          className="border border-[#0b6b4a] bg-[#e2f5ec] px-4 py-3 text-[15px] leading-[22px] font-semibold text-[#0b4f37]"
+          className="anim-aviso border border-[#0b6b4a] bg-[#e2f5ec] px-4 py-3 text-[15px] leading-[22px] font-semibold text-[#0b4f37]"
         >
           ✓ {toast}
         </div>
       )}
 
       <div className="flex min-w-0 flex-wrap items-start gap-5">
-        <div className="tblwrap min-w-0 flex-[1_1_640px]" role="table" aria-label="Alertas">
+        <div className="tblwrap min-w-0 flex-[1_1_560px]" role="table" aria-label="Alertas">
           <div className="gh g-ale" role="row">
             <div role="columnheader">Criticidad</div>
             <div role="columnheader">Cuenta</div>
@@ -156,7 +158,7 @@ function Bandeja() {
           {estado === "cargando" && (
             <Cargando
               etiqueta="alertas"
-              minWidth={960}
+              className="md:min-w-[960px]"
               grid="g-ale"
               anchos={["90px", "70px", "75%", "90px", "100px", "70px", "70px"]}
             />
@@ -176,13 +178,13 @@ function Bandeja() {
             />
           )}
           {estado === "normal" &&
-            filtradas.map((a) => (
-              <FilaAlerta key={a.id} alerta={a} onOpen={() => setSelId(a.id)} onTake={() => tomar(a.id)} />
+            filtradas.map((a, i) => (
+              <FilaAlerta key={a.id} indice={i} alerta={a} onOpen={() => setSelId(a.id)} onTake={() => tomar(a.id)} />
             ))}
         </div>
 
         {seleccionada && (
-          <VistaPrevia alerta={seleccionada} onClose={() => setSelId("")} onTake={() => tomar(seleccionada.id)} />
+          <VistaPrevia alerta={seleccionada} onClose={cerrarPreview} onTake={() => tomar(seleccionada.id)} />
         )}
       </div>
     </div>
@@ -195,25 +197,35 @@ function insignias(alerta: Alerta) {
   return { crit: <span className={`badge ${critCls}`}>{critLabel}</span>, est: <span className={`badge ${estCls}`}>{estLabel}</span> };
 }
 
-function FilaAlerta({ alerta: a, onOpen, onTake }: { alerta: Alerta; onOpen: () => void; onTake: () => void }) {
+function FilaAlerta({
+  alerta: a,
+  indice,
+  onOpen,
+  onTake,
+}: {
+  alerta: Alerta;
+  indice: number;
+  onOpen: () => void;
+  onTake: () => void;
+}) {
   const b = insignias(a);
   return (
-    <div className="gr g-ale" role="row">
+    <div className="gr g-ale anim-fila" style={{ "--i": indice } as CSSProperties} role="row">
       <div role="cell">
         <button type="button" className="rowlink" onClick={onOpen} aria-label={`Ver vista previa: ${a.motivo}`}>
           {b.crit}
         </button>
       </div>
-      <div role="cell" className="tabular-nums">
+      <div role="cell" data-label="Cuenta" className="tabular-nums">
         {a.cuenta}
       </div>
       <div role="cell">{a.motivo}</div>
-      <div role="cell">{b.est}</div>
-      <div role="cell">{a.resp || "—"}</div>
-      <div role="cell" className="text-ink-soft">
+      <div role="cell" data-label="Estado">{b.est}</div>
+      <div role="cell" data-label="Responsable">{a.resp || "—"}</div>
+      <div role="cell" data-label="Fecha" className="text-ink-soft">
         {a.fecha}
       </div>
-      <div role="cell">
+      <div role="cell" className="empty:hidden">
         {a.estado === "Sin asignar" && (
           <button type="button" className="btn btn-take" onClick={onTake} aria-label={`Tomar la alerta de la cuenta ${a.cuenta}`}>
             Tomarla
@@ -226,11 +238,27 @@ function FilaAlerta({ alerta: a, onOpen, onTake }: { alerta: Alerta; onOpen: () 
 
 function VistaPrevia({ alerta: a, onClose, onTake }: { alerta: Alerta; onClose: () => void; onTake: () => void }) {
   const b = insignias(a);
+  const cerrar = useRef<HTMLButtonElement>(null);
+
+  // Al abrirse lleva el foco al panel; Escape lo cierra.
+  useEffect(() => {
+    cerrar.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [a.id, onClose]);
+
   return (
-    <aside className="card flex min-w-[260px] flex-[0_1_320px] flex-col gap-3.5" aria-label="Vista previa de la alerta">
+    <>
+      {/* Por debajo de xl la vista previa es un panel superpuesto; en xl va junto a la tabla. */}
+      <div className="anim-aparecer fixed inset-0 z-40 bg-black/40 xl:hidden" aria-hidden="true" onClick={onClose} />
+      <aside
+        className="card anim-panel fixed inset-x-0 bottom-0 z-50 flex max-h-[80vh] flex-col gap-3.5 overflow-y-auto shadow-[0_-8px_24px_rgba(0,0,0,0.18)] sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-none sm:w-[360px] xl:sticky xl:top-24 xl:z-auto xl:max-h-[calc(100vh-7rem)] xl:w-auto xl:min-w-[260px] xl:flex-[0_1_320px] xl:shadow-none"
+        aria-label="Vista previa de la alerta"
+      >
       <div className="flex items-center justify-between gap-2">
         <h2 className="m-0 font-display text-lg font-extrabold">Vista previa</h2>
-        <button type="button" className="btn2 px-4" onClick={onClose} aria-label="Cerrar vista previa">
+        <button ref={cerrar} type="button" className="btn2 px-4" onClick={onClose} aria-label="Cerrar vista previa">
           Cerrar
         </button>
       </div>
@@ -256,6 +284,7 @@ function VistaPrevia({ alerta: a, onClose, onTake }: { alerta: Alerta; onClose: 
           Tomarla
         </button>
       )}
-    </aside>
+      </aside>
+    </>
   );
 }

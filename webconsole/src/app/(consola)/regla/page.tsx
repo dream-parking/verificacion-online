@@ -3,7 +3,7 @@ import { Encabezado } from "@/components/consola/ui";
 
 export default function ReglaPage() {
   return (
-    <div className="flex max-w-[860px] min-w-0 flex-col gap-5">
+    <div className="anim-escalonado flex max-w-[860px] min-w-0 flex-col gap-5">
       <Encabezado titulo="Regla de score">Así se asigna hoy el nivel de riesgo a cada solicitud.</Encabezado>
 
       <div className="flex items-center gap-3 border border-line-mid bg-soft px-4 py-3 text-[15px] leading-[22px]">

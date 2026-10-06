@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Cargando, Encabezado, ErrorCarga, useEstadoDatos, Vacio } from "@/components/consola/ui";
 import {
   completada,
@@ -43,7 +43,7 @@ export function SolicitudesView() {
       </Encabezado>
 
       <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
-        <div className="max-w-[380px] flex-[1_1_260px]">
+        <div className="flex-[1_1_260px] sm:max-w-[380px]">
           <label htmlFor="q" className="lbl">
             Buscar por nombre o número
           </label>
@@ -56,7 +56,7 @@ export function SolicitudesView() {
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-        <div className="min-w-[180px] flex-[0_1_220px]">
+        <div className="min-w-[180px] flex-[0_1_220px] max-sm:basis-full">
           <label htmlFor="f-r" className="lbl">
             Nivel de riesgo
           </label>
@@ -67,7 +67,7 @@ export function SolicitudesView() {
             <option value="sin">Sin evaluar</option>
           </select>
         </div>
-        <div className="min-w-[160px] flex-[0_1_200px]">
+        <div className="min-w-[160px] flex-[0_1_200px] max-sm:basis-full">
           <label htmlFor="f-e" className="lbl">
             Estado
           </label>
@@ -93,7 +93,7 @@ export function SolicitudesView() {
         {estado === "cargando" && (
           <Cargando
             etiqueta="solicitudes"
-            minWidth={1060}
+            className="md:min-w-[1060px]"
             grid="g-sol"
             anchos={["110px", "70%", "90px", "110px", "60px", "120px", "90px"]}
           />
@@ -119,11 +119,11 @@ export function SolicitudesView() {
           />
         )}
         {estado === "normal" &&
-          filtradas.map((r) => {
+          filtradas.map((r, i) => {
             const rk = riesgoDe(r);
             const est = estadoSolicitud(r);
             return (
-              <div key={r.id} className="gr g-sol" role="row">
+              <div key={r.id} className="gr g-sol anim-fila" style={{ "--i": i } as CSSProperties} role="row">
                 <div role="cell">
                   <Link
                     href={`/solicitudes/${r.id}`}
@@ -136,17 +136,17 @@ export function SolicitudesView() {
                 <div role="cell" className="font-semibold">
                   {r.nombre}
                 </div>
-                <div role="cell" className="text-ink-soft">
+                <div role="cell" data-label="Fecha" className="text-ink-soft">
                   {fechaCorta(r)}
                 </div>
-                <div role="cell">{r.tipo || "—"}</div>
-                <div role="cell" className="font-semibold">
+                <div role="cell" data-label="Tipo de dinero">{r.tipo || "—"}</div>
+                <div role="cell" data-label="Monto mensual" className="font-semibold">
                   {r.monto == null ? "—" : usd(r.monto)}
                 </div>
-                <div role="cell">
+                <div role="cell" data-label="Nivel de riesgo">
                   <span className={`badge ${rk.cls}`}>{rk.label}</span>
                 </div>
-                <div role="cell">
+                <div role="cell" data-label="Estado">
                   <span className={`badge ${est.cls}`}>{est.label}</span>
                 </div>
               </div>

@@ -81,7 +81,7 @@ jobs:
             APP=ca-verificaciononline-api-${APP_ENV}
             az containerapp ingress update -n "$APP" -g "$RESOURCE_GROUP" --target-port 8080 -o none
             az containerapp update -n "$APP" -g "$RESOURCE_GROUP" \
-              --image "$IMAGE:${{ github.sha }}" --set-env-vars APP_ENV="$APP_ENV" -o none
+              --image "$IMAGE:${{ github.sha }}" --set-env-vars APP_ENV="$APP_ENV" SPRING_PROFILES_ACTIVE=dev -o none
             FQDN=$(az containerapp show -n "$APP" -g "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)
             echo "FQDN=$FQDN" >> "$GITHUB_ENV"
 

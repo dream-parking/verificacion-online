@@ -16,22 +16,22 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.dreamparking.backend.alert.Alert;
-import com.dreamparking.backend.alert.AlertCriticality;
-import com.dreamparking.backend.alert.AlertInboxItem;
-import com.dreamparking.backend.alert.AlertStatus;
-import com.dreamparking.backend.onboarding.OnboardingRequest;
-import com.dreamparking.backend.onboarding.OnboardingSession;
-import com.dreamparking.backend.onboarding.OnboardingStep;
-import com.dreamparking.backend.onboarding.RequestEvent;
-import com.dreamparking.backend.onboarding.RequestEventType;
-import com.dreamparking.backend.onboarding.RequestSignals;
-import com.dreamparking.backend.onboarding.RequestStatus;
-import com.dreamparking.backend.onboarding.RequestStep;
-import com.dreamparking.backend.onboarding.RequestStepId;
-import com.dreamparking.backend.onboarding.TypingPace;
-import com.dreamparking.backend.risk.RiskAssessment;
-import com.dreamparking.backend.risk.RiskLevel;
+import com.dreamparking.backend.alert.entity.Alert;
+import com.dreamparking.backend.alert.entity.AlertInboxItem;
+import com.dreamparking.backend.alert.entity.enums.AlertCriticality;
+import com.dreamparking.backend.alert.entity.enums.AlertStatus;
+import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
+import com.dreamparking.backend.onboarding.entity.OnboardingSession;
+import com.dreamparking.backend.onboarding.entity.RequestEvent;
+import com.dreamparking.backend.onboarding.entity.RequestSignals;
+import com.dreamparking.backend.onboarding.entity.RequestStep;
+import com.dreamparking.backend.onboarding.entity.RequestStepId;
+import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
+import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
+import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
+import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
+import com.dreamparking.backend.risk.entity.RiskAssessment;
+import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
 /** Reads the demo data through the entities and writes new rows, so every column type mapping is exercised. */
 @Import(TestcontainersConfiguration.class)

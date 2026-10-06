@@ -1,9 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
+import 'package:onboarding/api/onboarding_api.dart';
 import 'package:onboarding/main.dart';
 import 'package:onboarding/onboarding/onboarding_flow.dart';
 import 'package:onboarding/onboarding/solicitud.dart';
+
+/// API falsa: responde `POST /api/onboarding/requests` y cuenta las llamadas.
+class ApiFalsa {
+  ApiFalsa({this.fallarPrimeras = 0});
+
+  int fallarPrimeras;
+  final llamadas = <http.Request>[];
+
+  OnboardingApi get api => OnboardingApi(
+        baseUrl: 'https://api.test',
+        client: MockClient((req) async {
+          llamadas.add(req);
+          if (fallarPrimeras > 0) {
+            fallarPrimeras--;
+            return http.Response('{"status":503,"detail":"Servicio no disponible"}', 503);
+          }
+          return http.Response('{"id":"11111111-2222-3333-4444-555555555555","status":"IN_PROGRESS"}', 201);
+        }),
+      );
+}
 
 void main() {
   group('validación y formato', () {
@@ -61,8 +84,12 @@ void main() {
     Future<void> continuar(WidgetTester tester) => tocar(tester, find.text('CONTINUAR'));
 
     testWidgets('completa la solicitud de principio a fin', (tester) async {
-      await tester.pumpWidget(const OnboardingApp(
-        home: OnboardingFlow(simularErrorDeConexion: true, demoraEnvio: Duration(milliseconds: 10)),
+      await tester.pumpWidget(OnboardingApp(
+        home: OnboardingFlow(
+          api: ApiFalsa().api,
+          simularErrorDeConexion: true,
+          demoraEnvio: const Duration(milliseconds: 10),
+        ),
       ));
       expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
 
@@ -109,11 +136,62 @@ void main() {
     });
 
     testWidgets('la flecha de volver regresa al paso anterior', (tester) async {
-      await tester.pumpWidget(const OnboardingApp());
+      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: ApiFalsa().api)));
       await tocar(tester, find.text('EMPEZAR'));
       expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
       await tocar(tester, find.byTooltip('Volver al paso anterior'));
       expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
+    });
+
+    group('aviso de privacidad (VDI-45)', () {
+      testWidgets('no crea la solicitud hasta aceptar el aviso', (tester) async {
+        final falsa = ApiFalsa();
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api)));
+        await tocar(tester, find.text('EMPEZAR'));
+        expect(find.text('Texto provisional · pendiente de revisión legal'), findsOneWidget);
+
+        await continuar(tester);
+        expect(falsa.llamadas, isEmpty);
+
+        await tocar(tester, find.byType(Checkbox));
+        await continuar(tester);
+        expect(falsa.llamadas, hasLength(1));
+        expect(falsa.llamadas.single.method, 'POST');
+        expect(falsa.llamadas.single.url.path, '/api/onboarding/requests');
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+      });
+
+      testWidgets('al volver, el aviso queda aceptado y no se crea otra solicitud', (tester) async {
+        final falsa = ApiFalsa();
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api)));
+        await tocar(tester, find.text('EMPEZAR'));
+        await tocar(tester, find.byType(Checkbox));
+        await continuar(tester);
+
+        await tocar(tester, find.byTooltip('Volver al paso anterior'));
+        final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
+        expect(checkbox.value, isTrue);
+        expect(checkbox.onChanged, isNull, reason: 'no se puede retirar el consentimiento ya registrado');
+
+        await continuar(tester);
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+        expect(falsa.llamadas, hasLength(1));
+      });
+
+      testWidgets('si falla la conexión muestra el error y permite reintentar', (tester) async {
+        final falsa = ApiFalsa(fallarPrimeras: 1);
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api)));
+        await tocar(tester, find.text('EMPEZAR'));
+        await tocar(tester, find.byType(Checkbox));
+        await continuar(tester);
+
+        expect(find.text('No pudimos iniciar tu solicitud'), findsOneWidget);
+        expect(find.text('Paso 1 de 4'), findsNothing);
+
+        await tocar(tester, find.text('REINTENTAR'));
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+        expect(falsa.llamadas, hasLength(2));
+      });
     });
   });
 }

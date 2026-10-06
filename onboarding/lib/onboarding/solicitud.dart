@@ -41,6 +41,13 @@ String etiquetaDe(List<Opcion> opciones, String valor) {
 
 /// Datos que el cliente llena durante el onboarding.
 class Solicitud {
+  /// `id` de la solicitud en el backend; se crea al aceptar el aviso de privacidad.
+  /// Mientras sea `null` no se captura ninguna señal.
+  String? id;
+  DateTime? avisoAceptadoEn;
+
+  bool get capturaPermitida => id != null;
+
   bool aceptado = false;
   String nombres = '';
   String apellidos = '';

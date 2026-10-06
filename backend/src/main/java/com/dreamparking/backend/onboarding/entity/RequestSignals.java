@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.Synchronize;
 import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -21,6 +22,8 @@ import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 /** Session and device signals of a request, as shown in the console (view). */
 @Entity
 @Immutable
+// Tables the view reads: Hibernate flushes pending changes to them before querying it.
+@Synchronize({ "solicitud", "dispositivo", "sesion_onboarding", "paso_solicitud" })
 @Table(name = "v_solicitud_senales")
 public class RequestSignals {
 

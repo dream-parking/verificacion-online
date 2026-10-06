@@ -33,6 +33,17 @@ public class PgEnumJdbcType extends VarcharJdbcType {
 				st.setObject(name, javaType.unwrap(value, String.class, options), Types.OTHER);
 			}
 
+			// A null typed as VARCHAR is rejected by an enum column; untyped, PostgreSQL accepts it.
+			@Override
+			protected void doBindNull(PreparedStatement st, int index, WrapperOptions options) throws SQLException {
+				st.setNull(index, Types.OTHER);
+			}
+
+			@Override
+			protected void doBindNull(CallableStatement st, String name, WrapperOptions options) throws SQLException {
+				st.setNull(name, Types.OTHER);
+			}
+
 		};
 	}
 

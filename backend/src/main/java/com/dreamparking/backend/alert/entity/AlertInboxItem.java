@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.Synchronize;
 import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -21,6 +22,8 @@ import com.dreamparking.backend.common.persistence.PgEnumJdbcType;
 /** Open alert in the console inbox (view). */
 @Entity
 @Immutable
+// Tables the view reads: Hibernate flushes pending changes to them before querying it.
+@Synchronize({ "alerta", "cuenta", "usuario_consola" })
 @Table(name = "v_bandeja_alertas")
 public class AlertInboxItem {
 

@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import { ConsolaProvider } from "@/components/consola/ConsolaProvider";
+import { ConSesion } from "@/components/consola/ConsolaProvider";
 import { Shell } from "@/components/consola/Shell";
 
 export default function ConsolaLayout({ children }: { children: ReactNode }) {
   return (
-    <ConsolaProvider>
+    <ConSesion>
       <Shell>{children}</Shell>
-    </ConsolaProvider>
+    </ConSesion>
   );
 }

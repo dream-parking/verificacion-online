@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import type { Rol } from "@/lib/consola/datos";
+import { ROL } from "@/lib/consola/formato";
+import { cerrarSesion } from "@/lib/consola/sesion";
 import { useConsola } from "./ConsolaProvider";
 import { Logo } from "./Logo";
 
@@ -17,33 +18,22 @@ function tituloDe(pathname: string) {
   return "";
 }
 
-function SelectorRol({ id, oscuro = false }: { id: string; oscuro?: boolean }) {
-  const { rol, setRol } = useConsola();
-  return (
-    <div className="min-w-[190px]">
-      <label htmlFor={id} className={`lbl ${oscuro ? "text-line-mid" : ""}`}>
-        Rol de demostración
-      </label>
-      <select
-        id={id}
-        className={`fld h-9 ${oscuro ? "border-white text-white [&>option]:text-ink" : ""}`}
-        value={rol}
-        onChange={(e) => setRol(e.target.value as Rol)}
-      >
-        <option value="gerardo">Gerardo · Conozca a su Cliente</option>
-        <option value="ana">Ana · Fraude y cumplimiento</option>
-      </select>
-    </div>
-  );
-}
-
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { usuario, alertas } = useConsola();
   // menuAbierto: menú desplegable en móvil y tableta. colapsado: barra lateral oculta en escritorio.
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [colapsado, setColapsado] = useState(false);
-  const sinAsignar = alertas.filter((x) => x.estado === "Sin asignar").length;
+  const sinAsignar = (alertas.datos ?? []).filter((x) => x.status === "UNASSIGNED").length;
+  const iniciales =
+    usuario.initials ||
+    usuario.fullName
+      .split(/s+/)
+      .slice(0, 2)
+      .map((p) => p[0])
+      .join("")
+      .toUpperCase();
+  const cargo = usuario.jobTitle || ROL[usuario.role];
 
   // En pantallas pequeñas el menú lateral se cierra con Escape.
   useEffect(() => {
@@ -76,7 +66,7 @@ export function Shell({ children }: { children: ReactNode }) {
         } ${colapsado ? "lg:invisible lg:w-0" : "lg:visible"}`}
       >
         <div className="flex h-full w-[248px] flex-col overflow-y-auto">
-          <div className="flex items-center justify-between px-5 pt-[22px] pb-6">
+          <div className="flex items-center justify-between gap-2 py-5 pr-3 pl-4">
             <Logo />
             <button
               type="button"
@@ -90,7 +80,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </button>
             <button
               type="button"
-              className="-mr-2 hidden size-11 items-center justify-center rounded-full text-white hover:bg-dark-hover lg:flex"
+              className="hidden size-9 flex-none items-center justify-center rounded-full text-white hover:bg-dark-hover lg:flex"
               aria-label="Ocultar menú lateral"
               aria-controls="menu-principal"
               aria-expanded={!colapsado}
@@ -120,9 +110,6 @@ export function Shell({ children }: { children: ReactNode }) {
             ))}
           </div>
           <div className="flex-1" />
-          <div className="border-t border-dark-line p-5 md:hidden">
-            <SelectorRol id="rol-menu" oscuro />
-          </div>
           {ONBOARDING_URL && (
             <div className="flex flex-col gap-2.5 border-t border-dark-line p-5">
               <span className="text-[13px] text-line-mid">Atajo de la demostración</span>
@@ -167,24 +154,27 @@ export function Shell({ children }: { children: ReactNode }) {
             </button>
             <div className="truncate font-display text-lg font-extrabold md:text-xl">{tituloDe(pathname)}</div>
           </div>
-          <div className="flex flex-none items-center gap-4">
-            <div className="hidden md:block">
-              <SelectorRol id="rol" />
-            </div>
+          <div className="flex flex-none items-center gap-3 md:gap-4">
             <div className="flex items-center gap-2.5">
               <div
                 className="flex size-10 flex-none items-center justify-center rounded-full bg-ink font-display text-[15px] font-extrabold text-white"
-                title={`${usuario.nombre} · ${usuario.cargo}`}
+                title={`${usuario.fullName} · ${cargo}`}
                 aria-hidden="true"
               >
-                {usuario.ini}
+                {iniciales}
               </div>
-              <div className="hidden sm:max-md:block xl:block">
-                <div className="text-[15px] leading-5 font-bold">{usuario.nombre}</div>
-                <div className="text-[13px] leading-[18px] text-muted">{usuario.cargo}</div>
+              <div className="hidden sm:block">
+                <div className="text-[15px] leading-5 font-bold">{usuario.fullName}</div>
+                <div className="text-[13px] leading-[18px] text-muted">{cargo}</div>
               </div>
-              <span className="sr-only sm:max-md:hidden xl:hidden">{usuario.nombre}</span>
+              <span className="sr-only sm:hidden">{usuario.fullName}</span>
             </div>
+            <button type="button" className="btn2 min-h-10 gap-2 px-3 text-[13px] md:px-4" onClick={cerrarSesion}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" />
+              </svg>
+              <span className="max-md:sr-only">Cerrar sesión</span>
+            </button>
           </div>
         </header>
 

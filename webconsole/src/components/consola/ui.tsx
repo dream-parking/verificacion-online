@@ -1,21 +1,62 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { useState, type ReactNode } from "react";
-import type { EstadoDatos, Par } from "@/lib/consola/datos";
+import { useEffect, useState, type ReactNode } from "react";
+import { ApiError } from "@/lib/consola/api";
+import { cerrarSesion, useSesion } from "@/lib/consola/sesion";
 
-const ESTADOS: EstadoDatos[] = ["normal", "cargando", "error", "vacio"];
+export type Par = { k: string; v: ReactNode };
+
+type Resultado<T> = { clave: string; datos?: T; error?: ApiError };
 
 /**
- * Estado de los datos de la pantalla. Mientras no haya backend se puede forzar
- * con `?estado=cargando|error|vacio` para revisar esos diseños. «Reintentar»
- * vuelve al estado normal.
+ * Carga datos del API con el token de la sesión. `clave` identifica la carga:
+ * cuando cambia se vuelve a pedir. Un 401 cierra la sesión (token vencido o
+ * usuario dado de baja) y la consola vuelve al login.
  */
-export function useEstadoDatos() {
-  const param = useSearchParams().get("estado") as EstadoDatos | null;
-  const [reintentado, setReintentado] = useState(false);
-  const estado: EstadoDatos = !reintentado && param && ESTADOS.includes(param) ? param : "normal";
-  return { estado, reintentar: () => setReintentado(true) };
+export function useCarga<T>(clave: string | null, cargar: (token: string) => Promise<T>) {
+  const token = useSesion()?.accessToken ?? null;
+  const [intento, setIntento] = useState(0);
+  const [res, setRes] = useState<Resultado<T>>();
+  const id = clave && token ? `${clave}#${intento}` : null;
+
+  useEffect(() => {
+    if (!id || !token) return;
+    let vigente = true;
+    cargar(token).then(
+      (datos) => vigente && setRes({ clave: id, datos }),
+      (e: unknown) => {
+        if (!vigente) return;
+        const error = e instanceof ApiError ? e : new ApiError(0, "Error", String(e));
+        if (error.status === 401) cerrarSesion();
+        setRes({ clave: id, error });
+      },
+    );
+    return () => {
+      vigente = false;
+    };
+    // `id` ya refleja todo lo que define la carga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const actual = res?.clave === id ? res : undefined;
+  return {
+    datos: actual?.datos,
+    error: actual?.error,
+    cargando: !!id && !actual,
+    recargar: () => setIntento((i) => i + 1),
+    /** Actualiza los datos ya cargados sin volver a pedirlos (por ejemplo, tras tomar una alerta). */
+    actualizar: (fn: (d: T) => T) =>
+      setRes((r) => (r && r.clave === id && r.datos !== undefined ? { ...r, datos: fn(r.datos) } : r)),
+  };
+}
+
+/** Mensaje para mostrar a la persona a partir de un error del API. */
+export function mensajeDeError(e: ApiError | undefined, porDefecto: string) {
+  if (!e) return porDefecto;
+  if (e.status === 0) return "Hubo un problema de conexión con el servidor. Revisa tu conexión e intenta de nuevo.";
+  if (e.status === 403) return "Tu rol no tiene permiso para ver esta información.";
+  if (e.status === 404) return "No encontramos lo que buscas. Puede que ya no exista.";
+  return porDefecto;
 }
 
 export function Encabezado({ titulo, children }: { titulo: string; children: ReactNode }) {

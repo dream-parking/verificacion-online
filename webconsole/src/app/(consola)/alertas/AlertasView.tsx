@@ -9,13 +9,14 @@ import {
   FiltroSelect,
   FiltroTexto,
   KeyValue,
+  mensajeDeError,
   Paginacion,
   PanelFiltros,
-  useEstadoDatos,
   useFiltrosPaginados,
   Vacio,
 } from "@/components/consola/ui";
-import { CRITICIDAD, ESTADO_ALERTA, SEVERIDAD, type Alerta } from "@/lib/consola/datos";
+import { ApiError, type Alerta } from "@/lib/consola/api";
+import { CRITICIDAD, ESTADO_ALERTA, fecha, fechaCorta, NOTA_HORA, puedeTomarAlertas } from "@/lib/consola/formato";
 
 const FILTROS_INICIALES = {
   tab: "todas",
@@ -24,80 +25,109 @@ const FILTROS_INICIALES = {
   motivo: "",
   estado: "todos",
   resp: "todos",
-  fecha: "7d",
+  fecha: "todas",
   accion: "todas",
 };
 
-const SIN_RESPONSABLE = "sin";
+const SIN_RESPONSABLE = "__sin__";
+const HORA = 3600_000;
 
-export function AlertasView() {
-  // Al cambiar de rol se reinician los filtros y el aviso.
-  const { rol } = useConsola();
-  return <Bandeja key={rol} />;
+/** Límite del filtro de fecha, calculado al elegirlo (no en cada render). */
+type Corte = { desde?: number; dia?: string };
+function corteDe(opcion: string): Corte {
+  const ahora = Date.now();
+  if (opcion === "hoy") return { dia: fecha(new Date(ahora).toISOString()) };
+  if (opcion === "48h") return { desde: ahora - 48 * HORA };
+  if (opcion === "7d") return { desde: ahora - 7 * 24 * HORA };
+  return {};
 }
 
-function Bandeja() {
+type Aviso = { tipo: "ok" | "error"; texto: string };
+
+function mensajeAlTomar(e: unknown) {
+  if (e instanceof ApiError) {
+    if (e.status === 409) return "Otra persona tomó esta alerta antes que tú, o ya no está abierta. Actualizamos la bandeja.";
+    if (e.status === 403) return "Tu rol no puede tomar alertas.";
+    if (e.status === 404) return "Esta alerta ya no existe.";
+    if (e.status === 0) return "No pudimos conectar con el servidor. Intenta de nuevo.";
+  }
+  return "No pudimos tomar la alerta. Intenta de nuevo.";
+}
+
+export function AlertasView() {
   const { usuario, alertas, tomarAlerta } = useConsola();
-  const { estado, reintentar } = useEstadoDatos();
   const { filtros: f, setFiltro, limpiar, hayFiltros, tamano, setTamano, setPagina, paginar } =
     useFiltrosPaginados(FILTROS_INICIALES);
-  const [toast, setToast] = useState("");
+  const [corte, setCorte] = useState<Corte>({});
+  const [aviso, setAviso] = useState<Aviso | null>(null);
+  const [tomando, setTomando] = useState<string | null>(null);
   const [selId, setSelId] = useState("");
 
-  const sinAsignar = alertas.filter((x) => x.estado === "Sin asignar").length;
-  const mias = alertas.filter((x) => x.resp === usuario.nombre).length;
-  const responsables = [...new Set(alertas.flatMap((x) => (x.resp ? [x.resp] : [])))].sort();
+  const puedeTomar = puedeTomarAlertas(usuario.role);
+  const lista = alertas.datos ?? [];
+  const sinAsignar = lista.filter((x) => x.status === "UNASSIGNED").length;
+  const mias = lista.filter((x) => x.assigneeId === usuario.id).length;
+  const responsables = [...new Set(lista.flatMap((x) => (x.assigneeName ? [x.assigneeName] : [])))].sort();
   const digitos = f.cuenta.replace(/\D/g, "");
   const motivo = f.motivo.trim().toLowerCase();
 
-  const filtradas = alertas
-    .filter((x) => {
-      if (f.tab === "mias" && x.resp !== usuario.nombre) return false;
-      if (f.tab === "sin" && x.estado !== "Sin asignar") return false;
-      if (f.crit !== "todas" && x.crit !== f.crit) return false;
-      if (digitos && !x.cuenta.includes(digitos)) return false;
-      if (motivo && !x.motivo.toLowerCase().includes(motivo)) return false;
-      if (f.estado !== "todos" && x.estado !== f.estado) return false;
-      if (f.resp === SIN_RESPONSABLE && x.resp) return false;
-      if (f.resp !== "todos" && f.resp !== SIN_RESPONSABLE && x.resp !== f.resp) return false;
-      if (f.fecha === "hoy" && x.d !== 5) return false;
-      if (f.fecha === "48h" && x.d < 4) return false;
-      if (f.accion === "tomar" && x.estado !== "Sin asignar") return false;
-      if (f.accion === "ninguna" && x.estado === "Sin asignar") return false;
-      return true;
-    })
-    .sort((a, b) => SEVERIDAD[a.crit] - SEVERIDAD[b.crit] || (a.ts < b.ts ? 1 : -1));
+  // El API ya las devuelve de la más crítica a la menos crítica, y la más reciente primero.
+  const filtradas = lista.filter((x) => {
+    if (f.tab === "mias" && x.assigneeId !== usuario.id) return false;
+    if (f.tab === "sin" && x.status !== "UNASSIGNED") return false;
+    if (f.crit !== "todas" && x.criticality !== f.crit) return false;
+    if (digitos && !x.account.replace(/\D/g, "").includes(digitos)) return false;
+    if (motivo && !x.reason.toLowerCase().includes(motivo)) return false;
+    if (f.estado !== "todos" && x.status !== f.estado) return false;
+    if (f.resp === SIN_RESPONSABLE && x.assigneeName) return false;
+    if (f.resp !== "todos" && f.resp !== SIN_RESPONSABLE && x.assigneeName !== f.resp) return false;
+    if (f.fecha !== "todas" && corte.dia && fecha(x.raisedAt) !== corte.dia) return false;
+    if (f.fecha !== "todas" && corte.desde && Date.parse(x.raisedAt) < corte.desde) return false;
+    const tomable = puedeTomar && x.status === "UNASSIGNED";
+    if (f.accion === "tomar" && !tomable) return false;
+    if (f.accion === "ninguna" && tomable) return false;
+    return true;
+  });
   const pag = paginar(filtradas);
 
-  const tomar = (id: string) => setToast(tomarAlerta(id));
-  const seleccionada = alertas.find((x) => x.id === selId);
+  const tomar = async (a: Alerta) => {
+    setTomando(a.id);
+    try {
+      const nueva = await tomarAlerta(a.id);
+      setAviso({ tipo: "ok", texto: `Alerta de la cuenta ${nueva.account} asignada a ${nueva.assigneeName ?? usuario.fullName}.` });
+    } catch (e) {
+      setAviso({ tipo: "error", texto: mensajeAlTomar(e) });
+    } finally {
+      setTomando(null);
+    }
+  };
+  const seleccionada = lista.find((x) => x.id === selId);
   const cerrarPreview = useCallback(() => setSelId(""), []);
 
-  // ¿Solo está activo el filtro rápido «Mis alertas», sin ningún otro filtro?
+  // ¿Solo está activo el filtro rápido, sin ningún otro filtro?
   const soloTab = (Object.keys(FILTROS_INICIALES) as (keyof typeof FILTROS_INICIALES)[]).every(
     (k) => k === "tab" || f[k] === FILTROS_INICIALES[k],
   );
   let vacioTitulo = "No hay alertas con esos filtros";
   let vacioTexto = "Cambia o quita los filtros para ver más alertas.";
-  if (estado === "vacio") {
-    vacioTitulo = "Tu bandeja está al día";
-    vacioTexto = "No hay alertas por atender en este momento. Cuando el sistema genere una nueva, aparecerá aquí.";
-  } else if (f.tab === "mias" && soloTab) {
+  if (f.tab === "mias" && soloTab) {
     vacioTitulo = "No tienes alertas asignadas";
-    vacioTexto = "Revisa «Sin asignar» para tomar una.";
+    vacioTexto = puedeTomar ? "Revisa «Sin asignar» para tomar una." : "Tu rol puede consultar la bandeja, pero no tomar alertas.";
   } else if (f.tab === "mias") {
     vacioTitulo = "No tienes alertas con esos filtros";
   }
 
   const tabs = [
-    { key: "todas", label: "Todas", count: alertas.length },
+    { key: "todas", label: "Todas", count: lista.length },
     { key: "mias", label: "Mis alertas", count: mias },
     { key: "sin", label: "Sin asignar", count: sinAsignar },
   ];
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
-      <Encabezado titulo="Bandeja de alertas">Ordenadas por criticidad, de la más urgente a la menos urgente.</Encabezado>
+      <Encabezado titulo="Bandeja de alertas">
+        Ordenadas por criticidad, de la más urgente a la menos urgente. {NOTA_HORA}
+      </Encabezado>
 
       <div className="flex flex-wrap gap-2.5" role="group" aria-label="Filtro rápido">
         {tabs.map((t) => (
@@ -124,10 +154,10 @@ function Bandeja() {
           onChange={(v) => setFiltro("crit", v)}
           opciones={[
             { value: "todas", label: "Todas" },
-            { value: "Crítica", label: "Crítica" },
-            { value: "Alta", label: "Alta" },
-            { value: "Media", label: "Media" },
-            { value: "Baja", label: "Baja" },
+            { value: "CRITICAL", label: "Crítica" },
+            { value: "HIGH", label: "Alta" },
+            { value: "MEDIUM", label: "Media" },
+            { value: "LOW", label: "Baja" },
           ]}
         />
         <FiltroTexto
@@ -152,9 +182,9 @@ function Bandeja() {
           onChange={(v) => setFiltro("estado", v)}
           opciones={[
             { value: "todos", label: "Todos" },
-            { value: "Sin asignar", label: "Sin asignar" },
-            { value: "Asignada", label: "Asignada" },
-            { value: "En revisión", label: "En revisión" },
+            { value: "UNASSIGNED", label: "Sin asignar" },
+            { value: "ASSIGNED", label: "Asignada" },
+            { value: "IN_REVIEW", label: "En revisión" },
           ]}
         />
         <FiltroSelect
@@ -172,8 +202,12 @@ function Bandeja() {
           id="a-f"
           label="Fecha"
           value={f.fecha}
-          onChange={(v) => setFiltro("fecha", v)}
+          onChange={(v) => {
+            setCorte(corteDe(v));
+            setFiltro("fecha", v);
+          }}
           opciones={[
+            { value: "todas", label: "Todas las fechas" },
             { value: "7d", label: "Últimos 7 días" },
             { value: "48h", label: "Últimas 48 horas" },
             { value: "hoy", label: "Hoy" },
@@ -192,13 +226,28 @@ function Bandeja() {
         />
       </PanelFiltros>
 
-      {toast && (
+      {aviso && (
         <div
-          key={toast}
-          role="status"
-          className="anim-aviso border border-[#0b6b4a] bg-[#e2f5ec] px-4 py-3 text-[15px] leading-[22px] font-semibold text-[#0b4f37]"
+          key={aviso.texto}
+          role={aviso.tipo === "ok" ? "status" : "alert"}
+          className={`anim-aviso flex items-start justify-between gap-3 border px-4 py-3 text-[15px] leading-[22px] font-semibold ${
+            aviso.tipo === "ok"
+              ? "border-[#0b6b4a] bg-[#e2f5ec] text-[#0b4f37]"
+              : "border-danger bg-[#fbeaea] text-danger"
+          }`}
         >
-          ✓ {toast}
+          <span>
+            {aviso.tipo === "ok" ? "✓ " : "⚠ "}
+            {aviso.texto}
+          </span>
+          <button
+            type="button"
+            className="-my-1 flex-none rounded-full px-2 text-lg leading-none hover:bg-black/5"
+            aria-label="Cerrar aviso"
+            onClick={() => setAviso(null)}
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -215,35 +264,44 @@ function Bandeja() {
               <div role="columnheader">Acción</div>
             </div>
 
-            {estado === "cargando" && (
+            {alertas.cargando && (
               <Cargando
                 etiqueta="alertas"
-                className="md:min-w-[960px]"
+                className="md:min-w-[1030px]"
                 grid="g-ale"
                 anchos={["90px", "70px", "75%", "90px", "100px", "70px", "70px"]}
               />
             )}
-            {estado === "error" && (
+            {alertas.error && (
               <ErrorCarga
                 titulo="No pudimos cargar las alertas"
-                texto="Hubo un problema de conexión con el servidor. Intenta de nuevo en un momento."
-                onRetry={reintentar}
+                texto={mensajeDeError(alertas.error, "Hubo un problema con el servidor. Intenta de nuevo en un momento.")}
+                onRetry={alertas.recargar}
               />
             )}
-            {(estado === "vacio" || (estado === "normal" && filtradas.length === 0)) && (
+            {alertas.datos && lista.length === 0 && (
               <Vacio
-                titulo={vacioTitulo}
-                texto={vacioTexto}
-                onLimpiar={estado === "normal" && hayFiltros ? limpiar : undefined}
+                titulo="Tu bandeja está al día"
+                texto="No hay alertas por atender en este momento. Cuando el sistema genere una nueva, aparecerá aquí."
               />
             )}
-            {estado === "normal" &&
-              pag.visibles.map((a, i) => (
-                <FilaAlerta key={a.id} indice={i} alerta={a} onOpen={() => setSelId(a.id)} onTake={() => tomar(a.id)} />
-              ))}
+            {lista.length > 0 && filtradas.length === 0 && (
+              <Vacio titulo={vacioTitulo} texto={vacioTexto} onLimpiar={hayFiltros ? limpiar : undefined} />
+            )}
+            {pag.visibles.map((a, i) => (
+              <FilaAlerta
+                key={a.id}
+                indice={i}
+                alerta={a}
+                puedeTomar={puedeTomar}
+                tomando={tomando === a.id}
+                onOpen={() => setSelId(a.id)}
+                onTake={() => tomar(a)}
+              />
+            ))}
           </div>
 
-          {estado === "normal" && filtradas.length > 0 && (
+          {filtradas.length > 0 && (
             <Paginacion
               etiqueta="alertas"
               total={pag.total}
@@ -257,7 +315,13 @@ function Bandeja() {
         </div>
 
         {seleccionada && (
-          <VistaPrevia alerta={seleccionada} onClose={cerrarPreview} onTake={() => tomar(seleccionada.id)} />
+          <VistaPrevia
+            alerta={seleccionada}
+            puedeTomar={puedeTomar}
+            tomando={tomando === seleccionada.id}
+            onClose={cerrarPreview}
+            onTake={() => tomar(seleccionada)}
+          />
         )}
       </div>
     </div>
@@ -265,19 +329,50 @@ function Bandeja() {
 }
 
 function insignias(alerta: Alerta) {
-  const [critCls, critLabel] = CRITICIDAD[alerta.crit];
-  const [estCls, estLabel] = ESTADO_ALERTA[alerta.estado];
-  return { crit: <span className={`badge ${critCls}`}>{critLabel}</span>, est: <span className={`badge ${estCls}`}>{estLabel}</span> };
+  const crit = CRITICIDAD[alerta.criticality];
+  const est = ESTADO_ALERTA[alerta.status];
+  return {
+    crit: <span className={`badge ${crit.cls}`}>{crit.label}</span>,
+    est: <span className={`badge ${est.cls}`}>{est.label}</span>,
+  };
+}
+
+function BotonTomar({
+  alerta: a,
+  tomando,
+  onTake,
+  className = "",
+}: {
+  alerta: Alerta;
+  tomando: boolean;
+  onTake: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`btn ${className}`}
+      onClick={onTake}
+      disabled={tomando}
+      aria-label={`Tomar la alerta de la cuenta ${a.account}`}
+    >
+      {tomando ? "Tomando…" : "Tomarla"}
+    </button>
+  );
 }
 
 function FilaAlerta({
   alerta: a,
   indice,
+  puedeTomar,
+  tomando,
   onOpen,
   onTake,
 }: {
   alerta: Alerta;
   indice: number;
+  puedeTomar: boolean;
+  tomando: boolean;
   onOpen: () => void;
   onTake: () => void;
 }) {
@@ -285,31 +380,45 @@ function FilaAlerta({
   return (
     <div className="gr g-ale anim-fila" style={{ "--i": indice } as CSSProperties} role="row">
       <div role="cell">
-        <button type="button" className="rowlink" onClick={onOpen} aria-label={`Ver vista previa: ${a.motivo}`}>
+        <button type="button" className="rowlink" onClick={onOpen} aria-label={`Ver vista previa: ${a.reason}`}>
           {b.crit}
         </button>
       </div>
       <div role="cell" data-label="Cuenta" className="tabular-nums">
-        {a.cuenta}
+        {a.account}
       </div>
-      <div role="cell">{a.motivo}</div>
-      <div role="cell" data-label="Estado">{b.est}</div>
-      <div role="cell" data-label="Responsable">{a.resp || "—"}</div>
+      <div role="cell">{a.reason}</div>
+      <div role="cell" data-label="Estado">
+        {b.est}
+      </div>
+      <div role="cell" data-label="Responsable">
+        {a.assigneeName || "—"}
+      </div>
       <div role="cell" data-label="Fecha" className="text-ink-soft">
-        {a.fecha}
+        {fechaCorta(a.raisedAt)}
       </div>
       <div role="cell" className="empty:hidden">
-        {a.estado === "Sin asignar" && (
-          <button type="button" className="btn btn-take" onClick={onTake} aria-label={`Tomar la alerta de la cuenta ${a.cuenta}`}>
-            Tomarla
-          </button>
+        {puedeTomar && a.status === "UNASSIGNED" && (
+          <BotonTomar alerta={a} tomando={tomando} onTake={onTake} className="btn-take" />
         )}
       </div>
     </div>
   );
 }
 
-function VistaPrevia({ alerta: a, onClose, onTake }: { alerta: Alerta; onClose: () => void; onTake: () => void }) {
+function VistaPrevia({
+  alerta: a,
+  puedeTomar,
+  tomando,
+  onClose,
+  onTake,
+}: {
+  alerta: Alerta;
+  puedeTomar: boolean;
+  tomando: boolean;
+  onClose: () => void;
+  onTake: () => void;
+}) {
   const b = insignias(a);
   const cerrar = useRef<HTMLButtonElement>(null);
 
@@ -329,34 +438,30 @@ function VistaPrevia({ alerta: a, onClose, onTake }: { alerta: Alerta; onClose: 
         className="card anim-panel fixed inset-x-0 bottom-0 z-50 flex max-h-[80vh] flex-col gap-3.5 overflow-y-auto shadow-[0_-8px_24px_rgba(0,0,0,0.18)] sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-none sm:w-[360px] xl:sticky xl:top-24 xl:z-auto xl:max-h-[calc(100vh-7rem)] xl:w-auto xl:min-w-[260px] xl:flex-[0_1_320px] xl:shadow-none"
         aria-label="Vista previa de la alerta"
       >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="m-0 font-display text-lg font-extrabold">Vista previa</h2>
-        <button ref={cerrar} type="button" className="btn2 px-4" onClick={onClose} aria-label="Cerrar vista previa">
-          Cerrar
-        </button>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {b.crit}
-        {b.est}
-      </div>
-      <div className="text-base leading-6 font-semibold">{a.motivo}</div>
-      <KeyValue
-        className="grid-cols-[100px_1fr]"
-        items={[
-          { k: "Cuenta", v: a.cuenta },
-          { k: "Responsable", v: a.resp || "—" },
-          { k: "Fecha", v: a.fecha },
-        ]}
-      />
-      <div className="border border-dashed border-line-strong bg-soft px-4 py-3.5 text-sm leading-5 text-ink-soft">
-        <strong className="text-ink">Detalle: próximamente.</strong> En esta versión solo puedes ver el resumen y tomar
-        alertas sin dueño.
-      </div>
-      {a.estado === "Sin asignar" && (
-        <button type="button" className="btn" onClick={onTake}>
-          Tomarla
-        </button>
-      )}
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="m-0 font-display text-lg font-extrabold">Vista previa</h2>
+          <button ref={cerrar} type="button" className="btn2 px-4" onClick={onClose} aria-label="Cerrar vista previa">
+            Cerrar
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {b.crit}
+          {b.est}
+        </div>
+        <div className="text-base leading-6 font-semibold">{a.reason}</div>
+        <KeyValue
+          className="grid-cols-[100px_1fr]"
+          items={[
+            { k: "Cuenta", v: a.account },
+            { k: "Responsable", v: a.assigneeName || "—" },
+            { k: "Fecha", v: fechaCorta(a.raisedAt) },
+          ]}
+        />
+        <div className="border border-dashed border-line-strong bg-soft px-4 py-3.5 text-sm leading-5 text-ink-soft">
+          <strong className="text-ink">Detalle: próximamente.</strong> En esta versión solo puedes ver el resumen y tomar
+          alertas sin dueño.
+        </div>
+        {puedeTomar && a.status === "UNASSIGNED" && <BotonTomar alerta={a} tomando={tomando} onTake={onTake} />}
       </aside>
     </>
   );

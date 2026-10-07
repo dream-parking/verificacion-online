@@ -37,15 +37,19 @@ const catalogoDev = {
 
 /// API falsa: responde el catálogo, `POST /api/onboarding/requests` y `PUT .../signals`, y guarda las llamadas.
 class ApiFalsa {
-  ApiFalsa({this.fallarPrimeras = 0, this.fallarSenales = 0, this.fallarCatalogos = 0});
+  ApiFalsa({this.fallarPrimeras = 0, this.fallarSenales = 0, this.fallarCatalogos = 0, this.erroresIngresos = const []});
 
   int fallarPrimeras;
   int fallarSenales;
   int fallarCatalogos;
+
+  /// Códigos HTTP con los que responden los primeros `PUT /income` (luego 204).
+  List<int> erroresIngresos;
   final llamadas = <http.Request>[];
 
   List<http.Request> get creaciones =>
       llamadas.where((r) => r.method == 'POST' && r.url.path == '/api/onboarding/requests').toList();
+  List<http.Request> get ingresos => llamadas.where((r) => r.url.path.endsWith('/income')).toList();
   List<http.Request> get catalogos => llamadas.where((r) => r.url.path == '/api/catalogs').toList();
   List<http.Request> get senales => llamadas.where((r) => r.url.path.endsWith('/signals')).toList();
 
@@ -59,6 +63,14 @@ class ApiFalsa {
               return http.Response('', 503);
             }
             return http.Response.bytes(utf8.encode(jsonEncode(catalogoDev)), 200);
+          }
+          if (req.url.path.endsWith('/income')) {
+            if (erroresIngresos.isNotEmpty) {
+              final status = erroresIngresos.first;
+              erroresIngresos = erroresIngresos.sublist(1);
+              return http.Response('{"status":$status,"detail":"error"}', status);
+            }
+            return http.Response('', 204);
           }
           if (req.url.path.endsWith('/signals')) {
             if (fallarSenales > 0) {
@@ -436,6 +448,70 @@ void main() {
         await tocar(tester, find.text('REINTENTAR'));
         expect(find.byType(OpcionTarjeta), findsNWidgets(9));
         expect(falsa.catalogos, hasLength(2));
+      });
+    });
+
+    group('guardar los ingresos (VDI-47)', () {
+      Future<void> irAIngresos(WidgetTester tester, ApiFalsa falsa) async {
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
+        await tocar(tester, find.text('EMPEZAR'));
+        await tocar(tester, find.byType(Checkbox));
+        await continuar(tester);
+        await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await continuar(tester);
+      }
+
+      testWidgets('al continuar envía el origen y el rango con los códigos del catálogo', (tester) async {
+        final falsa = ApiFalsa();
+        await irAIngresos(tester, falsa);
+        await tocar(tester, find.text('Remesas'));
+        await tocar(tester, find.text('USD 500.01 a 1,000'));
+        expect(falsa.ingresos, isEmpty, reason: 'no se envía hasta tocar Continuar');
+        await continuar(tester);
+
+        expect(find.text('Paso 3 de 4'), findsOneWidget);
+        final req = falsa.ingresos.single;
+        expect(req.method, 'PUT');
+        expect(req.url.path, '/api/onboarding/requests/11111111-2222-3333-4444-555555555555/income');
+        expect(jsonDecode(req.body), {'sourceCode': 'REMESAS', 'rangeCode': '500_1000'});
+      });
+
+      testWidgets('con "Otro" envía también el detalle', (tester) async {
+        final falsa = ApiFalsa();
+        await irAIngresos(tester, falsa);
+        await tocar(tester, find.text('Otro'));
+        await tocar(tester, find.text('Hasta USD 500'));
+        await tester.enterText(find.byType(TextField), '  Venta de artesanías ');
+        await continuar(tester);
+        expect(jsonDecode(falsa.ingresos.single.body), {
+          'sourceCode': 'OTRO',
+          'rangeCode': 'HASTA_500',
+          'sourceDetail': 'Venta de artesanías',
+        });
+      });
+
+      testWidgets('si no se guarda no avanza; al reintentar sí', (tester) async {
+        final falsa = ApiFalsa(erroresIngresos: [503]);
+        await irAIngresos(tester, falsa);
+        await tocar(tester, find.text('Salario'));
+        await tocar(tester, find.text('Hasta USD 500'));
+        await continuar(tester);
+
+        expect(find.text('No pudimos guardar tus ingresos'), findsOneWidget);
+        expect(find.text('Paso 2 de 4'), findsOneWidget);
+
+        await tocar(tester, find.text('REINTENTAR'));
+        expect(find.text('Paso 3 de 4'), findsOneWidget);
+        expect(falsa.ingresos, hasLength(2));
+      });
+
+      testWidgets('si la solicitud ya no está en progreso lo explica', (tester) async {
+        final falsa = ApiFalsa(erroresIngresos: [409]);
+        await irAIngresos(tester, falsa);
+        await tocar(tester, find.text('Salario'));
+        await tocar(tester, find.text('Hasta USD 500'));
+        await continuar(tester);
+        expect(find.text('Tu solicitud ya fue enviada y no se puede modificar.'), findsOneWidget);
       });
     });
   });

@@ -88,6 +88,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   var _enviando = false;
   var _preparando = false;
   String? _errorInicio;
+  var _guardando = false;
+  String? _errorGuardar;
   var _errorConexion = false;
   var _intentos = 0;
   var _copiado = false;
@@ -123,6 +125,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _pantalla = p;
       _errorConexion = false;
       _errorInicio = null;
+      _errorGuardar = null;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
     // VDI-43: el inicio del paso queda en memoria; solo se envía después de aceptar el aviso.
@@ -155,11 +158,47 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _iniciarSolicitud();
       return;
     }
+    if (_pantalla == Pantalla.ingresos) {
+      _guardarYSeguir(_declararIngresos);
+      return;
+    }
     _completarPaso(_pantalla);
     _ir(_siguiente[_pantalla]!);
   }
 
-  bool get _ocupado => _enviando || _preparando;
+  /// VDI-47: guarda el origen y el rango de ingresos en la API.
+  Future<void> _declararIngresos() => _api.declararIngresos(
+        _s.id!,
+        origen: _s.origen,
+        rango: _s.nivel,
+        detalle: _s.origen == origenOtro ? _s.detalleOrigen.trim() : null,
+      );
+
+  /// Guarda el paso actual en la API y solo avanza si se guardó.
+  Future<void> _guardarYSeguir(Future<void> Function() guardar) async {
+    final paso = _pantalla;
+    setState(() {
+      _guardando = true;
+      _errorGuardar = null;
+    });
+    try {
+      await guardar();
+      if (!mounted) return;
+      setState(() => _guardando = false);
+      _completarPaso(paso);
+      _ir(_siguiente[paso]!);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _guardando = false;
+        _errorGuardar = e.status == 409
+            ? 'Tu solicitud ya fue enviada y no se puede modificar.'
+            : 'Revisa tu conexión a internet e inténtalo de nuevo.';
+      });
+    }
+  }
+
+  bool get _ocupado => _enviando || _preparando || _guardando;
 
   /// VDI-40: lee el dispositivo y envía su huella. Solo corre después de aceptar el aviso.
   /// Si falla no interrumpe al cliente: las señales sirven para el score, no para continuar.
@@ -263,6 +302,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _reenviar = false;
       _intentado.clear();
       _errorInicio = null;
+      _errorGuardar = null;
       _intentos = 0;
       _copiado = false;
     });
@@ -310,6 +350,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               ),
               if (_enviando)
                 const _Cargando(titulo: 'Enviando tu solicitud…', detalle: 'No cierres la aplicación.'),
+              if (_guardando)
+                const _Cargando(titulo: 'Guardando tu información…', detalle: 'Un momento, por favor.'),
               if (_preparando)
                 const _Cargando(titulo: 'Preparando tu solicitud…', detalle: 'Esto puede tardar unos segundos.'),
             ],
@@ -567,6 +609,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 const SizedBox(height: 12),
                 ..._opciones(catalogos.rangosIngreso, _s.nivel, (v) => _s.nivel = v),
                 if (errNivel.isNotEmpty) TextoError(errNivel),
+                if (_errorGuardar != null) ...[
+                  const SizedBox(height: 16),
+                  _ErrorConexion(
+                    titulo: 'No pudimos guardar tus ingresos',
+                    mensaje: _errorGuardar!,
+                    onReintentar: _continuar,
+                  ),
+                ],
               ],
             ],
           ),

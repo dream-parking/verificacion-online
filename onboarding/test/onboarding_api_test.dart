@@ -95,4 +95,23 @@ void main() {
     expect(c.rangosIngreso.single.valor, 'HASTA_500');
     expect(c.tiposMovimiento, isEmpty);
   });
+
+  test('declararIngresos manda sourceDetail solo si hay detalle', () async {
+    final cuerpos = <Object?>[];
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        expect(req.method, 'PUT');
+        expect(req.url.path, '/api/onboarding/requests/abc/income');
+        cuerpos.add(jsonDecode(req.body));
+        return http.Response('', 204);
+      }),
+    );
+    await api.declararIngresos('abc', origen: 'SALARIO', rango: 'HASTA_500');
+    await api.declararIngresos('abc', origen: 'OTRO', rango: 'MAS_2500', detalle: 'Herencia');
+    expect(cuerpos, [
+      {'sourceCode': 'SALARIO', 'rangeCode': 'HASTA_500'},
+      {'sourceCode': 'OTRO', 'rangeCode': 'MAS_2500', 'sourceDetail': 'Herencia'},
+    ]);
+  });
 }

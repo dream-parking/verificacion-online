@@ -2,6 +2,7 @@ package com.dreamparking.backend.onboarding.service;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -28,6 +29,9 @@ public class SignalsService {
 	static final int SLOW_BELOW_CPM = 120;
 
 	static final int FAST_ABOVE_CPM = 250;
+
+	/** Tolerated difference between the phone clock and the server clock for step times. */
+	static final Duration MAX_CLOCK_SKEW = Duration.ofMinutes(5);
 
 	private final OnboardingService onboardingService;
 
@@ -77,7 +81,7 @@ public class SignalsService {
 		sessions.save(session);
 
 		if (body.steps() != null) {
-			body.steps().forEach(timing -> saveStep(request, timing));
+			body.steps().forEach(timing -> saveStep(request, timing, now));
 		}
 		request.setLastActivityAt(now);
 	}
@@ -92,9 +96,21 @@ public class SignalsService {
 		return cpm > FAST_ABOVE_CPM ? TypingPace.FAST : TypingPace.NORMAL;
 	}
 
-	private void saveStep(OnboardingRequest request, CaptureSignalsRequest.StepTiming timing) {
+	/**
+	 * The app is the only source of step times and attempts (it measures from when the customer sees the screen).
+	 * Times are checked against the request and the server clock, so a wrong phone clock cannot put impossible
+	 * values in the KYC file.
+	 */
+	private void saveStep(OnboardingRequest request, CaptureSignalsRequest.StepTiming timing, Instant now) {
 		if (timing.completedAt() != null && timing.completedAt().isBefore(timing.startedAt())) {
 			throw new InvalidInputException("Step " + timing.step() + " completes before it starts");
+		}
+		if (timing.startedAt().isBefore(request.getStartedAt().minus(MAX_CLOCK_SKEW))) {
+			throw new InvalidInputException("Step " + timing.step() + " starts before the request was created");
+		}
+		Instant latest = now.plus(MAX_CLOCK_SKEW);
+		if (timing.startedAt().isAfter(latest) || (timing.completedAt() != null && timing.completedAt().isAfter(latest))) {
+			throw new InvalidInputException("Step " + timing.step() + " has a time in the future");
 		}
 		RequestStep step = steps.findById(new RequestStepId(request.getId(), timing.step()))
 			.orElseGet(() -> new RequestStep(request, timing.step(), timing.startedAt()));

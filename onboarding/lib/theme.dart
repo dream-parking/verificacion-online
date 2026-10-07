@@ -22,6 +22,10 @@ abstract final class AppColors {
   static const error = Color(0xFFB3261E);
   static const errorDark = Color(0xFF8C1D18);
   static const errorBg = Color(0xFFFDECEA);
+
+  /// Colores del logo Banco Tangamandapio (webconsole/public/marca).
+  static const marcaAzul = Color(0xFF081B39);
+  static const marcaVerde = Color(0xFF0A402B);
 }
 
 /// Estilos de texto. El diseño usa Nunito para títulos y Open Sans para el
@@ -37,6 +41,18 @@ abstract final class AppText {
   static const label = TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.muted);
   static const small = TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.muted);
   static const error = TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.error);
+
+  /// Nombre del banco en Cinzel, como en la consola web (`font-marca`). Cinzel es una fuente
+  /// variable: el grosor se pide con [FontVariation] además de [FontWeight].
+  static TextStyle marca(double size, {required Color color, int peso = 700, double espaciado = 0}) => TextStyle(
+        fontFamily: 'Cinzel',
+        fontSize: size,
+        height: 1.1,
+        color: color,
+        letterSpacing: espaciado,
+        fontWeight: FontWeight.values[(peso ~/ 100) - 1],
+        fontVariations: [FontVariation.weight(peso.toDouble())],
+      );
 }
 
 ThemeData buildTheme() {

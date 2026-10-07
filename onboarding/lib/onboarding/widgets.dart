@@ -299,29 +299,56 @@ class ProgresoPasos extends StatelessWidget {
   }
 }
 
-/// Logo "Ceiba": círculo amarillo con punto negro.
+/// Marca Banco Tangamandapio para el encabezado: emblema redondo y nombre del banco,
+/// como en la barra lateral de la consola web (Logo.tsx), adaptado a fondo blanco.
 class Logo extends StatelessWidget {
   const Logo({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(color: AppColors.yellow, shape: BoxShape.circle),
-          child: Container(
-            width: 10,
-            height: 10,
-            decoration: const BoxDecoration(color: AppColors.ink, shape: BoxShape.circle),
+    return Semantics(
+      label: 'Banco Tangamandapio',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.yellow, width: 2),
+            ),
+            child: ClipOval(child: Image.asset('assets/marca/emblema.png', fit: BoxFit.cover)),
           ),
-        ),
-        const SizedBox(width: 8),
-        Text('Ceiba', style: AppText.heading(22)),
-      ],
+          const SizedBox(width: 10),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('BANCO', style: AppText.marca(10, color: AppColors.marcaVerde, peso: 600, espaciado: 3.2)),
+              Text('TANGAMANDAPIO', style: AppText.marca(15, color: AppColors.marcaAzul, peso: 700)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Logo completo con el lema, para la bienvenida (mismo archivo que el login de la consola).
+class LogoCompleto extends StatelessWidget {
+  const LogoCompleto({super.key, this.ancho = 220});
+
+  final double ancho;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/marca/logo-tangamandapio.webp',
+      width: ancho,
+      semanticLabel: 'Banco Tangamandapio. Confianza que nos une, futuro que construimos',
     );
   }
 }

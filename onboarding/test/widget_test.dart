@@ -596,5 +596,16 @@ void main() {
         expect(falsa.movimientos, hasLength(2));
       });
     });
+
+    testWidgets('marca Banco Tangamandapio: logo completo en la bienvenida y emblema en los pasos', (tester) async {
+      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: ApiFalsa().api, dispositivo: DispositivoFalso())));
+      expect(find.byType(LogoCompleto), findsOneWidget);
+      expect(find.byType(Logo), findsNothing, reason: 'en la bienvenida no se repite la marca en el encabezado');
+      expect(find.text('Ceiba'), findsNothing);
+
+      await tocar(tester, find.text('EMPEZAR'));
+      expect(find.byType(Logo), findsOneWidget);
+      expect(find.text('TANGAMANDAPIO'), findsOneWidget);
+    });
   });
 }

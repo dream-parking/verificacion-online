@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../api/catalogos.dart';
 import '../api/onboarding_api.dart';
 import '../env.dart';
 import '../senales/huella_dispositivo.dart';
@@ -69,10 +70,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   final _dui = TextEditingController();
   final _tel = TextEditingController();
   final _monto = TextEditingController();
+  final _detalleOrigen = TextEditingController();
 
   late final OnboardingApi _api = widget.api ?? OnboardingApi();
   late final FuenteDispositivo _dispositivo = widget.dispositivo ?? HuellaDispositivo();
   var _s = Solicitud();
+
+  /// Opciones de la API (VDI-48). No son datos personales: se piden al abrir la app.
+  Catalogos? _catalogos;
+  var _errorCatalogos = false;
   var _senales = Senales();
   var _senalesPendientes = false;
   Future<void>? _envioEnCurso;
@@ -88,10 +94,27 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   @override
   void dispose() {
-    for (final c in [_scroll, _nombres, _apellidos, _dui, _tel, _monto]) {
+    for (final c in [_scroll, _nombres, _apellidos, _dui, _tel, _monto, _detalleOrigen]) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarCatalogos();
+  }
+
+  Future<void> _cargarCatalogos() async {
+    if (_errorCatalogos) setState(() => _errorCatalogos = false);
+    try {
+      final catalogos = await _api.catalogos();
+      if (mounted) setState(() => _catalogos = catalogos);
+    } on ApiException catch (e) {
+      debugPrint('No se pudieron cargar los catálogos: $e');
+      if (mounted) setState(() => _errorCatalogos = true);
+    }
   }
 
   void _ir(Pantalla p) {
@@ -230,7 +253,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   void _reiniciar() {
-    for (final c in [_nombres, _apellidos, _dui, _tel, _monto]) {
+    for (final c in [_nombres, _apellidos, _dui, _tel, _monto, _detalleOrigen]) {
       c.clear();
     }
     setState(() {
@@ -497,7 +520,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   Widget _ingresos() {
     final errOrigen = _error('origen');
+    final errDetalle = _error('detalleOrigen');
     final errNivel = _error('nivel');
+    final catalogos = _catalogos;
     return Column(
       children: [
         const Cabecera(
@@ -516,19 +541,52 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     'Se llama «Conozca a su Cliente».',
               ),
               const SizedBox(height: 24),
-              const Subtitulo('Origen de tus ingresos'),
-              const SizedBox(height: 12),
-              ..._opciones(origenesIngreso, _s.origen, (v) => _s.origen = v),
-              if (errOrigen.isNotEmpty) TextoError(errOrigen),
-              const SizedBox(height: 28),
-              const Subtitulo('¿Cuánto ganas al mes?'),
-              const SizedBox(height: 12),
-              ..._opciones(nivelesIngreso, _s.nivel, (v) => _s.nivel = v),
-              if (errNivel.isNotEmpty) TextoError(errNivel),
+              if (catalogos == null)
+                _cargandoOpciones()
+              else ...[
+                const Subtitulo('Origen de tus ingresos'),
+                const SizedBox(height: 12),
+                ..._opciones(catalogos.origenesIngreso, _s.origen, (v) => _s.origen = v),
+                if (errOrigen.isNotEmpty) TextoError(errOrigen),
+                if (_s.origen == origenOtro) ...[
+                  const SizedBox(height: 8),
+                  CampoTexto(
+                    controller: _detalleOrigen,
+                    etiqueta: '¿De dónde vienen tus ingresos?',
+                    placeholder: 'Por ejemplo, venta de artesanías',
+                    formatters: [LengthLimitingTextInputFormatter(150)],
+                    error: errDetalle,
+                    onChanged: (v) {
+                      _escribio('detalleOrigen', v);
+                      setState(() => _s.detalleOrigen = v);
+                    },
+                  ),
+                ],
+                const SizedBox(height: 28),
+                const Subtitulo('¿Cuánto ganas al mes?'),
+                const SizedBox(height: 12),
+                ..._opciones(catalogos.rangosIngreso, _s.nivel, (v) => _s.nivel = v),
+                if (errNivel.isNotEmpty) TextoError(errNivel),
+              ],
             ],
           ),
         ),
       ],
+    );
+  }
+
+  /// Mientras llegan las opciones de la API, o si fallaron.
+  Widget _cargandoOpciones() {
+    if (_errorCatalogos) {
+      return _ErrorConexion(
+        titulo: 'No pudimos cargar las opciones',
+        mensaje: 'Revisa tu conexión a internet e inténtalo de nuevo.',
+        onReintentar: _cargarCatalogos,
+      );
+    }
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 32),
+      child: Center(child: CircularProgressIndicator(color: AppColors.blue)),
     );
   }
 
@@ -643,8 +701,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           _Resumen(
             titulo: 'Tus ingresos',
             semanticaEditar: 'Editar ingresos',
-            linea1: etiquetaDe(origenesIngreso, _s.origen),
-            linea2: '${etiquetaDe(nivelesIngreso, _s.nivel)} al mes',
+            linea1: _s.origen == origenOtro
+                ? 'Otro: ${_s.detalleOrigen.trim()}'
+                : etiquetaDe(_catalogos?.origenesIngreso ?? const [], _s.origen),
+            linea2: '${etiquetaDe(_catalogos?.rangosIngreso ?? const [], _s.nivel)} al mes',
             onEditar: () => _ir(Pantalla.ingresos),
           ),
           const SizedBox(height: 14),

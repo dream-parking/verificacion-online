@@ -9,23 +9,57 @@ import 'package:onboarding/api/onboarding_api.dart';
 import 'package:onboarding/main.dart';
 import 'package:onboarding/onboarding/onboarding_flow.dart';
 import 'package:onboarding/onboarding/solicitud.dart';
+import 'package:onboarding/onboarding/widgets.dart';
 import 'package:onboarding/senales/huella_dispositivo.dart';
 
-/// API falsa: responde `POST /api/onboarding/requests` y `PUT .../signals`, y guarda las llamadas.
+/// Catálogo como el de la API de Dev (VDI-46 y VDI-50).
+const catalogoDev = {
+  'incomeSources': [
+    {'code': 'SALARIO', 'label': 'Salario'},
+    {'code': 'NEGOCIO_PROPIO', 'label': 'Negocio propio'},
+    {'code': 'REMESAS', 'label': 'Remesas'},
+    {'code': 'PENSION', 'label': 'Pensión'},
+    {'code': 'OTRO', 'label': 'Otro'},
+  ],
+  'incomeRanges': [
+    {'code': 'HASTA_500', 'label': 'Hasta USD 500', 'minUsd': null, 'maxUsd': 500.0},
+    {'code': '500_1000', 'label': 'USD 500.01 a 1,000', 'minUsd': 500.01, 'maxUsd': 1000.0},
+    {'code': '1000_2500', 'label': 'USD 1,000.01 a 2,500', 'minUsd': 1000.01, 'maxUsd': 2500.0},
+    {'code': 'MAS_2500', 'label': 'Más de USD 2,500', 'minUsd': 2500.01, 'maxUsd': null},
+  ],
+  'transactionTypes': [
+    {'code': 'PAGO_SALARIO', 'label': 'Pago de salario'},
+  ],
+  'monthlyAmountRanges': [
+    {'code': 'HASTA_200', 'label': 'Hasta USD 200', 'minUsd': null, 'maxUsd': 200.0},
+  ],
+};
+
+/// API falsa: responde el catálogo, `POST /api/onboarding/requests` y `PUT .../signals`, y guarda las llamadas.
 class ApiFalsa {
-  ApiFalsa({this.fallarPrimeras = 0, this.fallarSenales = 0});
+  ApiFalsa({this.fallarPrimeras = 0, this.fallarSenales = 0, this.fallarCatalogos = 0});
 
   int fallarPrimeras;
   int fallarSenales;
+  int fallarCatalogos;
   final llamadas = <http.Request>[];
 
-  List<http.Request> get creaciones => llamadas.where((r) => r.method == 'POST').toList();
+  List<http.Request> get creaciones =>
+      llamadas.where((r) => r.method == 'POST' && r.url.path == '/api/onboarding/requests').toList();
+  List<http.Request> get catalogos => llamadas.where((r) => r.url.path == '/api/catalogs').toList();
   List<http.Request> get senales => llamadas.where((r) => r.url.path.endsWith('/signals')).toList();
 
   OnboardingApi get api => OnboardingApi(
         baseUrl: 'https://api.test',
         client: MockClient((req) async {
           llamadas.add(req);
+          if (req.url.path == '/api/catalogs') {
+            if (fallarCatalogos > 0) {
+              fallarCatalogos--;
+              return http.Response('', 503);
+            }
+            return http.Response.bytes(utf8.encode(jsonEncode(catalogoDev)), 200);
+          }
           if (req.url.path.endsWith('/signals')) {
             if (fallarSenales > 0) {
               fallarSenales--;
@@ -142,7 +176,7 @@ void main() {
       // Ingresos.
       expect(find.text('Paso 2 de 4'), findsOneWidget);
       await tocar(tester, find.text('Remesas'));
-      await tocar(tester, find.text('USD 500 a 1,500'));
+      await tocar(tester, find.text('USD 500.01 a 1,000'));
       await continuar(tester);
 
       // Movimiento esperado.
@@ -155,6 +189,8 @@ void main() {
       expect(find.text('Paso 4 de 4'), findsOneWidget);
       expect(find.text('Marta Alejandra Rivas Cruz'), findsOneWidget);
       expect(find.text('DUI 04812377-5 · Cel. 7845-2310'), findsOneWidget);
+      expect(find.text('Remesas'), findsOneWidget);
+      expect(find.text('USD 500.01 a 1,000 al mes'), findsOneWidget);
       expect(find.text('Aprox. USD 1,500 al mes'), findsOneWidget);
 
       // Primer envío falla (simulado) y el reintento funciona.
@@ -309,7 +345,7 @@ void main() {
         await continuar(tester);
 
         await tocar(tester, find.text('Remesas'));
-        await tocar(tester, find.text('USD 500 a 1,500'));
+        await tocar(tester, find.text('USD 500.01 a 1,000'));
         avanzar(4000);
         await continuar(tester);
 
@@ -343,7 +379,63 @@ void main() {
         await tocar(tester, find.text('EMPEZAR'));
         await continuar(tester);
         await continuar(tester);
-        expect(falsa.llamadas, isEmpty);
+        expect(falsa.llamadas.where((r) => r.url.path != '/api/catalogs'), isEmpty);
+      });
+    });
+
+    group('pantalla de ingresos (VDI-48)', () {
+      Future<void> irAIngresos(WidgetTester tester, ApiFalsa falsa) async {
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
+        await tocar(tester, find.text('EMPEZAR'));
+        await tocar(tester, find.byType(Checkbox));
+        await continuar(tester);
+        await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await continuar(tester);
+        expect(find.text('Paso 2 de 4'), findsOneWidget);
+      }
+
+      testWidgets('muestra solo las opciones del catálogo de la UIF', (tester) async {
+        final falsa = ApiFalsa();
+        await irAIngresos(tester, falsa);
+        for (final texto in [
+          'Salario', 'Negocio propio', 'Remesas', 'Pensión', 'Otro', //
+          'Hasta USD 500', 'USD 500.01 a 1,000', 'USD 1,000.01 a 2,500', 'Más de USD 2,500',
+        ]) {
+          expect(find.text(texto), findsOneWidget, reason: texto);
+        }
+        expect(find.byType(OpcionTarjeta), findsNWidgets(9));
+        expect(find.text('USD 500 a 1,500'), findsNothing, reason: 'ya no se usan los rangos fijos');
+        expect(falsa.catalogos, hasLength(1));
+      });
+
+      testWidgets('"Otro" pide el detalle y lo muestra en la revisión', (tester) async {
+        await irAIngresos(tester, ApiFalsa());
+        await tocar(tester, find.text('Otro'));
+        await tocar(tester, find.text('Hasta USD 500'));
+        await continuar(tester);
+        expect(find.text('Cuéntanos de dónde vienen tus ingresos.'), findsOneWidget);
+        expect(find.text('Paso 2 de 4'), findsOneWidget);
+
+        await tester.enterText(find.byType(TextField), 'Venta de artesanías');
+        await continuar(tester);
+        expect(find.text('Paso 3 de 4'), findsOneWidget);
+
+        await tocar(tester, find.text('Ahorro'));
+        await tester.enterText(find.byType(TextField), '300');
+        await continuar(tester);
+        expect(find.text('Otro: Venta de artesanías'), findsOneWidget);
+        expect(find.text('Hasta USD 500 al mes'), findsOneWidget);
+      });
+
+      testWidgets('si no cargan las opciones muestra el error y permite reintentar', (tester) async {
+        final falsa = ApiFalsa(fallarCatalogos: 1);
+        await irAIngresos(tester, falsa);
+        expect(find.text('No pudimos cargar las opciones'), findsOneWidget);
+        expect(find.byType(OpcionTarjeta), findsNothing);
+
+        await tocar(tester, find.text('REINTENTAR'));
+        expect(find.byType(OpcionTarjeta), findsNWidgets(9));
+        expect(falsa.catalogos, hasLength(2));
       });
     });
   });

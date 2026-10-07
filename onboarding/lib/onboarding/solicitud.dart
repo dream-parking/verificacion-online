@@ -38,6 +38,9 @@ class Solicitud {
 
   bool get capturaPermitida => id != null;
 
+  /// Número que asigna el servidor al enviar la solicitud (SOL-AAAA-NNNNN).
+  String? numero;
+
   bool aceptado = false;
   String nombres = '';
   String apellidos = '';
@@ -58,9 +61,10 @@ class Solicitud {
       'nombres': nombres.trim().length < 2 ? 'Escribe tus nombres.' : '',
       'apellidos': apellidos.trim().length < 2 ? 'Escribe tus apellidos.' : '',
       'dui': RegExp(r'^\d{8}-\d$').hasMatch(dui) ? '' : 'Escribe tu DUI con el formato 00000000-0.',
-      'tel': RegExp(r'^[267]\d{3}-\d{4}$').hasMatch(tel)
+      // Celular: en El Salvador empiezan con 6 o 7 (los que empiezan con 2 son fijos); igual que la API.
+      'tel': RegExp(r'^[67]\d{3}-\d{4}$').hasMatch(tel)
           ? ''
-          : 'Escribe un celular de 8 dígitos, por ejemplo 7845-2310.',
+          : 'Escribe un celular de 8 dígitos que empiece con 6 o 7, por ejemplo 7845-2310.',
       'origen': origen.isNotEmpty ? '' : 'Elige de dónde vienen tus ingresos.',
       'detalleOrigen': origen == origenOtro && detalleOrigen.trim().isEmpty
           ? 'Cuéntanos de dónde vienen tus ingresos.'

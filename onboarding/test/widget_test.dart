@@ -29,15 +29,21 @@ const catalogoDev = {
   ],
   'transactionTypes': [
     {'code': 'PAGO_SALARIO', 'label': 'Pago de salario'},
+    {'code': 'COBROS_NEGOCIO', 'label': 'Cobros de su negocio'},
+    {'code': 'REMESAS', 'label': 'Remesas familiares'},
+    {'code': 'AHORRO', 'label': 'Ahorro'},
   ],
   'monthlyAmountRanges': [
     {'code': 'HASTA_200', 'label': 'Hasta USD 200', 'minUsd': null, 'maxUsd': 200.0},
+    {'code': '200_500', 'label': 'USD 200.01 a 500', 'minUsd': 200.01, 'maxUsd': 500.0},
+    {'code': '500_1000', 'label': 'USD 500.01 a 1,000', 'minUsd': 500.01, 'maxUsd': 1000.0},
+    {'code': 'MAS_1000', 'label': 'Más de USD 1,000', 'minUsd': 1000.01, 'maxUsd': null},
   ],
 };
 
 /// API falsa: responde el catálogo, `POST /api/onboarding/requests` y `PUT .../signals`, y guarda las llamadas.
 class ApiFalsa {
-  ApiFalsa({this.fallarPrimeras = 0, this.fallarSenales = 0, this.fallarCatalogos = 0, this.erroresIngresos = const []});
+  ApiFalsa({this.fallarPrimeras = 0, this.fallarSenales = 0, this.fallarCatalogos = 0, this.erroresIngresos = const [], this.erroresMovimiento = const []});
 
   int fallarPrimeras;
   int fallarSenales;
@@ -45,11 +51,15 @@ class ApiFalsa {
 
   /// Códigos HTTP con los que responden los primeros `PUT /income` (luego 204).
   List<int> erroresIngresos;
+
+  /// Códigos HTTP con los que responden los primeros `PUT /expected-activity` (luego 200 con el score).
+  List<int> erroresMovimiento;
   final llamadas = <http.Request>[];
 
   List<http.Request> get creaciones =>
       llamadas.where((r) => r.method == 'POST' && r.url.path == '/api/onboarding/requests').toList();
   List<http.Request> get ingresos => llamadas.where((r) => r.url.path.endsWith('/income')).toList();
+  List<http.Request> get movimientos => llamadas.where((r) => r.url.path.endsWith('/expected-activity')).toList();
   List<http.Request> get catalogos => llamadas.where((r) => r.url.path == '/api/catalogs').toList();
   List<http.Request> get senales => llamadas.where((r) => r.url.path.endsWith('/signals')).toList();
 
@@ -71,6 +81,14 @@ class ApiFalsa {
               return http.Response('{"status":$status,"detail":"error"}', status);
             }
             return http.Response('', 204);
+          }
+          if (req.url.path.endsWith('/expected-activity')) {
+            if (erroresMovimiento.isNotEmpty) {
+              final status = erroresMovimiento.first;
+              erroresMovimiento = erroresMovimiento.sublist(1);
+              return http.Response('{"status":$status,"detail":"error"}', status);
+            }
+            return http.Response('{"level":"LOW","ruleCode":"R-01"}', 200);
           }
           if (req.url.path.endsWith('/signals')) {
             if (fallarSenales > 0) {
@@ -106,13 +124,11 @@ class DispositivoFalso implements FuenteDispositivo {
 
 void main() {
   group('validación y formato', () {
-    test('máscaras de DUI, teléfono y monto', () {
+    test('máscaras de DUI y teléfono', () {
       expect(formatearDui('048123775'), '04812377-5');
       expect(formatearDui('04a8-12377599'), '04812377-5');
       expect(formatearTel('78452310'), '7845-2310');
       expect(formatearTel('784'), '784');
-      expect(formatearMonto('1234567'), '1,234,567');
-      expect(formatearMonto('320'), '320');
     });
 
     test('datos básicos', () {
@@ -128,13 +144,11 @@ void main() {
       expect(s.pantallaValida(Pantalla.basicos), isTrue);
     });
 
-    test('monto debe ser mayor que 0', () {
-      final s = Solicitud()..tipo = 'ahorro';
-      for (final m in ['', '0']) {
-        s.monto = m;
-        expect(s.pantallaValida(Pantalla.movimiento), isFalse);
-      }
-      s.monto = '320';
+    test('movimiento esperado pide tipo y rango de monto', () {
+      final s = Solicitud()..tipo = 'AHORRO';
+      expect(s.pantallaValida(Pantalla.movimiento), isFalse);
+      expect(s.mensajes()['rangoMonto'], 'Elige cuánto dinero moverás al mes.');
+      s.rangoMonto = '200_500';
       expect(s.pantallaValida(Pantalla.movimiento), isTrue);
     });
   });
@@ -194,7 +208,7 @@ void main() {
       // Movimiento esperado.
       expect(find.text('Paso 3 de 4'), findsOneWidget);
       await tocar(tester, find.text('Ahorro'));
-      await tester.enterText(find.byType(TextField), '1500');
+      await tocar(tester, find.text('Más de USD 1,000'));
       await continuar(tester);
 
       // Revisión.
@@ -203,7 +217,8 @@ void main() {
       expect(find.text('DUI 04812377-5 · Cel. 7845-2310'), findsOneWidget);
       expect(find.text('Remesas'), findsOneWidget);
       expect(find.text('USD 500.01 a 1,000 al mes'), findsOneWidget);
-      expect(find.text('Aprox. USD 1,500 al mes'), findsOneWidget);
+      expect(find.text('Ahorro'), findsOneWidget);
+      expect(find.text('Más de USD 1,000 al mes'), findsOneWidget);
 
       // Primer envío falla (simulado) y el reintento funciona.
       await tocar(tester, find.text('ENVIAR SOLICITUD'));
@@ -362,7 +377,7 @@ void main() {
         await continuar(tester);
 
         await tocar(tester, find.text('Ahorro'));
-        await escribir(0, '320');
+        await tocar(tester, find.text('USD 200.01 a 500'));
         await continuar(tester);
 
         avanzar(3000);
@@ -433,7 +448,7 @@ void main() {
         expect(find.text('Paso 3 de 4'), findsOneWidget);
 
         await tocar(tester, find.text('Ahorro'));
-        await tester.enterText(find.byType(TextField), '300');
+        await tocar(tester, find.text('USD 200.01 a 500'));
         await continuar(tester);
         expect(find.text('Otro: Venta de artesanías'), findsOneWidget);
         expect(find.text('Hasta USD 500 al mes'), findsOneWidget);
@@ -512,6 +527,73 @@ void main() {
         await tocar(tester, find.text('Hasta USD 500'));
         await continuar(tester);
         expect(find.text('Tu solicitud ya fue enviada y no se puede modificar.'), findsOneWidget);
+      });
+    });
+
+    group('movimiento esperado (VDI-51)', () {
+      Future<void> irAMovimiento(WidgetTester tester, ApiFalsa falsa) async {
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
+        await tocar(tester, find.text('EMPEZAR'));
+        await tocar(tester, find.byType(Checkbox));
+        await continuar(tester);
+        await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await continuar(tester);
+        await tocar(tester, find.text('Salario'));
+        await tocar(tester, find.text('Hasta USD 500'));
+        await continuar(tester);
+        expect(find.text('Paso 3 de 4'), findsOneWidget);
+      }
+
+      testWidgets('solo se elige del catálogo: no hay campo de texto libre', (tester) async {
+        await irAMovimiento(tester, ApiFalsa());
+        for (final texto in [
+          'Pago de salario', 'Cobros de su negocio', 'Remesas familiares', 'Ahorro', //
+          'Hasta USD 200', 'USD 200.01 a 500', 'USD 500.01 a 1,000', 'Más de USD 1,000',
+        ]) {
+          expect(find.text(texto), findsOneWidget, reason: texto);
+        }
+        expect(find.text('Tu empleador te depositará aquí el sueldo.'), findsOneWidget);
+        expect(find.byType(OpcionTarjeta), findsNWidgets(8));
+        expect(find.byType(TextField), findsNothing);
+      });
+
+      testWidgets('pide elegir tipo y rango antes de continuar', (tester) async {
+        final falsa = ApiFalsa();
+        await irAMovimiento(tester, falsa);
+        await continuar(tester);
+        expect(find.text('Elige qué tipo de dinero manejarás.'), findsOneWidget);
+        expect(find.text('Elige cuánto dinero moverás al mes.'), findsOneWidget);
+        expect(falsa.movimientos, isEmpty);
+      });
+
+      testWidgets('al continuar envía los códigos y pasa a la revisión', (tester) async {
+        final falsa = ApiFalsa();
+        await irAMovimiento(tester, falsa);
+        await tocar(tester, find.text('Remesas familiares'));
+        await tocar(tester, find.text('USD 200.01 a 500'));
+        await continuar(tester);
+
+        expect(find.text('Paso 4 de 4'), findsOneWidget);
+        expect(find.text('Remesas familiares'), findsOneWidget);
+        expect(find.text('USD 200.01 a 500 al mes'), findsOneWidget);
+        final req = falsa.movimientos.single;
+        expect(req.method, 'PUT');
+        expect(req.url.path, '/api/onboarding/requests/11111111-2222-3333-4444-555555555555/expected-activity');
+        expect(jsonDecode(req.body), {'transactionTypeCode': 'REMESAS', 'monthlyAmountRangeCode': '200_500'});
+      });
+
+      testWidgets('si no se guarda no avanza; al reintentar sí', (tester) async {
+        final falsa = ApiFalsa(erroresMovimiento: [503]);
+        await irAMovimiento(tester, falsa);
+        await tocar(tester, find.text('Ahorro'));
+        await tocar(tester, find.text('Hasta USD 200'));
+        await continuar(tester);
+        expect(find.text('No pudimos guardar esta información'), findsOneWidget);
+        expect(find.text('Paso 3 de 4'), findsOneWidget);
+
+        await tocar(tester, find.text('REINTENTAR'));
+        expect(find.text('Paso 4 de 4'), findsOneWidget);
+        expect(falsa.movimientos, hasLength(2));
       });
     });
   });

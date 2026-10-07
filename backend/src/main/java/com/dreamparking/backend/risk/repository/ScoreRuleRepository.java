@@ -28,4 +28,7 @@ public interface ScoreRuleRepository extends JpaRepository<ScoreRule, Integer> {
 		return findInForce(code, List.of(RuleStatus.PROVISIONAL, RuleStatus.CONFIRMED));
 	}
 
+	/** Every version of a rule, newest first. */
+	List<ScoreRule> findByCodeOrderByRuleVersionDesc(String code);
+
 }

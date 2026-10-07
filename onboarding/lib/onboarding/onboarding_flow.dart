@@ -340,7 +340,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             children: [
               Column(
                 children: [
-                  _encabezado(anterior),
+                  // En la bienvenida la marca va en grande (logo completo), no en el encabezado.
+                  if (_pantalla != Pantalla.bienvenida) _encabezado(anterior),
                   if (paso != null) ProgresoPasos(paso: paso),
                   Expanded(
                     child: SingleChildScrollView(
@@ -871,6 +872,10 @@ class _Bienvenida extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(24, 16, 24, 20),
+          child: Center(child: LogoCompleto()),
+        ),
         Container(
           width: double.infinity,
           color: AppColors.orange,

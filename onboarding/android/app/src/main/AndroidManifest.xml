@@ -2,7 +2,7 @@
     <!-- La app habla con la API de onboarding (también en el APK de release). -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="onboarding"
+        android:label="Tangamandapio"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

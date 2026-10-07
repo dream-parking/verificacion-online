@@ -1,7 +1,7 @@
 package com.dreamparking.backend;
 
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -17,10 +17,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.context.WebApplicationContext;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
-import com.dreamparking.backend.console.ConsoleRole;
+import com.dreamparking.backend.console.entity.enums.ConsoleRole;
 import com.jayway.jsonpath.JsonPath;
 
 /** Console read side (request list and detail, rule view) and the analyst inbox (VDI-56, VDI-57, VDI-61, VDI-62, VDI-63). */

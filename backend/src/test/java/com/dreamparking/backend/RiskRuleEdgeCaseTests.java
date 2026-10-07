@@ -20,11 +20,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.dreamparking.backend.onboarding.OnboardingRequest;
-import com.dreamparking.backend.onboarding.OnboardingRequestRepository;
-import com.dreamparking.backend.risk.RiskAssessmentResponse;
-import com.dreamparking.backend.risk.RiskAssessmentService;
-import com.dreamparking.backend.risk.RiskLevel;
+import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
+import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
+import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
+import com.dreamparking.backend.risk.entity.enums.RiskLevel;
+import com.dreamparking.backend.risk.service.RiskAssessmentService;
 import com.jayway.jsonpath.JsonPath;
 
 /**

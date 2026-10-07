@@ -38,6 +38,45 @@ class OnboardingApi {
     return json['id'] as String;
   }
 
+  /// Registra la aceptación del aviso de privacidad, incluida la captura de señales.
+  /// El servidor guarda la versión vigente del aviso y la IP desde la que se aceptó.
+  Future<void> aceptarAviso(String solicitudId) async {
+    await _enviar('PUT', '/api/onboarding/requests/$solicitudId/privacy-consent', cuerpo: {'signalsAccepted': true});
+  }
+
+  /// Paso de datos básicos: DUI con formato 00000000-0 y celular 0000-0000 que empiece con 6 o 7.
+  /// Se puede volver a enviar para corregirlos mientras la solicitud está en progreso.
+  Future<void> enviarDatosBasicos(String solicitudId, {
+    required String nombres,
+    required String apellidos,
+    required String dui,
+    required String celular,
+  }) async {
+    await _enviar('PUT', '/api/onboarding/requests/$solicitudId/basic-data', cuerpo: {
+      'firstNames': nombres,
+      'lastNames': apellidos,
+      'dui': dui,
+      'mobilePhone': celular,
+    });
+  }
+
+  /// Envía la solicitud y devuelve el número que le asignó el servidor (SOL-AAAA-NNNNN, único).
+  ///
+  /// Si la solicitud ya estaba enviada (por ejemplo, se perdió la respuesta de un envío anterior y el
+  /// cliente reintentó), devuelve el número que ya tiene en vez de fallar.
+  Future<String> enviarSolicitud(String solicitudId) async {
+    try {
+      final json = await _enviar('POST', '/api/onboarding/requests/$solicitudId/submit');
+      return json['number'] as String;
+    } on ApiException catch (e) {
+      if (e.status != 409) rethrow;
+      final actual = await _enviar('GET', '/api/onboarding/requests/$solicitudId');
+      final numero = actual['number'];
+      if (actual['status'] == 'COMPLETED' && numero is String) return numero;
+      rethrow;
+    }
+  }
+
   /// Paso de ingresos (VDI-47): códigos del catálogo; `detalle` solo cuando el origen es `OTRO`.
   /// El servidor guarda la fecha y hora de la declaración. Se puede volver a enviar para corregirla
   /// mientras la solicitud está en progreso; después responde 409.

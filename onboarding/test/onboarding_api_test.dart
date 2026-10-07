@@ -129,4 +129,70 @@ void main() {
     expect(enviada.url.path, '/api/onboarding/requests/abc/expected-activity');
     expect(jsonDecode(enviada.body), {'transactionTypeCode': 'AHORRO', 'monthlyAmountRangeCode': 'HASTA_200'});
   });
+
+  test('aceptarAviso registra la aceptación con la captura de señales', () async {
+    late http.Request enviada;
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        enviada = req;
+        return http.Response('{"completedSteps":1}', 200);
+      }),
+    );
+    await api.aceptarAviso('abc');
+    expect(enviada.method, 'PUT');
+    expect(enviada.url.path, '/api/onboarding/requests/abc/privacy-consent');
+    expect(jsonDecode(enviada.body), {'signalsAccepted': true});
+  });
+
+  test('enviarDatosBasicos manda nombres, apellidos, DUI y celular', () async {
+    late http.Request enviada;
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        enviada = req;
+        return http.Response('{"completedSteps":2}', 200);
+      }),
+    );
+    await api.enviarDatosBasicos('abc', nombres: 'Ana', apellidos: 'Pérez', dui: '01234567-8', celular: '7123-4567');
+    expect(enviada.method, 'PUT');
+    expect(enviada.url.path, '/api/onboarding/requests/abc/basic-data');
+    expect(jsonDecode(utf8.decode(enviada.bodyBytes)),
+        {'firstNames': 'Ana', 'lastNames': 'Pérez', 'dui': '01234567-8', 'mobilePhone': '7123-4567'});
+  });
+
+  test('enviarSolicitud devuelve el número que asigna el servidor', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        expect(req.method, 'POST');
+        expect(req.url.path, '/api/onboarding/requests/abc/submit');
+        return http.Response('{"number":"SOL-2026-00419","status":"COMPLETED"}', 200);
+      }),
+    );
+    expect(await api.enviarSolicitud('abc'), 'SOL-2026-00419');
+  });
+
+  test('si la solicitud ya estaba enviada, enviarSolicitud devuelve su número', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async => req.method == 'POST'
+          ? http.Response('{"status":409,"detail":"Onboarding request abc is COMPLETED"}', 409)
+          : http.Response('{"number":"SOL-2026-00419","status":"COMPLETED"}', 200)),
+    );
+    expect(await api.enviarSolicitud('abc'), 'SOL-2026-00419');
+  });
+
+  test('si faltan pasos, enviarSolicitud falla con el detalle del servidor', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async => req.method == 'POST'
+          ? http.Response('{"status":409,"detail":"Complete the 4 previous steps before submitting"}', 409)
+          : http.Response('{"number":null,"status":"IN_PROGRESS"}', 200)),
+    );
+    expect(
+      api.enviarSolicitud('abc'),
+      throwsA(isA<ApiException>().having((e) => e.mensaje, 'mensaje', 'Complete the 4 previous steps before submitting')),
+    );
+  });
 }

@@ -41,23 +41,51 @@ const catalogoDev = {
   ],
 };
 
-/// API falsa: responde el catálogo, `POST /api/onboarding/requests` y `PUT .../signals`, y guarda las llamadas.
+/// API falsa: responde el catálogo y cada paso de la solicitud, y guarda las llamadas.
 class ApiFalsa {
-  ApiFalsa({this.fallarPrimeras = 0, this.fallarSenales = 0, this.fallarCatalogos = 0, this.erroresIngresos = const [], this.erroresMovimiento = const []});
+  ApiFalsa({
+    this.fallarPrimeras = 0,
+    this.fallarSenales = 0,
+    this.fallarCatalogos = 0,
+    this.erroresAviso = const [],
+    this.erroresBasicos = const [],
+    this.erroresIngresos = const [],
+    this.erroresMovimiento = const [],
+    this.erroresEnvio = const [],
+    this.numero = 'SOL-2026-00419',
+  });
 
   int fallarPrimeras;
   int fallarSenales;
   int fallarCatalogos;
+
+  /// Códigos HTTP con los que responden los primeros `PUT /privacy-consent` (luego 200).
+  List<int> erroresAviso;
+
+  /// Códigos HTTP con los que responden los primeros `PUT /basic-data` (luego 200).
+  List<int> erroresBasicos;
 
   /// Códigos HTTP con los que responden los primeros `PUT /income` (luego 204).
   List<int> erroresIngresos;
 
   /// Códigos HTTP con los que responden los primeros `PUT /expected-activity` (luego 200 con el score).
   List<int> erroresMovimiento;
+
+  /// Códigos HTTP con los que responden los primeros `POST /submit` (luego 200 con [numero]).
+  List<int> erroresEnvio;
+
+  /// Número que asigna el servidor al enviar.
+  final String numero;
+
+  /// Si ya se envió: `GET` de la solicitud responde COMPLETED con [numero].
+  var enviada = false;
   final llamadas = <http.Request>[];
 
   List<http.Request> get creaciones =>
       llamadas.where((r) => r.method == 'POST' && r.url.path == '/api/onboarding/requests').toList();
+  List<http.Request> get avisos => llamadas.where((r) => r.url.path.endsWith('/privacy-consent')).toList();
+  List<http.Request> get basicos => llamadas.where((r) => r.url.path.endsWith('/basic-data')).toList();
+  List<http.Request> get envios => llamadas.where((r) => r.url.path.endsWith('/submit')).toList();
   List<http.Request> get ingresos => llamadas.where((r) => r.url.path.endsWith('/income')).toList();
   List<http.Request> get movimientos => llamadas.where((r) => r.url.path.endsWith('/expected-activity')).toList();
   List<http.Request> get catalogos => llamadas.where((r) => r.url.path == '/api/catalogs').toList();
@@ -73,6 +101,31 @@ class ApiFalsa {
               return http.Response('', 503);
             }
             return http.Response.bytes(utf8.encode(jsonEncode(catalogoDev)), 200);
+          }
+          http.Response? error(List<int> errores, void Function(List<int>) quedan) {
+            if (errores.isEmpty) return null;
+            quedan(errores.sublist(1));
+            return http.Response('{"status":${errores.first},"detail":"error"}', errores.first);
+          }
+
+          if (req.url.path.endsWith('/privacy-consent')) {
+            return error(erroresAviso, (r) => erroresAviso = r) ??
+                http.Response('{"status":"IN_PROGRESS","completedSteps":1}', 200);
+          }
+          if (req.url.path.endsWith('/basic-data')) {
+            return error(erroresBasicos, (r) => erroresBasicos = r) ??
+                http.Response('{"status":"IN_PROGRESS","completedSteps":2}', 200);
+          }
+          if (req.url.path.endsWith('/submit')) {
+            final fallo = error(erroresEnvio, (r) => erroresEnvio = r);
+            if (fallo != null) return fallo;
+            enviada = true;
+            return http.Response('{"number":"$numero","status":"COMPLETED","completedSteps":5}', 200);
+          }
+          if (req.method == 'GET' && req.url.path.startsWith('/api/onboarding/requests/')) {
+            return enviada
+                ? http.Response('{"number":"$numero","status":"COMPLETED"}', 200)
+                : http.Response('{"number":null,"status":"IN_PROGRESS"}', 200);
           }
           if (req.url.path.endsWith('/income')) {
             if (erroresIngresos.isNotEmpty) {
@@ -139,7 +192,9 @@ void main() {
         ..apellidos = 'Rivas'
         ..dui = '04812377-5'
         ..tel = '1845-2310';
-      expect(s.mensajes()['tel'], isNotEmpty, reason: 'el celular debe empezar con 2, 6 o 7');
+      expect(s.mensajes()['tel'], isNotEmpty, reason: 'el celular debe empezar con 6 o 7');
+      s.tel = '2245-6789';
+      expect(s.mensajes()['tel'], isNotEmpty, reason: 'los que empiezan con 2 son fijos y la API los rechaza');
       s.tel = '7845-2310';
       expect(s.pantallaValida(Pantalla.basicos), isTrue);
     });
@@ -174,12 +229,11 @@ void main() {
     Future<void> continuar(WidgetTester tester) => tocar(tester, find.text('CONTINUAR'));
 
     testWidgets('completa la solicitud de principio a fin', (tester) async {
+      final falsa = ApiFalsa(erroresEnvio: [503]);
       await tester.pumpWidget(OnboardingApp(
         home: OnboardingFlow(
-          api: ApiFalsa().api,
+          api: falsa.api,
           dispositivo: DispositivoFalso(),
-          simularErrorDeConexion: true,
-          demoraEnvio: const Duration(milliseconds: 10),
         ),
       ));
       expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
@@ -220,13 +274,80 @@ void main() {
       expect(find.text('Ahorro'), findsOneWidget);
       expect(find.text('Más de USD 1,000 al mes'), findsOneWidget);
 
-      // Primer envío falla (simulado) y el reintento funciona.
+      // Cada paso quedó guardado en la API, en el orden que exige el envío.
+      expect(falsa.avisos, hasLength(1));
+      expect(jsonDecode(falsa.basicos.single.body), {
+        'firstNames': 'Marta Alejandra',
+        'lastNames': 'Rivas Cruz',
+        'dui': '04812377-5',
+        'mobilePhone': '7845-2310',
+      });
+      expect(falsa.ingresos, hasLength(1));
+      expect(falsa.movimientos, hasLength(1));
+
+      // El primer envío falla (503) y el reintento funciona.
       await tocar(tester, find.text('ENVIAR SOLICITUD'));
       expect(find.text('No pudimos enviar tu solicitud'), findsOneWidget);
       await tocar(tester, find.text('REINTENTAR'));
 
+      // El número es el que asignó el servidor, no uno de ejemplo.
+      expect(falsa.envios, hasLength(2));
       expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
-      expect(find.text('SOL-2026-00418'), findsOneWidget);
+      expect(find.text('SOL-2026-00419'), findsOneWidget);
+      expect(find.text('SOL-2026-00418'), findsNothing);
+    });
+
+    testWidgets('si falla el registro del aviso, el reintento usa la misma solicitud', (tester) async {
+      final falsa = ApiFalsa(erroresAviso: [503]);
+      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
+      await tocar(tester, find.text('EMPEZAR'));
+      await tocar(tester, find.byType(Checkbox));
+
+      await continuar(tester);
+      expect(find.text('Paso 1 de 4'), findsNothing, reason: 'sin el aviso registrado no avanza');
+      await continuar(tester);
+
+      expect(find.text('Paso 1 de 4'), findsOneWidget);
+      expect(falsa.creaciones, hasLength(1), reason: 'no se crea una segunda solicitud');
+      expect(falsa.avisos, hasLength(2));
+    });
+
+    testWidgets('los datos básicos se guardan en la API antes de avanzar', (tester) async {
+      final falsa = ApiFalsa(erroresBasicos: [503]);
+      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
+      await tocar(tester, find.text('EMPEZAR'));
+      await tocar(tester, find.byType(Checkbox));
+      await continuar(tester);
+      await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+
+      await continuar(tester);
+      expect(find.text('No pudimos guardar tus datos'), findsOneWidget);
+      expect(find.text('Paso 1 de 4'), findsOneWidget);
+
+      await continuar(tester);
+      expect(find.text('Paso 2 de 4'), findsOneWidget);
+      expect(falsa.basicos, hasLength(2));
+    });
+
+    testWidgets('si se perdió la respuesta del envío, muestra el número que ya tiene la solicitud', (tester) async {
+      // El servidor guardó el envío pero el teléfono no recibió la respuesta: el reintento responde 409.
+      final falsa = ApiFalsa(erroresEnvio: [409], numero: 'SOL-2026-00420')..enviada = true;
+      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
+      await tocar(tester, find.text('EMPEZAR'));
+      await tocar(tester, find.byType(Checkbox));
+      await continuar(tester);
+      await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+      await continuar(tester);
+      await tocar(tester, find.text('Remesas'));
+      await tocar(tester, find.text('USD 500.01 a 1,000'));
+      await continuar(tester);
+      await tocar(tester, find.text('Ahorro'));
+      await tocar(tester, find.text('Más de USD 1,000'));
+      await continuar(tester);
+
+      await tocar(tester, find.text('ENVIAR SOLICITUD'));
+      expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+      expect(find.text('SOL-2026-00420'), findsOneWidget);
     });
 
     testWidgets('la flecha de volver regresa al paso anterior', (tester) async {
@@ -345,7 +466,6 @@ void main() {
             api: falsa.api,
             dispositivo: DispositivoFalso(),
             reloj: () => ahora,
-            demoraEnvio: const Duration(milliseconds: 10),
           ),
         ));
 

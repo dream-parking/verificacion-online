@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../env.dart';
+import '../senales/senales.dart';
 
 /// Error al hablar con la API: sin conexión, tiempo agotado o respuesta con error.
 class ApiException implements Exception {
@@ -31,6 +32,11 @@ class OnboardingApi {
   Future<String> iniciarSolicitud() async {
     final json = await _enviar('POST', '/api/onboarding/requests');
     return json['id'] as String;
+  }
+
+  /// Guarda las señales de la solicitud. La IP y el user agent los toma el servidor.
+  Future<void> enviarSenales(String solicitudId, Senales senales) async {
+    await _enviar('PUT', '/api/onboarding/requests/$solicitudId/signals', cuerpo: senales.toJson());
   }
 
   Future<Map<String, dynamic>> _enviar(String metodo, String ruta, {Object? cuerpo}) async {

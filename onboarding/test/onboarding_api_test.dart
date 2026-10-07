@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:onboarding/api/onboarding_api.dart';
+import 'package:onboarding/senales/huella_dispositivo.dart';
+import 'package:onboarding/senales/senales.dart';
 
 void main() {
   test('iniciarSolicitud devuelve el id', () async {
@@ -41,5 +43,28 @@ void main() {
       client: MockClient((_) async => throw http.ClientException('sin red')),
     );
     expect(api.iniciarSolicitud(), throwsA(isA<ApiException>()));
+  });
+
+  test('enviarSenales hace PUT con el JSON de las señales', () async {
+    late http.Request enviada;
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        enviada = req;
+        return http.Response('', 204);
+      }),
+    );
+    final senales = Senales()
+      ..dispositivo = const DatosDispositivo(
+        huella: 'd4f1·9a3c·e7b2',
+        modelo: 'iPhone 15',
+        sistemaOperativo: 'iOS 18.1',
+        versionApp: '1.0.0+1',
+      );
+    await api.enviarSenales('abc', senales);
+    expect(enviada.method, 'PUT');
+    expect(enviada.url.toString(), 'https://api.test/api/onboarding/requests/abc/signals');
+    expect(enviada.headers['Content-Type'], startsWith('application/json'));
+    expect(jsonDecode(enviada.body)['deviceFingerprint'], 'd4f1·9a3c·e7b2');
   });
 }

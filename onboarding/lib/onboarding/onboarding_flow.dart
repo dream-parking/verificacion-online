@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api/onboarding_api.dart';
 import '../env.dart';
+import '../senales/huella_dispositivo.dart';
+import '../senales/senales.dart';
 import '../theme.dart';
 import 'aviso_privacidad.dart';
 import 'solicitud.dart';
@@ -13,12 +17,20 @@ class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({
     super.key,
     this.api,
+    this.dispositivo,
+    this.reloj = DateTime.now,
     this.simularErrorDeConexion = false,
     this.demoraEnvio = const Duration(milliseconds: 1400),
   });
 
   /// Cliente de la API; los tests pasan uno falso.
   final OnboardingApi? api;
+
+  /// Lector del dispositivo (VDI-40); los tests pasan uno falso.
+  final FuenteDispositivo? dispositivo;
+
+  /// Hora actual para medir tiempos (VDI-43); los tests pasan una controlada.
+  final DateTime Function() reloj;
 
   /// Hace fallar el primer envío para mostrar el estado de error de conexión.
   final bool simularErrorDeConexion;
@@ -59,7 +71,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   final _monto = TextEditingController();
 
   late final OnboardingApi _api = widget.api ?? OnboardingApi();
+  late final FuenteDispositivo _dispositivo = widget.dispositivo ?? HuellaDispositivo();
   var _s = Solicitud();
+  var _senales = Senales();
+  var _senalesPendientes = false;
+  Future<void>? _envioEnCurso;
+  var _reenviar = false;
   var _pantalla = Pantalla.bienvenida;
   final _intentado = <Pantalla>{};
   var _enviando = false;
@@ -85,9 +102,24 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _errorInicio = null;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
+    // VDI-43: el inicio del paso queda en memoria; solo se envía después de aceptar el aviso.
+    _senales.pasos.iniciar(p, widget.reloj());
+    if (_senalesPendientes) unawaited(_enviarSenales());
+  }
+
+  /// VDI-43: marca el paso actual como completado y envía las señales.
+  void _completarPaso(Pantalla p) {
+    _senales.pasos.completar(p, widget.reloj());
+    unawaited(_enviarSenales());
+  }
+
+  /// VDI-43: ritmo de escritura en los campos de texto (solo después de aceptar el aviso).
+  void _escribio(String campo, String texto) {
+    if (_s.capturaPermitida) _senales.ritmo.registrar(campo, texto, widget.reloj());
   }
 
   void _continuar() {
+    _senales.pasos.intento(_pantalla);
     if (_pantalla == Pantalla.revision) {
       _enviar();
       return;
@@ -100,10 +132,54 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _iniciarSolicitud();
       return;
     }
+    _completarPaso(_pantalla);
     _ir(_siguiente[_pantalla]!);
   }
 
   bool get _ocupado => _enviando || _preparando;
+
+  /// VDI-40: lee el dispositivo y envía su huella. Solo corre después de aceptar el aviso.
+  /// Si falla no interrumpe al cliente: las señales sirven para el score, no para continuar.
+  Future<void> _capturarDispositivo() async {
+    if (!_s.capturaPermitida) return;
+    try {
+      _senales.dispositivo = await _dispositivo.leer();
+    } on Exception catch (e) {
+      debugPrint('No se pudo leer el dispositivo: $e');
+      return;
+    }
+    await _enviarSenales();
+  }
+
+  /// Envía todas las señales capturadas; si falla, se reintenta en el siguiente cambio de pantalla.
+  ///
+  /// Los envíos van de uno en uno: como el backend reemplaza todo en cada envío, uno viejo que
+  /// llegara tarde borraría datos nuevos. Si se pide otro mientras hay uno en curso, se manda
+  /// una vez más al terminar, con lo último capturado.
+  Future<void> _enviarSenales() {
+    if (_envioEnCurso != null) {
+      _reenviar = true;
+      return _envioEnCurso!;
+    }
+    return _envioEnCurso = _enviarEnOrden().whenComplete(() => _envioEnCurso = null);
+  }
+
+  Future<void> _enviarEnOrden() async {
+    do {
+      _reenviar = false;
+      final id = _s.id;
+      final senales = _senales;
+      if (id == null || senales.dispositivo == null) return;
+      _senalesPendientes = false;
+      try {
+        await _api.enviarSenales(id, senales);
+      } on ApiException catch (e) {
+        debugPrint('No se pudieron enviar las señales: $e');
+        _senalesPendientes = true;
+        return;
+      }
+    } while (_reenviar);
+  }
 
   /// Crea la solicitud en el backend al aceptar el aviso. Hasta este momento no se captura nada.
   Future<void> _iniciarSolicitud() async {
@@ -117,10 +193,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       setState(() {
         _s
           ..id = id
-          ..avisoAceptadoEn = DateTime.now();
+          ..avisoAceptadoEn = widget.reloj();
         _preparando = false;
       });
+      _senales.pasos.completar(Pantalla.privacidad, _s.avisoAceptadoEn!);
       _ir(Pantalla.basicos);
+      unawaited(_capturarDispositivo());
     } on ApiException {
       if (!mounted) return;
       setState(() {
@@ -146,6 +224,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       });
     } else {
       setState(() => _enviando = false);
+      _completarPaso(Pantalla.revision);
       _ir(Pantalla.confirmacion);
     }
   }
@@ -156,6 +235,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
     setState(() {
       _s = Solicitud();
+      _senales = Senales();
+      _senalesPendientes = false;
+      _reenviar = false;
       _intentado.clear();
       _errorInicio = null;
       _intentos = 0;
@@ -343,7 +425,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               placeholder: 'Por ejemplo, Marta Alejandra',
               autofill: const [AutofillHints.givenName],
               error: _error('nombres'),
-              onChanged: (v) => setState(() => _s.nombres = v),
+              onChanged: (v) {
+                _escribio('nombres', v);
+                setState(() => _s.nombres = v);
+              },
             ),
             const SizedBox(height: 20),
             CampoTexto(
@@ -352,7 +437,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               placeholder: 'Por ejemplo, Rivas Cruz',
               autofill: const [AutofillHints.familyName],
               error: _error('apellidos'),
-              onChanged: (v) => setState(() => _s.apellidos = v),
+              onChanged: (v) {
+                _escribio('apellidos', v);
+                setState(() => _s.apellidos = v);
+              },
             ),
             const SizedBox(height: 20),
             CampoTexto(
@@ -362,7 +450,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               teclado: TextInputType.number,
               formatters: [mascara(formatearDui)],
               error: _error('dui'),
-              onChanged: (v) => setState(() => _s.dui = v),
+              onChanged: (v) {
+                _escribio('dui', v);
+                setState(() => _s.dui = v);
+              },
             ),
             const SizedBox(height: 20),
             CampoTexto(
@@ -373,7 +464,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               autofill: const [AutofillHints.telephoneNumberNational],
               formatters: [mascara(formatearTel)],
               error: _error('tel'),
-              onChanged: (v) => setState(() => _s.tel = v),
+              onChanged: (v) {
+                _escribio('tel', v);
+                setState(() => _s.tel = v);
+              },
             ),
             if (appEnv != 'prod') ...[
               const SizedBox(height: 12),
@@ -501,7 +595,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                         LengthLimitingTextInputFormatter(7),
                       ],
                       error: '',
-                      onChanged: (v) => setState(() => _s.monto = v),
+                      onChanged: (v) {
+                        _escribio('monto', v);
+                        setState(() => _s.monto = v);
+                      },
                     ),
                   ),
                 ],

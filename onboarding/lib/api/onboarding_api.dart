@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../env.dart';
 import '../senales/senales.dart';
+import 'catalogos.dart';
 
 /// Error al hablar con la API: sin conexión, tiempo agotado o respuesta con error.
 class ApiException implements Exception {
@@ -27,6 +28,9 @@ class OnboardingApi {
 
   /// La API de Dev/QA escala a cero: la primera petición puede tardar ~30-60 s.
   static const _timeout = Duration(seconds: 60);
+
+  /// Opciones de origen y rango de ingresos, tipos de movimiento y rangos de monto.
+  Future<Catalogos> catalogos() async => Catalogos.fromJson(await _enviar('GET', '/api/catalogs'));
 
   /// Inicia una solicitud y devuelve su `id`.
   Future<String> iniciarSolicitud() async {

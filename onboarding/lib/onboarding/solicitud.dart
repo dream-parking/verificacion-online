@@ -10,20 +10,8 @@ class Opcion {
   final String descripcion;
 }
 
-const origenesIngreso = [
-  Opcion('salario', 'Salario'),
-  Opcion('negocio', 'Negocio propio'),
-  Opcion('remesas', 'Remesas'),
-  Opcion('pension', 'Pensión'),
-  Opcion('otro', 'Otro'),
-];
-
-const nivelesIngreso = [
-  Opcion('n1', 'Menos de USD 500'),
-  Opcion('n2', 'USD 500 a 1,500'),
-  Opcion('n3', 'USD 1,500 a 5,000'),
-  Opcion('n4', 'Más de USD 5,000'),
-];
+/// Código del origen "Otro": la API exige el detalle (`sourceDetail`) cuando se elige.
+const origenOtro = 'OTRO';
 
 const tiposMovimiento = [
   Opcion('salario', 'Pago de salario', 'Tu empleador te depositará aquí el sueldo.'),
@@ -54,6 +42,7 @@ class Solicitud {
   String dui = '';
   String tel = '';
   String origen = '';
+  String detalleOrigen = '';
   String nivel = '';
   String tipo = '';
   String monto = '';
@@ -72,6 +61,9 @@ class Solicitud {
           ? ''
           : 'Escribe un celular de 8 dígitos, por ejemplo 7845-2310.',
       'origen': origen.isNotEmpty ? '' : 'Elige de dónde vienen tus ingresos.',
+      'detalleOrigen': origen == origenOtro && detalleOrigen.trim().isEmpty
+          ? 'Cuéntanos de dónde vienen tus ingresos.'
+          : '',
       'nivel': nivel.isNotEmpty ? '' : 'Elige tu nivel de ingresos mensuales.',
       'tipo': tipo.isNotEmpty ? '' : 'Elige qué tipo de dinero manejarás.',
       'monto': (n > 0 && n <= 1000000) ? '' : 'Escribe un monto mensual mayor que 0.',
@@ -81,7 +73,7 @@ class Solicitud {
   static List<String> camposDe(Pantalla p) => switch (p) {
         Pantalla.privacidad => ['aceptado'],
         Pantalla.basicos => ['nombres', 'apellidos', 'dui', 'tel'],
-        Pantalla.ingresos => ['origen', 'nivel'],
+        Pantalla.ingresos => ['origen', 'detalleOrigen', 'nivel'],
         Pantalla.movimiento => ['tipo', 'monto'],
         _ => [],
       };

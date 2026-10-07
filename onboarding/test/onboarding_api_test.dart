@@ -67,4 +67,32 @@ void main() {
     expect(enviada.headers['Content-Type'], startsWith('application/json'));
     expect(jsonDecode(enviada.body)['deviceFingerprint'], 'd4f1·9a3c·e7b2');
   });
+
+  test('catalogos lee las cuatro listas con código y etiqueta', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        expect(req.method, 'GET');
+        expect(req.url.path, '/api/catalogs');
+        return http.Response.bytes(
+          utf8.encode(jsonEncode({
+            'incomeSources': [
+              {'code': 'PENSION', 'label': 'Pensión'},
+            ],
+            'incomeRanges': [
+              {'code': 'HASTA_500', 'label': 'Hasta USD 500', 'minUsd': null, 'maxUsd': 500.0},
+            ],
+            'transactionTypes': [],
+            'monthlyAmountRanges': [],
+          })),
+          200,
+        );
+      }),
+    );
+    final c = await api.catalogos();
+    expect(c.origenesIngreso.single.valor, 'PENSION');
+    expect(c.origenesIngreso.single.etiqueta, 'Pensión');
+    expect(c.rangosIngreso.single.valor, 'HASTA_500');
+    expect(c.tiposMovimiento, isEmpty);
+  });
 }

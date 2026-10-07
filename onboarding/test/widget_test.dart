@@ -246,12 +246,15 @@ void main() {
         final req = falsa.senales.single;
         expect(req.method, 'PUT');
         expect(req.url.path, '/api/onboarding/requests/11111111-2222-3333-4444-555555555555/signals');
-        expect(jsonDecode(req.body), {
-          'deviceFingerprint': 'd4f1·9a3c·e7b2',
-          'deviceModel': 'Google Pixel 9',
-          'operatingSystem': 'Android 16',
-          'appVersion': '1.0.0+1',
-        });
+        expect(
+          jsonDecode(req.body),
+          allOf(
+            containsPair('deviceFingerprint', 'd4f1·9a3c·e7b2'),
+            containsPair('deviceModel', 'Google Pixel 9'),
+            containsPair('operatingSystem', 'Android 16'),
+            containsPair('appVersion', '1.0.0+1'),
+          ),
+        );
       });
 
       testWidgets('si falla el envío no bloquea y se reintenta en la siguiente pantalla', (tester) async {
@@ -266,6 +269,81 @@ void main() {
         await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
         await continuar(tester);
         expect(falsa.senales, hasLength(2));
+      });
+    });
+
+    group('patrones de interacción (VDI-43)', () {
+      testWidgets('envía el ritmo de escritura y el tiempo e intentos de cada paso', (tester) async {
+        var ahora = DateTime.utc(2026, 10, 7, 10);
+        void avanzar(int ms) => ahora = ahora.add(Duration(milliseconds: ms));
+        final falsa = ApiFalsa();
+        await tester.pumpWidget(OnboardingApp(
+          home: OnboardingFlow(
+            api: falsa.api,
+            dispositivo: DispositivoFalso(),
+            reloj: () => ahora,
+            demoraEnvio: const Duration(milliseconds: 10),
+          ),
+        ));
+
+        await tocar(tester, find.text('EMPEZAR'));
+        avanzar(8000);
+        await tocar(tester, find.byType(Checkbox));
+        await continuar(tester);
+
+        // Datos básicos: un intento fallido y luego escritos letra por letra (una tecla cada 200 ms).
+        avanzar(1000);
+        await continuar(tester);
+        Future<void> escribir(int campo, String texto) async {
+          for (var i = 1; i <= texto.length; i++) {
+            avanzar(200);
+            await tester.enterText(find.byType(TextField).at(campo), texto.substring(0, i));
+          }
+          avanzar(2500); // pausa entre campos: no cuenta como tiempo escribiendo
+        }
+
+        await escribir(0, 'Marta Alejandra');
+        await escribir(1, 'Rivas Cruz');
+        await escribir(2, '048123775');
+        await escribir(3, '78452310');
+        await continuar(tester);
+
+        await tocar(tester, find.text('Remesas'));
+        await tocar(tester, find.text('USD 500 a 1,500'));
+        avanzar(4000);
+        await continuar(tester);
+
+        await tocar(tester, find.text('Ahorro'));
+        await escribir(0, '320');
+        await continuar(tester);
+
+        avanzar(3000);
+        await tocar(tester, find.text('ENVIAR SOLICITUD'));
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+        await tester.pumpAndSettle();
+
+        final ultimo = jsonDecode(falsa.senales.last.body) as Map<String, dynamic>;
+        expect(ultimo['deviceFingerprint'], 'd4f1·9a3c·e7b2', reason: 'se sigue mandando la huella (VDI-40)');
+        expect(ultimo['typingSpeedCpm'], 300);
+
+        final pasos = {for (final p in ultimo['steps'] as List) p['step']: p};
+        expect(pasos.keys, ['PRIVACY_NOTICE', 'BASIC_DATA', 'INCOME', 'EXPECTED_ACTIVITY', 'REVIEW']);
+        for (final p in pasos.values) {
+          expect(p['completedAt'], isNotNull, reason: '${p['step']} completado');
+        }
+        expect(pasos['PRIVACY_NOTICE']['startedAt'], '2026-10-07T10:00:00.000Z');
+        expect(pasos['PRIVACY_NOTICE']['completedAt'], '2026-10-07T10:00:08.000Z');
+        expect(pasos['BASIC_DATA']['attempts'], 2);
+        expect(pasos['INCOME']['attempts'], 1);
+      });
+
+      testWidgets('no mide nada que se envíe antes de aceptar el aviso', (tester) async {
+        final falsa = ApiFalsa();
+        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
+        await tocar(tester, find.text('EMPEZAR'));
+        await continuar(tester);
+        await continuar(tester);
+        expect(falsa.llamadas, isEmpty);
       });
     });
   });

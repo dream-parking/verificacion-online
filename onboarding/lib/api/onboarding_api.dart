@@ -38,6 +38,21 @@ class OnboardingApi {
     return json['id'] as String;
   }
 
+  /// Paso de ingresos (VDI-47): códigos del catálogo; `detalle` solo cuando el origen es `OTRO`.
+  /// El servidor guarda la fecha y hora de la declaración. Se puede volver a enviar para corregirla
+  /// mientras la solicitud está en progreso; después responde 409.
+  Future<void> declararIngresos(String solicitudId, {
+    required String origen,
+    required String rango,
+    String? detalle,
+  }) async {
+    await _enviar('PUT', '/api/onboarding/requests/$solicitudId/income', cuerpo: {
+      'sourceCode': origen,
+      'rangeCode': rango,
+      'sourceDetail': ?detalle,
+    });
+  }
+
   /// Guarda las señales de la solicitud. La IP y el user agent los toma el servidor.
   Future<void> enviarSenales(String solicitudId, Senales senales) async {
     await _enviar('PUT', '/api/onboarding/requests/$solicitudId/signals', cuerpo: senales.toJson());

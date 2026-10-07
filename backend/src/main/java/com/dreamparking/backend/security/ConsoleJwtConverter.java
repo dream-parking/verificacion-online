@@ -11,8 +11,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
-import com.dreamparking.backend.console.ConsoleUser;
-import com.dreamparking.backend.console.ConsoleUserRepository;
+import com.dreamparking.backend.console.entity.ConsoleUser;
+import com.dreamparking.backend.console.repository.ConsoleUserRepository;
 
 /**
  * Turns a verified token into the authenticated console user. The user and role are read from the database on each

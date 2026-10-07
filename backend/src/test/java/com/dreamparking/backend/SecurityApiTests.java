@@ -24,6 +24,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,15 +32,13 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
-import com.dreamparking.backend.common.InvalidInputException;
-import com.dreamparking.backend.console.AdminBootstrap;
-import com.dreamparking.backend.console.ConsoleRole;
-import com.dreamparking.backend.console.ConsoleUser;
-import com.dreamparking.backend.console.ConsoleUserRepository;
+import com.dreamparking.backend.common.exception.InvalidInputException;
+import com.dreamparking.backend.console.config.AdminBootstrap;
+import com.dreamparking.backend.console.entity.ConsoleUser;
+import com.dreamparking.backend.console.entity.enums.ConsoleRole;
+import com.dreamparking.backend.console.repository.ConsoleUserRepository;
 import com.dreamparking.backend.security.TokenService;
 import com.jayway.jsonpath.JsonPath;
-
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 /** Sign-in with email and password, token checks, roles and user management of the console. */
 @Import({ TestcontainersConfiguration.class, TestAuth.class })

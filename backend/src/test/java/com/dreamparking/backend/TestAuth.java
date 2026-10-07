@@ -11,9 +11,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import com.dreamparking.backend.console.ConsoleRole;
-import com.dreamparking.backend.console.ConsoleUser;
-import com.dreamparking.backend.console.ConsoleUserRepository;
+import com.dreamparking.backend.console.entity.ConsoleUser;
+import com.dreamparking.backend.console.entity.enums.ConsoleRole;
+import com.dreamparking.backend.console.repository.ConsoleUserRepository;
 import com.dreamparking.backend.security.TokenService;
 
 /** Test helper (import it with {@code @Import}): creates console users with a password and signs tokens for them. */

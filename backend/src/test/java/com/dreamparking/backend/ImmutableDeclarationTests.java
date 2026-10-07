@@ -27,33 +27,33 @@ class ImmutableDeclarationTests {
 	@Test
 	void submittedIncomeDeclarationCannotBeEdited() {
 		assertThatThrownBy(() -> jdbc.update(
-				"update declaracion_ingresos set rango_codigo = 'MAS_2500' where solicitud_id = ?::uuid", SUBMITTED))
+				"update income_declaration set range_code = 'MAS_2500' where request_id = ?::uuid", SUBMITTED))
 			.isInstanceOf(DataIntegrityViolationException.class)
-			.hasMessageContaining("no se puede modificar ni borrar");
+			.hasMessageContaining("cannot be modified or deleted");
 	}
 
 	@Test
 	void submittedIncomeDeclarationCannotBeDeleted() {
 		assertThatThrownBy(
-				() -> jdbc.update("delete from declaracion_ingresos where solicitud_id = ?::uuid", SUBMITTED))
+				() -> jdbc.update("delete from income_declaration where request_id = ?::uuid", SUBMITTED))
 			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test
 	void submittedExpectedActivityCannotBeEditedOrDeleted() {
 		assertThatThrownBy(() -> jdbc.update(
-				"update movimiento_esperado set rango_monto_codigo = 'MAS_1000' where solicitud_id = ?::uuid",
+				"update expected_activity set monthly_amount_range_code = 'MAS_1000' where request_id = ?::uuid",
 				SUBMITTED))
 			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test
 	void declarationsOfARequestInProgressCanStillBeCorrected() {
-		String id = jdbc.queryForObject("insert into solicitud default values returning id::text", String.class);
-		jdbc.update("insert into declaracion_ingresos (solicitud_id, origen_codigo, rango_codigo)"
+		String id = jdbc.queryForObject("insert into onboarding_request default values returning id::text", String.class);
+		jdbc.update("insert into income_declaration (request_id, source_code, range_code)"
 				+ " values (?::uuid, 'SALARIO', 'HASTA_500')", id);
 
-		int updated = jdbc.update("update declaracion_ingresos set rango_codigo = '500_1000' where solicitud_id = ?::uuid",
+		int updated = jdbc.update("update income_declaration set range_code = '500_1000' where request_id = ?::uuid",
 				id);
 
 		assertThat(updated).isEqualTo(1);
@@ -61,14 +61,14 @@ class ImmutableDeclarationTests {
 
 	@Test
 	void deletingARequestStillCascadesToItsDeclarations() {
-		String id = jdbc.queryForObject("insert into solicitud default values returning id::text", String.class);
-		jdbc.update("insert into declaracion_ingresos (solicitud_id, origen_codigo, rango_codigo)"
+		String id = jdbc.queryForObject("insert into onboarding_request default values returning id::text", String.class);
+		jdbc.update("insert into income_declaration (request_id, source_code, range_code)"
 				+ " values (?::uuid, 'SALARIO', 'HASTA_500')", id);
-		jdbc.update("update solicitud set estado = 'ABANDONADA' where id = ?::uuid", id);
+		jdbc.update("update onboarding_request set status = 'ABANDONED' where id = ?::uuid", id);
 
-		jdbc.update("delete from solicitud where id = ?::uuid", id);
+		jdbc.update("delete from onboarding_request where id = ?::uuid", id);
 
-		assertThat(jdbc.queryForObject("select count(*) from declaracion_ingresos where solicitud_id = ?::uuid",
+		assertThat(jdbc.queryForObject("select count(*) from income_declaration where request_id = ?::uuid",
 				Integer.class, id)).isZero();
 	}
 

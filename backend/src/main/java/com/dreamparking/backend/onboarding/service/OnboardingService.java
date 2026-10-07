@@ -26,8 +26,6 @@ import com.dreamparking.backend.onboarding.entity.IncomeDeclaration;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.PrivacyConsent;
 import com.dreamparking.backend.onboarding.entity.RequestEvent;
-import com.dreamparking.backend.onboarding.entity.RequestStep;
-import com.dreamparking.backend.onboarding.entity.RequestStepId;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
@@ -36,14 +34,14 @@ import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepositor
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
 import com.dreamparking.backend.onboarding.repository.PrivacyConsentRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
-import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
 import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 import com.dreamparking.backend.risk.service.RiskAssessmentService;
 
 /**
  * Steps of the mobile onboarding flow: privacy notice → basic data → income → expected activity → submit.
  * Steps can be saved again while the request is in progress; {@code completedSteps} only advances in order,
- * and the request can only be submitted once the four steps are done.
+ * and the request can only be submitted once the four steps are done. The time spent on each step is measured by
+ * the app and stored by {@link SignalsService}: this service only tracks the progress.
  */
 @Service
 public class OnboardingService {
@@ -58,8 +56,6 @@ public class OnboardingService {
 
 	private final ExpectedActivityRepository expectedActivities;
 
-	private final RequestStepRepository steps;
-
 	private final RequestEventRepository events;
 
 	private final CatalogService catalogService;
@@ -72,14 +68,13 @@ public class OnboardingService {
 
 	public OnboardingService(OnboardingRequestRepository requests, PrivacyConsentRepository consents,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
-			RequestStepRepository steps, RequestEventRepository events, CatalogService catalogService,
+			RequestEventRepository events, CatalogService catalogService,
 			PrivacyNoticeService privacyNoticeService, CustomerService customerService,
 			RiskAssessmentService riskAssessmentService) {
 		this.requests = requests;
 		this.consents = consents;
 		this.incomeDeclarations = incomeDeclarations;
 		this.expectedActivities = expectedActivities;
-		this.steps = steps;
 		this.events = events;
 		this.catalogService = catalogService;
 		this.privacyNoticeService = privacyNoticeService;
@@ -207,21 +202,12 @@ public class OnboardingService {
 	}
 
 	/**
-	 * Records the time spent on the step (from the previous activity until now) and advances
-	 * {@code completedSteps} when this is the next step in order. Repeating a step counts another attempt.
+	 * Advances {@code completedSteps} when this is the next step in order. Step times and attempts are not written
+	 * here: the app is their only source (it measures from when the customer sees the screen) and sends them to
+	 * {@code PUT /signals}.
 	 */
 	private void completeStep(OnboardingRequest request, OnboardingStep step) {
 		Instant now = Instant.now();
-		RequestStep record = steps.findById(new RequestStepId(request.getId(), step)).orElse(null);
-		if (record == null) {
-			record = new RequestStep(request, step, request.getLastActivityAt());
-		}
-		else {
-			record.setAttempts((short) (record.getAttempts() + 1));
-		}
-		record.setCompletedAt(now);
-		steps.save(record);
-
 		int stepNumber = step.ordinal() + 1;
 		if (request.getCompletedSteps() == stepNumber - 1) {
 			request.setCompletedSteps((short) stepNumber);

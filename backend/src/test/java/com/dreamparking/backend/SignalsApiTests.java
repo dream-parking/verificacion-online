@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
@@ -51,6 +53,8 @@ class SignalsApiTests {
 	@Test
 	void storesSignalsAndShowsThemInTheConsole() throws Exception {
 		String id = startRequest();
+		Instant shown = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+		Instant done = shown.plusSeconds(68);
 
 		mvc.perform(put("/api/onboarding/requests/{id}/signals", id).contentType(MediaType.APPLICATION_JSON)
 			.header(HttpHeaders.USER_AGENT, "verificacion-app/1.0")
@@ -58,9 +62,9 @@ class SignalsApiTests {
 					{"deviceFingerprint": "aa11·bb22·cc33", "deviceModel": "iPhone 15", "operatingSystem": "iOS",
 					 "appVersion": "1.0.0+1", "approximateLocation": "San Salvador, El Salvador", "countryIso": "sv",
 					 "typingSpeedCpm": 185,
-					 "steps": [{"step": "PRIVACY_NOTICE", "startedAt": "2026-10-06T10:00:00Z", "completedAt": "2026-10-06T10:01:08Z"},
-					           {"step": "INCOME", "startedAt": "2026-10-06T10:01:08Z", "attempts": 2}]}
-					"""))
+					 "steps": [{"step": "PRIVACY_NOTICE", "startedAt": "%s", "completedAt": "%s"},
+					           {"step": "INCOME", "startedAt": "%s", "attempts": 2}]}
+					""".formatted(shown, done, done)))
 			.andExpect(status().isNoContent());
 
 		flushAndClear();
@@ -115,10 +119,11 @@ class SignalsApiTests {
 		capture(id, "{\"deviceFingerprint\": \"fp\", \"typingSpeedCpm\": 5000}", 400);
 		capture(id, "{\"deviceFingerprint\": \"fp\", \"typingSpeedCpm\": -1}", 400);
 		capture(id, "{\"deviceFingerprint\": \"fp\", \"countryIso\": \"SLV\"}", 400);
-		capture(id, "{\"deviceFingerprint\": \"fp\", \"steps\": [{\"step\": \"NO_EXISTE\", \"startedAt\": \"2026-10-06T10:00:00Z\"}]}",
+		Instant now = Instant.now();
+		capture(id, "{\"deviceFingerprint\": \"fp\", \"steps\": [{\"step\": \"NO_EXISTE\", \"startedAt\": \"" + now + "\"}]}",
 				400);
-		capture(id, "{\"deviceFingerprint\": \"fp\", \"steps\": [{\"step\": \"INCOME\", \"startedAt\": \"2026-10-06T10:00:00Z\", \"completedAt\": \"2026-10-06T09:00:00Z\"}]}",
-				400);
+		capture(id, "{\"deviceFingerprint\": \"fp\", \"steps\": [{\"step\": \"INCOME\", \"startedAt\": \"" + now
+				+ "\", \"completedAt\": \"" + now.minusSeconds(60) + "\"}]}", 400);
 	}
 
 	@Test

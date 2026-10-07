@@ -20,8 +20,6 @@ class OnboardingFlow extends StatefulWidget {
     this.api,
     this.dispositivo,
     this.reloj = DateTime.now,
-    this.simularErrorDeConexion = false,
-    this.demoraEnvio = const Duration(milliseconds: 1400),
   });
 
   /// Cliente de la API; los tests pasan uno falso.
@@ -32,10 +30,6 @@ class OnboardingFlow extends StatefulWidget {
 
   /// Hora actual para medir tiempos (VDI-43); los tests pasan una controlada.
   final DateTime Function() reloj;
-
-  /// Hace fallar el primer envío para mostrar el estado de error de conexión.
-  final bool simularErrorDeConexion;
-  final Duration demoraEnvio;
 
   @override
   State<OnboardingFlow> createState() => _OnboardingFlowState();
@@ -62,7 +56,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     Pantalla.movimiento: 3,
     Pantalla.revision: 4,
   };
-  static const _numeroSolicitud = 'SOL-2026-00418';
 
   final _scroll = ScrollController();
   final _nombres = TextEditingController();
@@ -74,6 +67,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   late final OnboardingApi _api = widget.api ?? OnboardingApi();
   late final FuenteDispositivo _dispositivo = widget.dispositivo ?? HuellaDispositivo();
   var _s = Solicitud();
+
+  /// Solicitud creada en el backend cuyo aviso todavía no se pudo registrar: el reintento la reutiliza.
+  String? _idCreado;
 
   /// Opciones de la API (VDI-48). No son datos personales: se piden al abrir la app.
   Catalogos? _catalogos;
@@ -90,7 +86,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   var _guardando = false;
   String? _errorGuardar;
   var _errorConexion = false;
-  var _intentos = 0;
   var _copiado = false;
 
   @override
@@ -157,6 +152,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _iniciarSolicitud();
       return;
     }
+    if (_pantalla == Pantalla.basicos) {
+      _guardarYSeguir(_enviarDatosBasicos);
+      return;
+    }
     if (_pantalla == Pantalla.ingresos) {
       _guardarYSeguir(_declararIngresos);
       return;
@@ -168,6 +167,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     _completarPaso(_pantalla);
     _ir(_siguiente[_pantalla]!);
   }
+
+  /// Guarda nombres, apellidos, DUI y celular en la API.
+  Future<void> _enviarDatosBasicos() => _api.enviarDatosBasicos(
+        _s.id!,
+        nombres: _s.nombres.trim(),
+        apellidos: _s.apellidos.trim(),
+        dui: _s.dui,
+        celular: _s.tel,
+      );
 
   /// VDI-47: guarda el origen y el rango de ingresos en la API.
   Future<void> _declararIngresos() => _api.declararIngresos(
@@ -198,9 +206,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       if (!mounted) return;
       setState(() {
         _guardando = false;
-        _errorGuardar = e.status == 409
-            ? 'Tu solicitud ya fue enviada y no se puede modificar.'
-            : 'Revisa tu conexión a internet e inténtalo de nuevo.';
+        _errorGuardar = switch (e.status) {
+          409 => 'Tu solicitud ya fue enviada y no se puede modificar.',
+          400 => 'Revisa tus datos: ${e.mensaje}',
+          _ => 'Revisa tu conexión a internet e inténtalo de nuevo.',
+        };
       });
     }
   }
@@ -250,14 +260,16 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     } while (_reenviar);
   }
 
-  /// Crea la solicitud en el backend al aceptar el aviso. Hasta este momento no se captura nada.
+  /// Crea la solicitud en el backend al aceptar el aviso y registra la aceptación. Hasta este momento
+  /// no se captura nada. Si se creó pero falló el registro del aviso, el reintento usa la misma solicitud.
   Future<void> _iniciarSolicitud() async {
     setState(() {
       _preparando = true;
       _errorInicio = null;
     });
     try {
-      final id = await _api.iniciarSolicitud();
+      final id = _idCreado ??= await _api.iniciarSolicitud();
+      await _api.aceptarAviso(id);
       if (!mounted) return;
       setState(() {
         _s
@@ -277,24 +289,30 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
+  /// Envía la solicitud; el servidor le asigna su número único (SOL-AAAA-NNNNN).
   Future<void> _enviar() async {
     setState(() {
       _enviando = true;
       _errorConexion = false;
     });
-    // TODO: reemplazar por la llamada al backend cuando exista el endpoint.
-    await Future<void>.delayed(widget.demoraEnvio);
-    if (!mounted) return;
-    if (widget.simularErrorDeConexion && _intentos == 0) {
+    // VDI-43: las señales van antes del envío; una solicitud enviada ya no las acepta.
+    _senales.pasos.completar(Pantalla.revision, widget.reloj());
+    await _enviarSenales();
+    try {
+      final numero = await _api.enviarSolicitud(_s.id!);
+      if (!mounted) return;
+      setState(() {
+        _s.numero = numero;
+        _enviando = false;
+      });
+      _ir(Pantalla.confirmacion);
+    } on ApiException catch (e) {
+      debugPrint('No se pudo enviar la solicitud: $e');
+      if (!mounted) return;
       setState(() {
         _enviando = false;
         _errorConexion = true;
-        _intentos = 1;
       });
-    } else {
-      setState(() => _enviando = false);
-      _completarPaso(Pantalla.revision);
-      _ir(Pantalla.confirmacion);
     }
   }
 
@@ -304,13 +322,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
     setState(() {
       _s = Solicitud();
+      _idCreado = null;
       _senales = Senales();
       _senalesPendientes = false;
       _reenviar = false;
       _intentado.clear();
       _errorInicio = null;
       _errorGuardar = null;
-      _intentos = 0;
       _copiado = false;
     });
     _ir(Pantalla.bienvenida);
@@ -544,6 +562,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             if (appEnv != 'prod') ...[
               const SizedBox(height: 12),
               BotonEnlace(texto: 'Rellenar con datos de ejemplo (demo)', onPressed: _rellenarDemo),
+            ],
+            if (_errorGuardar != null) ...[
+              const SizedBox(height: 16),
+              _ErrorConexion(
+                titulo: 'No pudimos guardar tus datos',
+                mensaje: _errorGuardar!,
+                onReintentar: _continuar,
+              ),
             ],
           ],
         ),
@@ -809,7 +835,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 const Text('Tu número de solicitud', style: AppText.label),
                 const SizedBox(height: 2),
                 Text(
-                  _numeroSolicitud,
+                  _s.numero ?? '',
                   style: AppText.heading(28).copyWith(letterSpacing: 0.5),
                 ),
                 const SizedBox(height: 12),
@@ -818,7 +844,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   child: BotonSecundario(
                     texto: _copiado ? '¡Número copiado!' : 'Copiar número',
                     onPressed: () async {
-                      await Clipboard.setData(const ClipboardData(text: _numeroSolicitud));
+                      await Clipboard.setData(ClipboardData(text: _s.numero ?? ''));
                       if (mounted) setState(() => _copiado = true);
                     },
                   ),

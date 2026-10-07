@@ -22,15 +22,18 @@ Ambientes: Dev `https://api.dev.identidad.alambritos.online`, QA `https://api.qa
 
 ## Flujo móvil — `/api/onboarding/requests` (público)
 
-Orden: `POST /` → `PUT /{id}/income` → `PUT /{id}/expected-activity` (y `PUT /{id}/signals` en cualquier momento). Mientras la solicitud está `IN_PROGRESS` cada paso se puede volver a enviar para corregirlo; al salir de ese estado responde `409`.
+Orden: `POST /` → `PUT /{id}/privacy-consent` → `PUT /{id}/basic-data` → `PUT /{id}/income` → `PUT /{id}/expected-activity` → `POST /{id}/submit` (y `PUT /{id}/signals` en cualquier momento antes del envío). `submit` exige los cuatro pasos registrados en ese orden y responde `409` si falta alguno. Mientras la solicitud está `IN_PROGRESS` cada paso se puede volver a enviar para corregirlo; al salir de ese estado responde `409`.
 
 | Método y ruta | Para qué | Tarea |
 |---|---|---|
 | `GET /api/catalogs` | Fuentes de ingreso, rangos de ingreso, tipos de movimiento y rangos de monto mensual. Códigos como `SALARIO`, `HASTA_500`, `PAGO_SALARIO`, `200_500`. | VDI-46, VDI-50 |
 | `POST /` | Inicia la solicitud y devuelve su `id`. | |
-| `PUT /{id}/income` | Paso 2: `sourceCode`, `rangeCode`, `sourceDetail` (obligatorio si es `OTRO`). | VDI-47 |
-| `PUT /{id}/expected-activity` | Paso 3: `transactionTypeCode` y `monthlyAmountRangeCode`, ambos del catálogo (sin monto libre). Responde el score. | VDI-52, VDI-55 |
-| `PUT /{id}/signals` | Huella, modelo, SO, ubicación, ritmo de escritura y tiempo por paso. La IP la toma el servidor. | VDI-41, VDI-42 |
+| `PUT /{id}/privacy-consent` | Paso 1: `{"signalsAccepted": true}`. Guarda la versión vigente del aviso y la IP. | |
+| `PUT /{id}/basic-data` | Paso 2: `firstNames`, `lastNames`, `dui` (`00000000-0`) y `mobilePhone` (`0000-0000`, empieza con 6 o 7). | |
+| `PUT /{id}/income` | Paso 3: `sourceCode`, `rangeCode`, `sourceDetail` (obligatorio si es `OTRO`). | VDI-47 |
+| `PUT /{id}/expected-activity` | Paso 4: `transactionTypeCode` y `monthlyAmountRangeCode`, ambos del catálogo (sin monto libre). Responde el score. | VDI-52, VDI-55 |
+| `POST /{id}/submit` | Envía la solicitud. Responde el `number` único que asigna el servidor (`SOL-AAAA-NNNNN`). Si ya estaba enviada responde `409`: consultar `GET /{id}` para leer su número. | |
+| `PUT /{id}/signals` | Huella, modelo, SO, ubicación, ritmo de escritura y tiempo por paso. La IP la toma el servidor. La app es la única fuente de los tiempos e intentos por paso; el servidor rechaza horas imposibles (antes de crear la solicitud o en el futuro, con 5 min de tolerancia). | VDI-41, VDI-42, VDI-43 |
 | `GET /{id}`, `GET /{id}/risk-assessment` | Resumen y score vigente. | |
 
 Reglas:

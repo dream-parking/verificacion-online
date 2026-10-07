@@ -8,7 +8,7 @@ import jakarta.persistence.Table;
 /** Catalog of expected transaction types (salary payment, business collections...). */
 @Entity
 @Table(name = "transaction_type")
-public class TransactionType {
+public class TransactionType implements CatalogEntry {
 
 	@Id
 	@Column(name = "code", length = 30)

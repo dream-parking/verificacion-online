@@ -53,6 +53,15 @@ class OnboardingApi {
     });
   }
 
+  /// Paso de movimiento esperado (VDI-51): códigos del catálogo, sin monto libre.
+  /// La API responde el score de riesgo; al cliente no se le muestra.
+  Future<void> declararMovimiento(String solicitudId, {required String tipo, required String rangoMonto}) async {
+    await _enviar('PUT', '/api/onboarding/requests/$solicitudId/expected-activity', cuerpo: {
+      'transactionTypeCode': tipo,
+      'monthlyAmountRangeCode': rangoMonto,
+    });
+  }
+
   /// Guarda las señales de la solicitud. La IP y el user agent los toma el servidor.
   Future<void> enviarSenales(String solicitudId, Senales senales) async {
     await _enviar('PUT', '/api/onboarding/requests/$solicitudId/signals', cuerpo: senales.toJson());

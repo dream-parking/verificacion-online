@@ -69,7 +69,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   final _apellidos = TextEditingController();
   final _dui = TextEditingController();
   final _tel = TextEditingController();
-  final _monto = TextEditingController();
   final _detalleOrigen = TextEditingController();
 
   late final OnboardingApi _api = widget.api ?? OnboardingApi();
@@ -96,7 +95,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   @override
   void dispose() {
-    for (final c in [_scroll, _nombres, _apellidos, _dui, _tel, _monto, _detalleOrigen]) {
+    for (final c in [_scroll, _nombres, _apellidos, _dui, _tel, _detalleOrigen]) {
       c.dispose();
     }
     super.dispose();
@@ -162,6 +161,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _guardarYSeguir(_declararIngresos);
       return;
     }
+    if (_pantalla == Pantalla.movimiento) {
+      _guardarYSeguir(_declararMovimiento);
+      return;
+    }
     _completarPaso(_pantalla);
     _ir(_siguiente[_pantalla]!);
   }
@@ -173,6 +176,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         rango: _s.nivel,
         detalle: _s.origen == origenOtro ? _s.detalleOrigen.trim() : null,
       );
+
+  /// VDI-51: guarda el tipo de movimiento y el rango de monto mensual en la API.
+  Future<void> _declararMovimiento() =>
+      _api.declararMovimiento(_s.id!, tipo: _s.tipo, rangoMonto: _s.rangoMonto);
 
   /// Guarda el paso actual en la API y solo avanza si se guardó.
   Future<void> _guardarYSeguir(Future<void> Function() guardar) async {
@@ -292,7 +299,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   void _reiniciar() {
-    for (final c in [_nombres, _apellidos, _dui, _tel, _monto, _detalleOrigen]) {
+    for (final c in [_nombres, _apellidos, _dui, _tel, _detalleOrigen]) {
       c.clear();
     }
     setState(() {
@@ -659,7 +666,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   Widget _movimiento() {
     final errTipo = _error('tipo');
-    final errMonto = _error('monto');
+    final errRango = _error('rangoMonto');
+    final catalogos = _catalogos;
     return Column(
       children: [
         const Cabecera(
@@ -677,41 +685,39 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 texto: 'Aquí nos dices qué dinero esperas mover en esta cuenta cada mes.',
               ),
               const SizedBox(height: 24),
-              const Subtitulo('Tipo de dinero que manejarás'),
-              const SizedBox(height: 12),
-              ..._opciones(tiposMovimiento, _s.tipo, (v) => _s.tipo = v),
-              if (errTipo.isNotEmpty) TextoError(errTipo),
-              const SizedBox(height: 28),
-              const Subtitulo('Monto mensual estimado'),
-              const SizedBox(height: 4),
-              const Text(
-                'Un cálculo aproximado de lo que moverás en un mes, en dólares.',
-                style: AppText.small,
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text('USD', style: AppText.heading(20, color: AppColors.muted)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: CampoTexto(
-                      controller: _monto,
-                      placeholder: 'Por ejemplo, 320',
-                      teclado: TextInputType.number,
-                      formatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(7),
-                      ],
-                      error: '',
-                      onChanged: (v) {
-                        _escribio('monto', v);
-                        setState(() => _s.monto = v);
-                      },
-                    ),
+              if (catalogos == null)
+                _cargandoOpciones()
+              else ...[
+                const Subtitulo('Tipo de dinero que manejarás'),
+                const SizedBox(height: 12),
+                ..._opciones(
+                  [
+                    for (final t in catalogos.tiposMovimiento)
+                      Opcion(t.valor, t.etiqueta, descripcionesMovimiento[t.valor] ?? ''),
+                  ],
+                  _s.tipo,
+                  (v) => _s.tipo = v,
+                ),
+                if (errTipo.isNotEmpty) TextoError(errTipo),
+                const SizedBox(height: 28),
+                const Subtitulo('Monto mensual estimado'),
+                const SizedBox(height: 4),
+                const Text(
+                  'Un cálculo aproximado de lo que moverás en un mes, en dólares.',
+                  style: AppText.small,
+                ),
+                const SizedBox(height: 12),
+                ..._opciones(catalogos.rangosMonto, _s.rangoMonto, (v) => _s.rangoMonto = v),
+                if (errRango.isNotEmpty) TextoError(errRango),
+                if (_errorGuardar != null) ...[
+                  const SizedBox(height: 16),
+                  _ErrorConexion(
+                    titulo: 'No pudimos guardar esta información',
+                    mensaje: _errorGuardar!,
+                    onReintentar: _continuar,
                   ),
                 ],
-              ),
-              if (errMonto.isNotEmpty) TextoError(errMonto),
+              ],
             ],
           ),
         ),
@@ -761,8 +767,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           _Resumen(
             titulo: 'Dinero de tu cuenta',
             semanticaEditar: 'Editar movimiento esperado',
-            linea1: etiquetaDe(tiposMovimiento, _s.tipo),
-            linea2: 'Aprox. USD ${formatearMonto(_s.monto)} al mes',
+            linea1: etiquetaDe(_catalogos?.tiposMovimiento ?? const [], _s.tipo),
+            linea2: '${etiquetaDe(_catalogos?.rangosMonto ?? const [], _s.rangoMonto)} al mes',
             onEditar: () => _ir(Pantalla.movimiento),
           ),
         ],

@@ -114,4 +114,19 @@ void main() {
       {'sourceCode': 'OTRO', 'rangeCode': 'MAS_2500', 'sourceDetail': 'Herencia'},
     ]);
   });
+
+  test('declararMovimiento manda el tipo y el rango de monto', () async {
+    late http.Request enviada;
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        enviada = req;
+        return http.Response('{"level":"LOW"}', 200);
+      }),
+    );
+    await api.declararMovimiento('abc', tipo: 'AHORRO', rangoMonto: 'HASTA_200');
+    expect(enviada.method, 'PUT');
+    expect(enviada.url.path, '/api/onboarding/requests/abc/expected-activity');
+    expect(jsonDecode(enviada.body), {'transactionTypeCode': 'AHORRO', 'monthlyAmountRangeCode': 'HASTA_200'});
+  });
 }

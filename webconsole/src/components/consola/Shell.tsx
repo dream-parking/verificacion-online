@@ -15,6 +15,7 @@ function tituloDe(pathname: string) {
   if (pathname.startsWith("/solicitudes")) return "Solicitudes";
   if (pathname.startsWith("/alertas")) return "Bandeja de alertas";
   if (pathname.startsWith("/regla")) return "Regla de score";
+  if (pathname.startsWith("/usuarios")) return "Usuarios";
   return "";
 }
 
@@ -47,6 +48,8 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: "/solicitudes", label: "Solicitudes", badge: 0 },
     { href: "/alertas", label: "Bandeja de alertas", badge: sinAsignar },
     { href: "/regla", label: "Regla de score", badge: 0 },
+    // Solo un administrador gestiona usuarios.
+    ...(usuario.role === "ADMIN" ? [{ href: "/usuarios", label: "Usuarios", badge: 0 }] : []),
   ];
 
   return (

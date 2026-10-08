@@ -166,7 +166,13 @@ export function RequestDetailView({ id }: { id: string }) {
     : locationUnavailable
       ? [
           { k: "Ubicación aproximada", v: "Ubicación no disponible" },
-          { k: "Motivo", v: locationFailureText(geo?.failure) },
+          {
+            k: "Motivo",
+            // Without `ipDetails` the server never looked the IP up (the request is older than VDI-67).
+            v: geo
+              ? locationFailureText(geo.failure)
+              : "Todavía no se calculó la ubicación de esta solicitud: se envió antes de que el servidor la calculara.",
+          },
         ]
       : [
           { k: "Ubicación aproximada", v: noData(place) },

@@ -62,6 +62,19 @@ export const TYPING_PACE: Record<"SLOW" | "NORMAL" | "FAST", string> = {
   FAST: "Más rápido que el promedio",
 };
 
+/** Why the server could not locate an IP, in words for the analyst (the API sends a short English reason). */
+export function locationFailureText(failure: string | null | undefined): string {
+  const reason = (failure ?? "").toLowerCase();
+  if (reason.includes("private") || reason.includes("reserved")) {
+    return "La dirección IP es privada o reservada (por ejemplo, una red local) y ningún proveedor puede ubicarla.";
+  }
+  if (reason.includes("disabled")) return "La consulta de ubicación está desactivada en el servidor.";
+  if (reason.includes("provider")) {
+    return "El proveedor de ubicación no respondió o alcanzó su límite de consultas. Se puede reintentar más tarde.";
+  }
+  return "No se pudo ubicar esta dirección IP.";
+}
+
 // ---- Dates: always in El Salvador time (UTC−6, no daylight saving) and in 12-hour format
 
 const TIMEZONE = "America/El_Salvador";

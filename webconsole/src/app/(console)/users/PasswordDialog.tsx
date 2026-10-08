@@ -9,11 +9,14 @@ import { PASSWORD_POLICY, passwordError, resetPassword, resetPasswordMessage } f
 export function PasswordDialog({
   user,
   token,
+  isSelf,
   onClose,
   onDone,
 }: {
   user: ConsoleUser;
   token: string;
+  /** The administrator is changing their own password. */
+  isSelf: boolean;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -72,6 +75,13 @@ export function PasswordDialog({
             Para <strong className="text-ink">{user.fullName}</strong> ({user.email}). Reemplaza la contraseña actual.
           </p>
         </div>
+
+        {isSelf && (
+          <div className="border border-line-mid bg-soft px-4 py-3 text-[14px] leading-5">
+            <strong>Es tu propia cuenta.</strong> La contraseña nueva reemplaza la actual: anótala antes de guardar,
+            porque la necesitarás para volver a entrar.
+          </div>
+        )}
 
         <form onSubmit={submit} noValidate className="flex flex-col gap-4">
           <div>

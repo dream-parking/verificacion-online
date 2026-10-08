@@ -208,6 +208,7 @@ export function UsersView() {
         <PasswordDialog
           user={target}
           token={token}
+          isSelf={target.id === user.id}
           onClose={closeDialog}
           onDone={() => {
             setNotice({

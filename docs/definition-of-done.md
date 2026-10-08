@@ -4,29 +4,26 @@ Definition of Done del equipo (Los Alan-bres Ágiles) y cómo se hace cumplir. "
 
 | Criterio | Control | Tipo |
 |---|---|---|
-| Sin errores de sintaxis ni incongruencias de variables (no declaradas, sin usar) | Compilación/`flutter analyze`/`eslint`/`next build` en el CI + Quality Gate de Sonar: reliability **A** y maintainability **A** sobre el código nuevo (las variables sin usar son *code smells*) | Automático |
+| Sin errores de sintaxis ni incongruencias de variables (no declaradas, sin usar) | Compilación/`flutter analyze`/`eslint`/`next build` en el CI + Quality Gate de Sonar: *Sonar way*: reliability **A** y maintainability **A** sobre el código nuevo (las variables sin usar son *code smells*) | Automático |
 | Convención de nombres acordada | Reglas de nombres de Sonar (maintainability **A**) + lints (`eslint`, `flutter analyze`) | Automático |
-| Pruebas unitarias con **≥ 40 %** de cobertura sobre el código fuente | Backend: JaCoCo `check` en `verify` (mínimo **70 %**, más estricto que la DoD). Onboarding: paso "Cobertura mínima" del CI (**40 %**). Sonar: condición de cobertura **global** ≥ 40 % | Automático |
+| Pruebas unitarias con **≥ 40 %** de cobertura sobre el código fuente | Backend: JaCoCo `check` en `verify` (mínimo **70 %**, más estricto que la DoD). Onboarding: paso "Cobertura mínima" del CI (**40 %**). Sonar (gate *Sonar way*): cobertura del código **nuevo** ≥ 80 % | Automático |
 | Revisado por Scrum Master y QA antes de integrar a la rama principal | Revisión de PR | Manual (ver "Pendiente") |
 | Cada cambio en su propia rama; se unifica al main solo tras la revisión | Los `required checks` impiden el push directo a `dev`, `QA` y `main`; todo entra por PR | Automático |
 | Desplegado en un ambiente accesible por internet en la nube | Despliegue automático de `dev` (Dev) y `QA` (QA) a Azure; ver `docs/cicd.md` | Automático |
 | Segundo factor / TOTP, registro de usuarios nuevos | Criterios de aceptación del producto | Manual |
 | Criterios de aceptación verificados por el Product Owner y visto bueno del asesor | Revisión de producto | Manual |
 
-## Quality Gate de Sonar: "DoD Alan-bres"
-El gate por defecto de Sonar (*Sonar way*) exige 80 % de cobertura sobre el **código nuevo**, que es más estricto que la DoD y distinto de lo que ella pide (40 % sobre **todo** el código). Se reemplaza por un gate propio (SonarQube Cloud → *Quality Gates* → copiar *Sonar way*):
+## Quality Gate de Sonar
+Los tres proyectos usan el gate por defecto, *Sonar way*. En el plan gratis de SonarQube Cloud se puede **crear** un gate propio, pero no **asignarlo** a un proyecto (la API responde "Organization … is not allowed to modify Quality gates", comprobado el 2026-10-08), así que no es posible un gate "DoD Alan-bres" propio. Condiciones vigentes sobre el **código nuevo** de cada PR:
 
-| Condición | Ámbito | Valor |
-|---|---|---|
-| Reliability rating | Código nuevo | A |
-| Maintainability rating | Código nuevo | A |
-| Security rating | Código nuevo | A |
-| Security hotspots reviewed | Código nuevo | 100 % |
-| Duplicated lines | Código nuevo | ≤ 3 % |
-| Coverage | **Código global** | **≥ 40 %** |
-| ~~Coverage~~ | ~~Código nuevo ≥ 80 %~~ | eliminada |
+| Condición | Valor |
+|---|---|
+| Reliability / Maintainability / Security rating | A |
+| Security hotspots reviewed | 100 % |
+| Duplicated lines | ≤ 3 % |
+| Coverage | **≥ 80 %** (el equipo decidió mantener este umbral, más estricto que el 40 % de la DoD) |
 
-Se asigna a los tres proyectos (`dream-parking_verificacion-online`, `…-webconsole`, `…-onboarding`).
+Sonar way no tiene una condición de cobertura **global**. El mínimo de 40 % sobre todo el código que pide la DoD se hace cumplir en el CI de cada componente (backend: JaCoCo 70 %; onboarding: paso "Cobertura mínima", 40 %).
 
 ## Pendiente
 - **Webconsole** no tiene tests, así que no cumple el 40 %. Hasta que los tenga, su cobertura está excluida en `webconsole/sonar-project.properties` (incumple la DoD de forma explícita y temporal).

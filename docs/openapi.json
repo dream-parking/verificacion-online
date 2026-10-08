@@ -210,11 +210,13 @@
           "firstNames" : {
             "maxLength" : 100,
             "minLength" : 0,
+            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
             "type" : "string"
           },
           "lastNames" : {
             "maxLength" : 100,
             "minLength" : 0,
+            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
             "type" : "string"
           },
           "mobilePhone" : {

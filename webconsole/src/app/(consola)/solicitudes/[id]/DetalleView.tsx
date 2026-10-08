@@ -209,7 +209,7 @@ export function DetalleView({ id }: { id: string }) {
 
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div>
-          <h1 className="mt-0 mb-1 font-display text-[26px] leading-[1.1] font-extrabold md:text-[30px]">{nombre}</h1>
+          <h1 className="mt-0 mb-1 font-display text-[26px] leading-[1.1] font-extrabold md:text-[30px] [overflow-wrap:anywhere]">{nombre}</h1>
           <div className="text-base leading-6 text-ink-soft">
             Solicitud <strong className="text-ink">{r.number || "Sin número aún"}</strong> ·{" "}
             {fecha(r.submittedAt ?? r.startedAt)} · {hora(r.submittedAt ?? r.startedAt)}

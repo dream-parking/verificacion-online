@@ -45,6 +45,12 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 - Autenticación de la consola: `APP_JWT_SECRET`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` van como variables/secrets de cada Container App (detalle y comandos en `docs/integracion-api.md`). Sin ellas la app arranca igual, pero nadie puede iniciar sesión en la consola y los tokens no sobreviven a un reinicio. `APP_CORS_ALLOWED_ORIGINS` debe incluir la URL de la consola del ambiente.
 - Documentación de la API: con el perfil `dev` el backend publica Swagger UI en `/swagger-ui.html` y el OpenAPI en `/v3/api-docs` (springdoc). El archivo que se entrega a front y móvil es `docs/openapi.json`; una prueba falla si no coincide con el API. Por defecto (Prod) ambos están apagados (`application.properties`).
 
+### Análisis estático: SonarQube Cloud
+- El repo es público, así que SonarQube Cloud es gratis y sin límite de líneas; no hay VM ni recurso de Azure (nada que registrar en `azure-resources.csv`).
+- `backend-ci.yml` corre `sonar:sonar` después de `verify` (reusa clases y el informe JaCoCo) en PRs y en pushes a `main`. La línea base de Sonar es `main` (el plan gratis no permite cambiar la rama principal), así que se actualiza al liberar, y los PRs a `dev` se analizan como PR. Si el Quality Gate falla, falla el check. Sin el secret `SONAR_TOKEN` el paso se omite.
+- Alta única (manual): sonarcloud.io → entrar con GitHub → importar la organización `dream-parking` y el repo → en el proyecto, *Administration → Analysis Method* desactivar **Automatic Analysis** (si no, choca con el análisis del CI) → *My Account → Security* generar un token → GitHub → Settings → Secrets → Actions → `SONAR_TOKEN`. Organización `alambritos-esen`, proyecto `dream-parking_verificacion-online` (en `backend/pom.xml`).
+- Para bloquear el merge: Settings → Branches → regla de `dev` → exigir los checks `test` y `SonarCloud Code Analysis`.
+
 ### Paso manual único: hacer público el paquete
 GitHub no permite cambiar la visibilidad de un paquete por API. Tras el **primer** push de la imagen: GitHub → organización `dream-parking` → Packages → `verificacion-online-backend` → Package settings → Change visibility → Public. Si falla, revisar en la organización que se permita crear paquetes públicos. Luego, re-ejecutar el workflow.
 

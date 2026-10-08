@@ -211,11 +211,29 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _saving = false;
         _saveError = switch (e.status) {
           409 => 'Tu solicitud ya fue enviada y no se puede modificar.',
-          400 => 'Revisa tus datos: ${e.message}',
+          400 => _invalidDataMessage(e.fields),
           _ => 'Revisa tu conexión a internet e inténtalo de nuevo.',
         };
       });
     }
+  }
+
+  /// Message in Spanish for a 400: names the rejected fields, never the server text.
+  static String _invalidDataMessage(List<String> fields) {
+    const labels = {
+      'firstNames': 'nombres',
+      'lastNames': 'apellidos',
+      'dui': 'DUI',
+      'mobilePhone': 'celular',
+      'sourceDetail': 'origen de tus ingresos',
+    };
+    final names = [
+      for (final f in fields)
+        if (labels[f] != null) labels[f]!,
+    ];
+    return names.isEmpty
+        ? 'Revisa tus datos e inténtalo de nuevo.'
+        : 'Revisa estos datos e inténtalo de nuevo: ${names.join(', ')}.';
   }
 
   bool get _busy => _submitting || _starting || _saving;

@@ -1,10 +1,10 @@
 name: onboarding-build
 
-# main -> Dev build, QA -> QA build. Runs on Linux (Android only) to stay inside the
+# dev -> Dev build, QA -> QA build. Runs on Linux (Android only) to stay inside the
 # free GitHub Actions minutes; macOS runners are billed at 10x.
 on:
   push:
-    branches: [main, QA]
+    branches: [dev, QA]
     paths: ["onboarding/**", ".github/workflows/onboarding-build.yml"]
   workflow_dispatch:
 
@@ -15,9 +15,9 @@ concurrency:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'dev' || 'qa' }}
+    environment: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
     env:
-      APP_ENV: ${{ github.ref_name == 'main' && 'dev' || 'qa' }}
+      APP_ENV: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
     defaults:
       run:
         working-directory: onboarding

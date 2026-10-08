@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -51,6 +52,9 @@ public class OnboardingSession {
 	@JdbcTypeCode(SqlTypes.CHAR)
 	@Column(name = "country_iso", length = 2)
 	private String countryIso;
+
+	@Embedded
+	private SessionGeolocation geolocation = new SessionGeolocation();
 
 	@Column(name = "user_agent", columnDefinition = "text")
 	private String userAgent;
@@ -115,6 +119,14 @@ public class OnboardingSession {
 
 	public void setCountryIso(String countryIso) {
 		this.countryIso = countryIso;
+	}
+
+	public SessionGeolocation getGeolocation() {
+		return geolocation;
+	}
+
+	public void setGeolocation(SessionGeolocation geolocation) {
+		this.geolocation = geolocation;
 	}
 
 	public String getUserAgent() {

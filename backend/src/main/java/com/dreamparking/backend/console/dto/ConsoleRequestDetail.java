@@ -1,5 +1,6 @@
 package com.dreamparking.backend.console.dto;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -7,6 +8,7 @@ import java.util.UUID;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import com.dreamparking.backend.onboarding.entity.ExpectedActivity;
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
@@ -44,7 +46,17 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 	@Schema(name = "ConsoleRequestSignals")
 	public record Signals(String ip, String approximateLocation, String deviceFingerprint, String device,
 			Short typingSpeedCpm, TypingPace typingPace, Boolean nightTime, Long totalDurationSeconds,
-			Long requestsFromSameDevice) {
+			Long requestsFromSameDevice, LocationStatus locationStatus, BigDecimal latitude, BigDecimal longitude,
+			IpDetails ipDetails) {
+	}
+
+	/**
+	 * What the IP geolocation provider returned (VDI-67). When the location is {@code UNAVAILABLE} only
+	 * {@code failure} and {@code lookedUpAt} are filled in.
+	 */
+	@Schema(name = "ConsoleRequestIpDetails")
+	public record IpDetails(String country, String countryCode, String region, String regionName, String city,
+			String zip, String timezone, String isp, String org, String asName, String failure, Instant lookedUpAt) {
 	}
 
 	@Schema(name = "ConsoleRequestStepTime")

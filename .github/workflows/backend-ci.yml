@@ -3,7 +3,7 @@ name: backend-ci
 on:
   pull_request:
     branches: [dev, QA, main]
-    paths: ["backend/**", ".github/workflows/backend-*.yml"]
+  # Sin filtro de rutas en los PRs: estos checks son obligatorios y deben reportar siempre.
   # Sonar necesita analizar main (rama principal de Sonar, no se puede cambiar en el plan gratis) para tener la línea base contra la que compara los PRs.
   push:
     branches: [main]

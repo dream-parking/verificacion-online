@@ -1,5 +1,7 @@
 package com.dreamparking.backend.console.dto;
 
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -40,9 +42,13 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			String monthlyAmountRangeCode, String monthlyAmountRangeLabel, Instant registeredAt, Instant updatedAt) {
 	}
 
-	/** Device and behavior signals (VDI-12). */
+	/**
+	 * Device and behavior signals (VDI-12). {@code locationStatus}: {@code AVAILABLE} with coordinates;
+	 * {@code PERMISSION_DENIED} or {@code UNAVAILABLE} mean "not available"; null when the app did not report it.
+	 */
 	@Schema(name = "ConsoleRequestSignals")
-	public record Signals(String ip, String approximateLocation, String deviceFingerprint, String device,
+	public record Signals(String ip, String approximateLocation, LocationStatus locationStatus, BigDecimal latitude,
+			BigDecimal longitude, Integer locationAccuracyMeters, String deviceFingerprint, String device,
 			Short typingSpeedCpm, TypingPace typingPace, Boolean nightTime, Long totalDurationSeconds,
 			Long requestsFromSameDevice) {
 	}

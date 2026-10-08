@@ -123,7 +123,8 @@ public class ConsoleRequestService {
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {
 		return new ConsoleRequestDetail.Signals(s.getIp() == null ? null : s.getIp().getHostAddress(),
-				s.getApproximateLocation(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
+				s.getApproximateLocation(), s.getLocationStatus(), s.getLatitude(), s.getLongitude(),
+				s.getLocationAccuracyMeters(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
 				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice());
 	}
 

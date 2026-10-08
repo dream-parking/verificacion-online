@@ -1,5 +1,7 @@
 package com.dreamparking.backend.onboarding.entity;
 
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
+import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.time.Instant;
 import java.util.UUID;
@@ -47,6 +49,20 @@ public class OnboardingSession {
 
 	@Column(name = "approximate_location", length = 120)
 	private String approximateLocation;
+
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "location_status", columnDefinition = "location_status")
+	private LocationStatus locationStatus;
+
+	@Column(name = "latitude", precision = 9, scale = 6)
+	private BigDecimal latitude;
+
+	@Column(name = "longitude", precision = 9, scale = 6)
+	private BigDecimal longitude;
+
+	@Column(name = "location_accuracy_m")
+	private Integer locationAccuracyMeters;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
 	@Column(name = "country_iso", length = 2)
@@ -103,6 +119,30 @@ public class OnboardingSession {
 
 	public String getApproximateLocation() {
 		return approximateLocation;
+	}
+
+	public LocationStatus getLocationStatus() {
+		return locationStatus;
+	}
+
+	public BigDecimal getLatitude() {
+		return latitude;
+	}
+
+	public BigDecimal getLongitude() {
+		return longitude;
+	}
+
+	public Integer getLocationAccuracyMeters() {
+		return locationAccuracyMeters;
+	}
+
+	/** Location as reported by the app; coordinates only when {@code status} is {@code AVAILABLE}. */
+	public void setLocation(LocationStatus status, BigDecimal latitude, BigDecimal longitude, Integer accuracyMeters) {
+		this.locationStatus = status;
+		this.latitude = latitude;
+		this.longitude = longitude;
+		this.locationAccuracyMeters = accuracyMeters;
 	}
 
 	public void setApproximateLocation(String approximateLocation) {

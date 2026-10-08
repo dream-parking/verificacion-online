@@ -132,6 +132,54 @@ class SignalsApiTests {
 		capture(EntityMappingTests.DEMO_REQUEST.toString(), "{\"deviceFingerprint\": \"fp\"}", 409);
 	}
 
+	@Test
+	void withPermissionTheApproximateLocationIsStored() throws Exception {
+		// VDI-12 criterion 2
+		String id = startRequest();
+		capture(id, """
+				{"deviceFingerprint": "fp-ubicacion", "locationStatus": "AVAILABLE",
+				 "latitude": 13.69294123, "longitude": -89.218214, "locationAccuracyMeters": 1200}
+				""", 204);
+
+		flushAndClear();
+		mvc.perform(get("/api/console/requests/{id}", id))
+			.andExpect(jsonPath("$.signals.locationStatus").value("AVAILABLE"))
+			.andExpect(jsonPath("$.signals.latitude").value(13.692941))
+			.andExpect(jsonPath("$.signals.longitude").value(-89.218214))
+			.andExpect(jsonPath("$.signals.locationAccuracyMeters").value(1200));
+	}
+
+	@Test
+	void withoutPermissionTheLocationIsNotAvailableAndTheOtherSignalsAreStored() throws Exception {
+		// VDI-12 criterion 4
+		String id = startRequest();
+		capture(id, """
+				{"deviceFingerprint": "fp-sin-permiso", "deviceModel": "Pixel 8", "operatingSystem": "Android",
+				 "typingSpeedCpm": 150, "locationStatus": "PERMISSION_DENIED"}
+				""", 204);
+
+		flushAndClear();
+		mvc.perform(get("/api/console/requests/{id}", id))
+			.andExpect(jsonPath("$.signals.locationStatus").value("PERMISSION_DENIED"))
+			.andExpect(jsonPath("$.signals.latitude").isEmpty())
+			.andExpect(jsonPath("$.signals.longitude").isEmpty())
+			.andExpect(jsonPath("$.signals.ip").value("127.0.0.1"))
+			.andExpect(jsonPath("$.signals.device").value("Pixel 8 · Android"))
+			.andExpect(jsonPath("$.signals.typingPace").value("NORMAL"));
+	}
+
+	@Test
+	void coordinatesAndLocationStatusMustAgree() throws Exception {
+		String id = startRequest();
+		capture(id, "{\"deviceFingerprint\": \"fp\", \"locationStatus\": \"AVAILABLE\", \"latitude\": 13.7}", 400);
+		capture(id, "{\"deviceFingerprint\": \"fp\", \"locationStatus\": \"PERMISSION_DENIED\", \"latitude\": 13.7, \"longitude\": -89.2}", 400);
+		capture(id, "{\"deviceFingerprint\": \"fp\", \"latitude\": 13.7, \"longitude\": -89.2}", 400);
+		capture(id, "{\"deviceFingerprint\": \"fp\", \"locationStatus\": \"AVAILABLE\", \"latitude\": 91, \"longitude\": -89.2}", 400);
+		capture(id, "{\"deviceFingerprint\": \"fp\", \"locationStatus\": \"UNAVAILABLE\"}", 204);
+		// Older app versions do not report the location at all
+		capture(id, "{\"deviceFingerprint\": \"fp\"}", 204);
+	}
+
 	private void capture(String id, String body, int expectedStatus) throws Exception {
 		mvc.perform(put("/api/onboarding/requests/{id}/signals", id).contentType(MediaType.APPLICATION_JSON)
 			.content(body)).andExpect(status().is(expectedStatus));

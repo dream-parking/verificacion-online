@@ -1,5 +1,7 @@
 package com.dreamparking.backend.onboarding.entity;
 
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
+import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.time.Instant;
 import java.util.UUID;
@@ -36,6 +38,20 @@ public class RequestSignals {
 
 	@Column(name = "approximate_location", length = 120)
 	private String approximateLocation;
+
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(name = "location_status", columnDefinition = "location_status")
+	private LocationStatus locationStatus;
+
+	@Column(name = "latitude", precision = 9, scale = 6)
+	private BigDecimal latitude;
+
+	@Column(name = "longitude", precision = 9, scale = 6)
+	private BigDecimal longitude;
+
+	@Column(name = "location_accuracy_m")
+	private Integer locationAccuracyMeters;
 
 	@Column(name = "device_fingerprint", length = 64)
 	private String deviceFingerprint;
@@ -76,6 +92,22 @@ public class RequestSignals {
 
 	public String getApproximateLocation() {
 		return approximateLocation;
+	}
+
+	public LocationStatus getLocationStatus() {
+		return locationStatus;
+	}
+
+	public BigDecimal getLatitude() {
+		return latitude;
+	}
+
+	public BigDecimal getLongitude() {
+		return longitude;
+	}
+
+	public Integer getLocationAccuracyMeters() {
+		return locationAccuracyMeters;
 	}
 
 	public String getDeviceFingerprint() {

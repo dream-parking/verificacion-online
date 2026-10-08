@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Pattern;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -29,6 +30,8 @@ public class Customer {
 	@Column(name = "dui", nullable = false, unique = true, length = 10)
 	private String dui;
 
+	/** Letters only (accents and ñ allowed), words separated by a single space. */
+	@Pattern(regexp = "\\p{L}+( \\p{L}+)*")
 	@Column(name = "first_names", nullable = false, length = 100)
 	private String firstNames;
 

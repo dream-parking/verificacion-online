@@ -1,12 +1,11 @@
 package com.dreamparking.backend.onboarding.entity;
 
-import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
-import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -39,19 +38,9 @@ public class RequestSignals {
 	@Column(name = "approximate_location", length = 120)
 	private String approximateLocation;
 
-	@Enumerated(EnumType.STRING)
-	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
-	@Column(name = "location_status", columnDefinition = "location_status")
-	private LocationStatus locationStatus;
-
-	@Column(name = "latitude", precision = 9, scale = 6)
-	private BigDecimal latitude;
-
-	@Column(name = "longitude", precision = 9, scale = 6)
-	private BigDecimal longitude;
-
-	@Column(name = "location_accuracy_m")
-	private Integer locationAccuracyMeters;
+	/** VDI-41. Null when the app did not report the location (Hibernate leaves it null when all its columns are). */
+	@Embedded
+	private SessionLocation location;
 
 	@Column(name = "device_fingerprint", length = 64)
 	private String deviceFingerprint;
@@ -94,20 +83,8 @@ public class RequestSignals {
 		return approximateLocation;
 	}
 
-	public LocationStatus getLocationStatus() {
-		return locationStatus;
-	}
-
-	public BigDecimal getLatitude() {
-		return latitude;
-	}
-
-	public BigDecimal getLongitude() {
-		return longitude;
-	}
-
-	public Integer getLocationAccuracyMeters() {
-		return locationAccuracyMeters;
+	public SessionLocation getLocation() {
+		return location;
 	}
 
 	public String getDeviceFingerprint() {

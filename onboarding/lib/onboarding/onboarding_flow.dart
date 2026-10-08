@@ -7,7 +7,6 @@ import '../api/catalogs.dart';
 import '../api/onboarding_api.dart';
 import '../env.dart';
 import '../signals/device_fingerprint.dart';
-import '../signals/location.dart';
 import '../signals/signals.dart';
 import '../theme.dart';
 import 'application_form.dart';
@@ -20,7 +19,6 @@ class OnboardingFlow extends StatefulWidget {
     super.key,
     this.api,
     this.deviceInfo,
-    this.location,
     this.clock = DateTime.now,
   });
 
@@ -29,9 +27,6 @@ class OnboardingFlow extends StatefulWidget {
 
   /// Device reader (VDI-40); tests pass a fake one.
   final DeviceInfoSource? deviceInfo;
-
-  /// Approximate location reader (VDI-41); tests pass a fake one.
-  final LocationSource? location;
 
   /// Current time used to measure timings (VDI-43); tests pass a controlled one.
   final DateTime Function() clock;
@@ -71,7 +66,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   late final OnboardingApi _api = widget.api ?? OnboardingApi();
   late final DeviceInfoSource _deviceInfo = widget.deviceInfo ?? PlatformDeviceInfoSource();
-  late final LocationSource _location = widget.location ?? const PlatformLocationSource();
   var _form = ApplicationForm();
 
   /// Request created in the backend whose privacy notice could not be recorded yet: the retry reuses it.
@@ -239,15 +233,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     await _sendSignals();
   }
 
-  /// VDI-41: asks for the location permission and reads the approximate location. It only runs after the
-  /// notice is accepted. Without permission or position it is sent as not available, and the other signals
-  /// are captured as usual: the location never blocks the flow.
-  Future<void> _captureLocation() async {
-    if (!_form.captureAllowed) return;
-    _signals.location = await _location.read();
-    await _sendSignals();
-  }
-
   /// Sends all captured signals; if it fails, it is retried on the next screen change.
   ///
   /// Requests go one at a time: since the backend replaces everything on each request, an old one
@@ -299,7 +284,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _signals.steps.complete(Screen.privacy, _form.privacyAcceptedAt!);
       _goTo(Screen.basicData);
       unawaited(_captureDevice());
-      unawaited(_captureLocation());
     } on ApiException {
       if (!mounted) return;
       setState(() {

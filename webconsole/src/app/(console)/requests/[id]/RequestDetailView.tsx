@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
+import { LocationMap } from "./LocationMap";
 import { errorMessage, useLoad } from "@/lib/console/hooks";
 import { apiFetch, type RequestDetail } from "@/lib/console/api";
 import {
@@ -11,6 +12,7 @@ import {
   formatDate,
   formatDateTime,
   formatTime,
+  locationFailureText,
   minSec,
   TIME_NOTE,
   STEPS,
@@ -64,7 +66,7 @@ function entry(registeredAt: string, updatedAt: string | null): Pair[] {
 }
 
 export function RequestDetailView({ id }: { id: string }) {
-  const load = useLoad(`solicitud:${id}`, (t) =>
+  const load = useLoad(`request:${id}`, (t) =>
     apiFetch<RequestDetail>(`/api/console/requests/${encodeURIComponent(id)}`, { token: t }),
   );
 
@@ -153,10 +155,32 @@ export function RequestDetailView({ id }: { id: string }) {
     ...entry(r.expectedActivity.registeredAt, r.expectedActivity.updatedAt),
   ];
 
+  // Location resolved by the server from the IP (VDI-67). Older responses only have `approximateLocation`.
+  const geo = s?.ipDetails;
+  const hasCoordinates = s?.locationStatus === "AVAILABLE" && s.latitude != null && s.longitude != null;
+  const locationUnavailable = s?.locationStatus === "UNAVAILABLE";
+  const place =
+    [...new Set([geo?.city, geo?.regionName, geo?.country].filter(Boolean))].join(", ") || s?.approximateLocation || null;
+  const locationRows: Pair[] = !s
+    ? []
+    : locationUnavailable
+      ? [
+          { k: "Ubicación aproximada", v: "Ubicación no disponible" },
+          { k: "Motivo", v: locationFailureText(geo?.failure) },
+        ]
+      : [
+          { k: "Ubicación aproximada", v: noData(place) },
+          ...(hasCoordinates
+            ? [{ k: "Coordenadas aproximadas", v: `${s.latitude!.toFixed(4)}, ${s.longitude!.toFixed(4)}` }]
+            : []),
+          ...(geo?.timezone ? [{ k: "Zona horaria", v: geo.timezone }] : []),
+          ...(geo?.isp ? [{ k: "Proveedor de internet", v: geo.isp }] : []),
+        ];
+
   const signalList: Pair[] = s
     ? [
         { k: "Dirección IP", v: noData(s.ip) },
-        { k: "Ubicación aproximada", v: noData(s.approximateLocation) },
+        ...locationRows,
         { k: "Huella de dispositivo", v: noData(s.deviceFingerprint) },
         { k: "Dispositivo", v: noData(s.device) },
         {
@@ -270,6 +294,12 @@ export function RequestDetailView({ id }: { id: string }) {
             </ul>
           </div>
         </div>
+        {hasCoordinates && (
+          <div className="mt-6">
+            <div className="k mb-2">Mapa</div>
+            <LocationMap latitude={s!.latitude!} longitude={s!.longitude!} place={place} />
+          </div>
+        )}
       </Card>
 
       <Card id="h-tl" title="Línea de tiempo" help={TIME_NOTE}>

@@ -68,6 +68,22 @@ export type Assessment = {
   evaluatedAt: string | null;
 };
 
+/** What the IP geolocation provider returned. When the location is UNAVAILABLE only `failure` and `lookedUpAt` are set. */
+export type IpDetails = {
+  country: string | null;
+  countryCode: string | null;
+  region: string | null;
+  regionName: string | null;
+  city: string | null;
+  zip: string | null;
+  timezone: string | null;
+  isp: string | null;
+  org: string | null;
+  asName: string | null;
+  failure: string | null;
+  lookedUpAt: string | null;
+};
+
 export type RequestDetail = {
   id: string;
   number: string | null;
@@ -98,6 +114,11 @@ export type RequestDetail = {
   signals: {
     ip: string | null;
     approximateLocation: string | null;
+    /** Whether the server could locate the IP (VDI-67). Missing in responses of older API versions. */
+    locationStatus?: "AVAILABLE" | "UNAVAILABLE" | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    ipDetails?: IpDetails | null;
     deviceFingerprint: string | null;
     device: string | null;
     nightTime: boolean | null;

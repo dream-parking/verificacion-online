@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -36,6 +37,10 @@ public class RequestSignals {
 
 	@Column(name = "approximate_location", length = 120)
 	private String approximateLocation;
+
+	/** VDI-41. Null when the app did not report the location (Hibernate leaves it null when all its columns are). */
+	@Embedded
+	private SessionLocation location;
 
 	@Column(name = "device_fingerprint", length = 64)
 	private String deviceFingerprint;
@@ -76,6 +81,10 @@ public class RequestSignals {
 
 	public String getApproximateLocation() {
 		return approximateLocation;
+	}
+
+	public SessionLocation getLocation() {
+		return location;
 	}
 
 	public String getDeviceFingerprint() {

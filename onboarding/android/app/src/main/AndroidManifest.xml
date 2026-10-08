@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- The app talks to the onboarding API (also in the release APK). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- VDI-41: approximate location only (not precise), asked after the privacy notice is accepted. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="Tangamandapio"
         android:name="${applicationName}"

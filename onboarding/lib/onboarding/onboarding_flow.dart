@@ -171,8 +171,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   /// Saves first names, last names, DUI and mobile number in the API.
   Future<void> _sendBasicData() => _api.sendBasicData(
         _form.id!,
-        firstNames: _form.firstNames.trim(),
-        lastNames: _form.lastNames.trim(),
+        firstNames: normalizeName(_form.firstNames),
+        lastNames: normalizeName(_form.lastNames),
         dui: _form.dui,
         mobilePhone: _form.phone,
       );
@@ -520,6 +520,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               placeholder: 'Por ejemplo, Marta Alejandra',
               autofillHints: const [AutofillHints.givenName],
               error: _errorFor('firstNames'),
+              formatters: [LengthLimitingTextInputFormatter(maxNameLength)],
               onChanged: (v) {
                 _onTyped('firstNames', v);
                 setState(() => _form.firstNames = v);
@@ -532,6 +533,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               placeholder: 'Por ejemplo, Rivas Cruz',
               autofillHints: const [AutofillHints.familyName],
               error: _errorFor('lastNames'),
+              formatters: [LengthLimitingTextInputFormatter(maxNameLength)],
               onChanged: (v) {
                 _onTyped('lastNames', v);
                 setState(() => _form.lastNames = v);

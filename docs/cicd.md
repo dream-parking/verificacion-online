@@ -2,12 +2,12 @@
 
 | Rama | Ambiente | WebConsole | Onboarding (Flutter) |
 |---|---|---|---|
-| `main` | Dev | Deploy a `swa-verificaciononline-dev` | APK `APP_ENV=dev` (artefacto) |
+| `dev` | Dev | Deploy a `swa-verificaciononline-dev` | APK `APP_ENV=dev` (artefacto) |
 | `QA` | QA | Deploy a `swa-verificaciononline-qa` | APK `APP_ENV=qa` (artefacto) |
-| PR a `main`/`QA` | — | lint + build | analyze + test |
+| PR a `dev`/`QA`/`main` | — | lint + build | analyze + test |
 
 Los tokens están como secret `AZURE_STATIC_WEB_APPS_API_TOKEN` en los GitHub Environments `dev` y `qa`.
-Workflows en `.github/workflows/`. Flujo: feature → PR a `main` (Dev) → merge de `main` a `QA` (QA).
+Workflows en `.github/workflows/`. Flujo: feature → PR a `dev` (despliega Dev) → PR de `dev` a `QA` (despliega QA) → PR de `QA` a `main` al liberar. `main` es la rama estable: **no despliega nada** (reservada para Prod), así que ediciones menores o merges de documentación no disparan despliegues. Los PRs a `dev`, `QA` y `main` corren CI.
 
 ## URLs y DNS
 
@@ -28,7 +28,7 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 
 | Rama | Ambiente | Container App | Base de datos |
 |---|---|---|---|
-| `main` | Dev | `ca-verificaciononline-api-dev` | `verificacion_dev` (rol `app_dev`) |
+| `dev` | Dev | `ca-verificaciononline-api-dev` | `verificacion_dev` (rol `app_dev`) |
 | `QA` | QA | `ca-verificaciononline-api-qa` | `verificacion_qa` (rol `app_qa`) |
 
 - Región: South Central US (Central US no tenía capacidad para Container Apps al crear el entorno).
@@ -41,7 +41,7 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 - Datos: `V3__datos_referencia.sql` (catálogos, regla R-01, tipos de alerta) va a todos los ambientes. `db/demo/` (V4, V6 y V9: usuarios ficticios, las 10 solicitudes y las 9 alertas de ejemplo de la consola) solo a local/dev/qa, vía el perfil `dev` (`application-dev.properties`). Por defecto (`application.properties`) solo se aplica `db/migration`, así que Prod es seguro sin configurar nada: basta con **no** activar el perfil `dev`. `backend-deploy.yml` define `SPRING_PROFILES_ACTIVE=dev` en las Container Apps de Dev y QA.
 - Migraciones: las ya aplicadas (V1–V10) no se editan (Flyway valida el checksum y la app no arranca); cualquier cambio va en un archivo nuevo (V11, V12…), con nombres en inglés. No ejecutarlas a mano en la consola: usan `SET LOCAL search_path` y dependen de la transacción de Flyway.
 - Local: `docker compose up -d` en `backend/` y `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`; o `./mvnw spring-boot:test-run -Dspring-boot.run.profiles=dev` con Postgres desechable (en IntelliJ: run configuration `TestBackendApplication (dev)`). Los tests usan `@ActiveProfiles("dev")`.
-- Contra la base Dev desde tu PC: perfil `dev-remote` (`SPRING_PROFILES_ACTIVE=dev-remote`) más `DB_URL`, `DB_USER` y `DB_PASSWORD` de Dev (`sslmode=require`, y tu IP en el firewall del servidor). Incluye `dev` pero **no** ejecuta Flyway: las migraciones las aplica el despliegue de Azure al hacer merge a `main` (Dev) o `QA`. Como `ddl-auto=validate` sigue activo, si tu rama cambia entidades y la migración aún no está en Dev, la app no arranca.
+- Contra la base Dev desde tu PC: perfil `dev-remote` (`SPRING_PROFILES_ACTIVE=dev-remote`) más `DB_URL`, `DB_USER` y `DB_PASSWORD` de Dev (`sslmode=require`, y tu IP en el firewall del servidor). Incluye `dev` pero **no** ejecuta Flyway: las migraciones las aplica el despliegue de Azure al hacer merge a `dev` (Dev) o `QA`. Como `ddl-auto=validate` sigue activo, si tu rama cambia entidades y la migración aún no está en Dev, la app no arranca.
 - Autenticación de la consola: `APP_JWT_SECRET`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` van como variables/secrets de cada Container App (detalle y comandos en `docs/integracion-api.md`). Sin ellas la app arranca igual, pero nadie puede iniciar sesión en la consola y los tokens no sobreviven a un reinicio. `APP_CORS_ALLOWED_ORIGINS` debe incluir la URL de la consola del ambiente.
 - Documentación de la API: con el perfil `dev` el backend publica Swagger UI en `/swagger-ui.html` y el OpenAPI en `/v3/api-docs` (springdoc). El archivo que se entrega a front y móvil es `docs/openapi.json`; una prueba falla si no coincide con el API. Por defecto (Prod) ambos están apagados (`application.properties`).
 

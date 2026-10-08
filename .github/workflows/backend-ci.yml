@@ -2,7 +2,7 @@ name: backend-ci
 
 on:
   pull_request:
-    branches: [main, QA]
+    branches: [dev, QA, main]
     paths: ["backend/**", ".github/workflows/backend-*.yml"]
 
 concurrency:

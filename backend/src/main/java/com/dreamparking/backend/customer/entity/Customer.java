@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Pattern;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -20,22 +21,31 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "customer")
 public class Customer {
 
+	/** Letters (accents and ñ included) in words separated by single spaces; no digits or special characters. */
+	public static final String NAME_PATTERN = "\\p{L}+( \\p{L}+)*";
+
+	public static final String NAME_MESSAGE = "Solo se permiten letras y espacios";
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
 	@Column(name = "id")
 	private UUID id;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
+	@Pattern(regexp = "[0-9]{8}-[0-9]")
 	@Column(name = "dui", nullable = false, unique = true, length = 10)
 	private String dui;
 
+	@Pattern(regexp = NAME_PATTERN, message = NAME_MESSAGE)
 	@Column(name = "first_names", nullable = false, length = 100)
 	private String firstNames;
 
+	@Pattern(regexp = NAME_PATTERN, message = NAME_MESSAGE)
 	@Column(name = "last_names", nullable = false, length = 100)
 	private String lastNames;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
+	@Pattern(regexp = "[67][0-9]{3}-[0-9]{4}")
 	@Column(name = "mobile_phone", nullable = false, length = 9)
 	private String mobilePhone;
 

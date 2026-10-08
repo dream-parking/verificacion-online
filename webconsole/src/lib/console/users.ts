@@ -6,10 +6,20 @@ export const MIN_PASSWORD_LENGTH = 10;
 /** The API limits the password to 72 bytes (bcrypt limit): accents and emojis take more than one. */
 export const MAX_PASSWORD_BYTES = 72;
 
-export const PASSWORD_POLICY = `De ${MIN_PASSWORD_LENGTH} a ${MAX_PASSWORD_BYTES} caracteres y distinta del correo.`;
+export const PASSWORD_POLICY = `De ${MIN_PASSWORD_LENGTH} a ${MAX_PASSWORD_BYTES} caracteres, sin emojis y distinta del correo.`;
+
+// Emojis, flags, skin tones and the characters that glue them together (zero-width joiner, variation
+// selector, keycap). © and ® are allowed. Built with RegExp because the build target (ES2017) does
+// not accept \p{...} in a regex literal.
+const EMOJI = new RegExp("(?![\\u00a9\\u00ae])[\\p{Extended_Pictographic}\\p{Regional_Indicator}\\u200d\\ufe0f\\u20e3]", "u");
+
+export const hasEmoji = (text: string) => EMOJI.test(text);
 
 /** Message of the first rule the password breaks, or "" if it is valid. The API validates it again. */
 export function passwordError(password: string, email: string): string {
+  if (hasEmoji(password)) {
+    return "No uses emojis: pueden escribirse distinto en otro teclado o dispositivo y la persona no podría entrar.";
+  }
   if (password.length < MIN_PASSWORD_LENGTH) return `Usa al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
   if (new TextEncoder().encode(password).length > MAX_PASSWORD_BYTES) {
     return `Es demasiado larga: el máximo son ${MAX_PASSWORD_BYTES} caracteres comunes (los acentos, símbolos y emojis ocupan más).`;

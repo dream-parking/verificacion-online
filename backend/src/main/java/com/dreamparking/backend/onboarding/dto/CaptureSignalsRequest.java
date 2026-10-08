@@ -1,5 +1,9 @@
 package com.dreamparking.backend.onboarding.dto;
 
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -26,6 +30,10 @@ public record CaptureSignalsRequest(
 		@Schema(description = "Versión de la app", example = "1.0.0+1") @Size(max = 20) String appVersion,
 		@Schema(description = "Ubicación aproximada reportada por la app", example = "San Salvador, El Salvador") @Size(max = 120) String approximateLocation,
 		@Schema(description = "País, ISO 3166-1 alfa-2", example = "SV") @Pattern(regexp = "^[A-Za-z]{2}$") String countryIso,
+		@Schema(description = "Si se obtuvo la ubicación: AVAILABLE (con latitud y longitud), PERMISSION_DENIED (el solicitante no dio permiso) o UNAVAILABLE (dio permiso pero el teléfono no pudo ubicarse). Sin valor: la app no lo reporta", example = "AVAILABLE") LocationStatus locationStatus,
+		@Schema(description = "Latitud aproximada; solo con AVAILABLE", example = "13.6929") @DecimalMin("-90") @DecimalMax("90") BigDecimal latitude,
+		@Schema(description = "Longitud aproximada; solo con AVAILABLE", example = "-89.2182") @DecimalMin("-180") @DecimalMax("180") BigDecimal longitude,
+		@Schema(description = "Radio de precisión que reporta el teléfono, en metros; solo con AVAILABLE", example = "1200") @Min(0) Integer locationAccuracyMeters,
 		@Schema(description = "Ritmo de escritura en caracteres por minuto; el servidor lo clasifica", example = "185") @Min(0) @Max(2000) Short typingSpeedCpm,
 		@Schema(description = "Tiempo por paso del formulario") @Valid @Size(max = 5) List<StepTiming> steps) {
 

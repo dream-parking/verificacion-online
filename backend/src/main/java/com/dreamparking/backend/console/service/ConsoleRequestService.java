@@ -15,6 +15,7 @@ import com.dreamparking.backend.console.dto.ConsoleRequestListItem;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestListItem;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
+import com.dreamparking.backend.onboarding.entity.SessionLocation;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
@@ -122,8 +123,10 @@ public class ConsoleRequestService {
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {
+		SessionLocation location = s.getLocation() == null ? new SessionLocation(null, null, null, null) : s.getLocation();
 		return new ConsoleRequestDetail.Signals(s.getIp() == null ? null : s.getIp().getHostAddress(),
-				s.getApproximateLocation(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
+				s.getApproximateLocation(), location.getStatus(), location.getLatitude(), location.getLongitude(),
+				location.getAccuracyMeters(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
 				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice());
 	}
 

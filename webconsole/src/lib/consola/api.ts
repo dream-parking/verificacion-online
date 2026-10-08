@@ -98,6 +98,11 @@ export type SolicitudDetalle = {
   signals: {
     ip: string | null;
     approximateLocation: string | null;
+    /** VDI-41: AVAILABLE con coordenadas; PERMISSION_DENIED o UNAVAILABLE = «no disponible»; null si la app no lo reportó. */
+    locationStatus: "AVAILABLE" | "PERMISSION_DENIED" | "UNAVAILABLE" | null;
+    latitude: number | null;
+    longitude: number | null;
+    locationAccuracyMeters: number | null;
     deviceFingerprint: string | null;
     device: string | null;
     nightTime: boolean | null;

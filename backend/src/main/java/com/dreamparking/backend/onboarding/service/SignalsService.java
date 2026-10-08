@@ -1,5 +1,8 @@
 package com.dreamparking.backend.onboarding.service;
 
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
+import java.math.RoundingMode;
+import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
@@ -15,6 +18,7 @@ import com.dreamparking.backend.customer.repository.DeviceRepository;
 import com.dreamparking.backend.onboarding.dto.CaptureSignalsRequest;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.OnboardingSession;
+import com.dreamparking.backend.onboarding.entity.SessionLocation;
 import com.dreamparking.backend.onboarding.entity.RequestStep;
 import com.dreamparking.backend.onboarding.entity.RequestStepId;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
@@ -53,6 +57,7 @@ public class SignalsService {
 	@Transactional
 	public void capture(UUID requestId, CaptureSignalsRequest body, String clientIp, String userAgent) {
 		OnboardingRequest request = onboardingService.findInProgress(requestId);
+		checkLocation(body);
 		Instant now = Instant.now();
 
 		Device device = devices.findByFingerprint(body.deviceFingerprint()).orElseGet(Device::new);
@@ -76,6 +81,8 @@ public class SignalsService {
 		session.setAppVersion(body.appVersion());
 		session.setApproximateLocation(body.approximateLocation());
 		session.setCountryIso(body.countryIso() == null ? null : body.countryIso().toUpperCase());
+		session.setLocation(new SessionLocation(body.locationStatus(), coordinate(body.latitude()),
+				coordinate(body.longitude()), body.locationAccuracyMeters()));
 		session.setTypingSpeedCpm(body.typingSpeedCpm());
 		session.setTypingPace(paceOf(body.typingSpeedCpm()));
 		sessions.save(session);
@@ -84,6 +91,27 @@ public class SignalsService {
 			body.steps().forEach(timing -> saveStep(request, timing, now));
 		}
 		request.setLastActivityAt(now);
+	}
+
+	/**
+	 * VDI-41: coordinates travel only with {@code AVAILABLE}, which needs both of them. Without permission
+	 * ({@code PERMISSION_DENIED}) or without a position ({@code UNAVAILABLE}) the location is "not available".
+	 */
+	private static void checkLocation(CaptureSignalsRequest body) {
+		if (body.locationStatus() == LocationStatus.AVAILABLE) {
+			if (body.latitude() == null || body.longitude() == null) {
+				throw new InvalidInputException("locationStatus AVAILABLE needs latitude and longitude");
+			}
+		}
+		else if (body.latitude() != null || body.longitude() != null || body.locationAccuracyMeters() != null) {
+			throw new InvalidInputException(
+					"latitude, longitude and locationAccuracyMeters are only sent with locationStatus AVAILABLE");
+		}
+	}
+
+	/** Six decimals (about 0.1 m), the precision of the column. */
+	private static BigDecimal coordinate(BigDecimal value) {
+		return value == null ? null : value.setScale(6, RoundingMode.HALF_UP);
 	}
 
 	static TypingPace paceOf(Short cpm) {

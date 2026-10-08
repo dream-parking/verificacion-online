@@ -262,33 +262,6 @@
             "minLength" : 0,
             "type" : "string"
           },
-          "latitude" : {
-            "description" : "Latitud aproximada; solo con AVAILABLE",
-            "example" : 13.6929,
-            "maximum" : 90,
-            "minimum" : -90,
-            "type" : "number"
-          },
-          "locationAccuracyMeters" : {
-            "description" : "Radio de precisión que reporta el teléfono, en metros; solo con AVAILABLE",
-            "example" : 1200,
-            "format" : "int32",
-            "minimum" : 0,
-            "type" : "integer"
-          },
-          "locationStatus" : {
-            "description" : "Si se obtuvo la ubicación: AVAILABLE (con latitud y longitud), PERMISSION_DENIED (el solicitante no dio permiso) o UNAVAILABLE (dio permiso pero el teléfono no pudo ubicarse). Sin valor: la app no lo reporta",
-            "enum" : [ "AVAILABLE", "PERMISSION_DENIED", "UNAVAILABLE" ],
-            "example" : "AVAILABLE",
-            "type" : "string"
-          },
-          "longitude" : {
-            "description" : "Longitud aproximada; solo con AVAILABLE",
-            "example" : -89.2182,
-            "maximum" : 180,
-            "minimum" : -180,
-            "type" : "number"
-          },
           "operatingSystem" : {
             "description" : "Sistema operativo",
             "example" : "iOS",
@@ -635,20 +608,6 @@
           },
           "ip" : {
             "type" : "string"
-          },
-          "latitude" : {
-            "type" : "number"
-          },
-          "locationAccuracyMeters" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "locationStatus" : {
-            "enum" : [ "AVAILABLE", "PERMISSION_DENIED", "UNAVAILABLE" ],
-            "type" : "string"
-          },
-          "longitude" : {
-            "type" : "number"
           },
           "nightTime" : {
             "type" : "boolean"

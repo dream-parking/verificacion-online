@@ -11,7 +11,6 @@ import 'package:onboarding/onboarding/application_form.dart';
 import 'package:onboarding/onboarding/onboarding_flow.dart';
 import 'package:onboarding/onboarding/widgets.dart';
 import 'package:onboarding/signals/device_fingerprint.dart';
-import 'package:onboarding/signals/location.dart';
 
 /// Catalog like the one from the Dev API (VDI-46 and VDI-50).
 const devCatalog = {
@@ -167,20 +166,6 @@ class FakeDeviceInfo implements DeviceInfoSource {
   }
 }
 
-/// Fake location reader: answers like the phone would and counts how many times it was asked.
-class FakeLocation implements LocationSource {
-  FakeLocation([this.answer = const ApproximateLocation.available(latitude: 13.6929, longitude: -89.2182, accuracyMeters: 1200)]);
-
-  final ApproximateLocation answer;
-  var reads = 0;
-
-  @override
-  Future<ApproximateLocation> read() async {
-    reads++;
-    return answer;
-  }
-}
-
 void main() {
   group('validation and formatting', () {
     test('DUI and phone masks', () {
@@ -234,12 +219,10 @@ void main() {
 
     Future<void> tapContinue(WidgetTester tester) => tap(tester, find.text('CONTINUAR'));
 
-    Widget app(FakeApi fake, {DeviceInfoSource? device, LocationSource? location, DateTime Function()? clock}) =>
-        OnboardingApp(
+    Widget app(FakeApi fake, {DeviceInfoSource? device, DateTime Function()? clock}) => OnboardingApp(
           home: OnboardingFlow(
             api: fake.api,
             deviceInfo: device ?? FakeDeviceInfo(),
-            location: location ?? FakeLocation(),
             clock: clock ?? DateTime.now,
           ),
         );
@@ -437,8 +420,8 @@ void main() {
         await tap(tester, find.byType(Checkbox));
         await tapContinue(tester);
 
-        expect(fake.signals, isNotEmpty);
-        final req = fake.signals.last;
+        expect(fake.signals, hasLength(1));
+        final req = fake.signals.single;
         expect(req.method, 'PUT');
         expect(req.url.path, '/api/onboarding/requests/11111111-2222-3333-4444-555555555555/signals');
         expect(
@@ -464,54 +447,6 @@ void main() {
         await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
         await tapContinue(tester);
         expect(fake.signals, hasLength(2));
-      });
-    });
-
-    group('approximate location (VDI-41)', () {
-      testWidgets('does not ask for the location before the notice is accepted', (tester) async {
-        final location = FakeLocation();
-        await tester.pumpWidget(app(FakeApi(), location: location));
-        await tap(tester, find.text('EMPEZAR'));
-        await tapContinue(tester);
-        expect(location.reads, 0);
-      });
-
-      testWidgets('with permission it sends the latitude and longitude', (tester) async {
-        // VDI-12 criterion 2
-        final fake = FakeApi();
-        final location = FakeLocation();
-        await tester.pumpWidget(app(fake, location: location));
-        await tap(tester, find.text('EMPEZAR'));
-        await tap(tester, find.byType(Checkbox));
-        await tapContinue(tester);
-
-        expect(location.reads, 1);
-        expect(
-          jsonDecode(fake.signals.last.body),
-          allOf(
-            containsPair('locationStatus', 'AVAILABLE'),
-            containsPair('latitude', 13.6929),
-            containsPair('longitude', -89.2182),
-            containsPair('locationAccuracyMeters', 1200),
-            containsPair('deviceFingerprint', 'd4f1·9a3c·e7b2'),
-          ),
-        );
-      });
-
-      testWidgets('without permission it sends the location as not available and the other signals', (tester) async {
-        // VDI-12 criterion 4
-        final fake = FakeApi();
-        await tester.pumpWidget(app(fake, location: FakeLocation(const ApproximateLocation.notAvailable(LocationStatus.permissionDenied))));
-        await tap(tester, find.text('EMPEZAR'));
-        await tap(tester, find.byType(Checkbox));
-        await tapContinue(tester);
-
-        expect(find.text('Paso 1 de 4'), findsOneWidget, reason: 'the flow continues without the location');
-        final body = jsonDecode(fake.signals.last.body) as Map<String, dynamic>;
-        expect(body['locationStatus'], 'PERMISSION_DENIED');
-        expect(body.containsKey('latitude'), isFalse);
-        expect(body.containsKey('longitude'), isFalse);
-        expect(body['deviceFingerprint'], 'd4f1·9a3c·e7b2');
       });
     });
 

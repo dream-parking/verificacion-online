@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { cerrarSesion } from "@/lib/consola/sesion";
-import { ApiError, type UsuarioConsola } from "@/lib/consola/api";
-import { PASSWORD_POLICY, passwordError, resetPassword, resetPasswordMessage } from "@/lib/consola/users";
+import { signOut } from "@/lib/console/session";
+import { ApiError, type ConsoleUser } from "@/lib/console/api";
+import { PASSWORD_POLICY, passwordError, resetPassword, resetPasswordMessage } from "@/lib/console/users";
 
-/** Diálogo para definir la contraseña de otra persona. La contraseña nunca se guarda ni se muestra después. */
+/** Dialog to set another person's password. The password is never stored or shown afterwards. */
 export function PasswordDialog({
   user,
   token,
   onClose,
   onDone,
 }: {
-  user: UsuarioConsola;
+  user: ConsoleUser;
   token: string;
   onClose: () => void;
   onDone: () => void;
@@ -26,7 +26,7 @@ export function PasswordDialog({
   const [saving, setSaving] = useState(false);
   const [serverError, setServerError] = useState("");
 
-  // Al abrirse lleva el foco al campo; Escape cierra (salvo mientras guarda).
+  // When it opens, focus goes to the field; Escape closes it (except while saving).
   useEffect(() => {
     input.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !saving && onClose();
@@ -49,7 +49,7 @@ export function PasswordDialog({
       await resetPassword(token, user.id, password);
       onDone();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) cerrarSesion();
+      if (err instanceof ApiError && err.status === 401) signOut();
       setServerError(resetPasswordMessage(err));
       setSaving(false);
     }
@@ -57,12 +57,12 @@ export function PasswordDialog({
 
   return (
     <>
-      <div className="anim-aparecer fixed inset-0 z-40 bg-black/40" aria-hidden="true" onClick={() => !saving && onClose()} />
+      <div className="anim-fade fixed inset-0 z-40 bg-black/40" aria-hidden="true" onClick={() => !saving && onClose()} />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-t`}
-        className="card anim-aviso fixed inset-x-4 top-1/2 z-50 mx-auto flex max-h-[calc(100vh-2rem)] max-w-[480px] -translate-y-1/2 flex-col gap-4 overflow-y-auto shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
+        className="card anim-notice fixed inset-x-4 top-1/2 z-50 mx-auto flex max-h-[calc(100vh-2rem)] max-w-[480px] -translate-y-1/2 flex-col gap-4 overflow-y-auto shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
       >
         <div>
           <h2 id={`${id}-t`} className="m-0 font-display text-xl font-extrabold">
@@ -134,7 +134,7 @@ export function PasswordDialog({
           </div>
 
           {serverError && (
-            <div role="alert" className="anim-aviso border border-danger bg-[#fbeaea] px-4 py-3 text-[14px] leading-5 font-semibold text-danger">
+            <div role="alert" className="anim-notice border border-danger bg-[#fbeaea] px-4 py-3 text-[14px] leading-5 font-semibold text-danger">
               ⚠ {serverError}
             </div>
           )}

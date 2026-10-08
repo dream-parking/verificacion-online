@@ -4,6 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- Solo en debug: permite http:// para el backend local (API_URL=http://10.0.2.2:8080). -->
+    <!-- Debug only: allows http:// for the local backend (API_URL=http://10.0.2.2:8080). -->
     <application android:usesCleartextTraffic="true"/>
 </manifest>

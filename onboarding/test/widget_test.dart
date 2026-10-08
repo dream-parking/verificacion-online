@@ -7,13 +7,13 @@ import 'package:http/testing.dart';
 
 import 'package:onboarding/api/onboarding_api.dart';
 import 'package:onboarding/main.dart';
+import 'package:onboarding/onboarding/application_form.dart';
 import 'package:onboarding/onboarding/onboarding_flow.dart';
-import 'package:onboarding/onboarding/solicitud.dart';
 import 'package:onboarding/onboarding/widgets.dart';
-import 'package:onboarding/senales/huella_dispositivo.dart';
+import 'package:onboarding/signals/device_fingerprint.dart';
 
-/// Catálogo como el de la API de Dev (VDI-46 y VDI-50).
-const catalogoDev = {
+/// Catalog like the one from the Dev API (VDI-46 and VDI-50).
+const devCatalog = {
   'incomeSources': [
     {'code': 'SALARIO', 'label': 'Salario'},
     {'code': 'NEGOCIO_PROPIO', 'label': 'Negocio propio'},
@@ -41,174 +41,165 @@ const catalogoDev = {
   ],
 };
 
-/// API falsa: responde el catálogo y cada paso de la solicitud, y guarda las llamadas.
-class ApiFalsa {
-  ApiFalsa({
-    this.fallarPrimeras = 0,
-    this.fallarSenales = 0,
-    this.fallarCatalogos = 0,
-    this.erroresAviso = const [],
-    this.erroresBasicos = const [],
-    this.erroresIngresos = const [],
-    this.erroresMovimiento = const [],
-    this.erroresEnvio = const [],
-    this.numero = 'SOL-2026-00419',
+/// Fake API: answers the catalog and every request step, and records the calls.
+class FakeApi {
+  FakeApi({
+    this.failStartTimes = 0,
+    this.failSignalsTimes = 0,
+    this.failCatalogsTimes = 0,
+    this.privacyErrors = const [],
+    this.basicDataErrors = const [],
+    this.incomeErrors = const [],
+    this.activityErrors = const [],
+    this.submitErrors = const [],
+    this.number = 'SOL-2026-00419',
   });
 
-  int fallarPrimeras;
-  int fallarSenales;
-  int fallarCatalogos;
+  int failStartTimes;
+  int failSignalsTimes;
+  int failCatalogsTimes;
 
-  /// Códigos HTTP con los que responden los primeros `PUT /privacy-consent` (luego 200).
-  List<int> erroresAviso;
+  /// HTTP codes returned by the first `PUT /privacy-consent` calls (then 200).
+  List<int> privacyErrors;
 
-  /// Códigos HTTP con los que responden los primeros `PUT /basic-data` (luego 200).
-  List<int> erroresBasicos;
+  /// HTTP codes returned by the first `PUT /basic-data` calls (then 200).
+  List<int> basicDataErrors;
 
-  /// Códigos HTTP con los que responden los primeros `PUT /income` (luego 204).
-  List<int> erroresIngresos;
+  /// HTTP codes returned by the first `PUT /income` calls (then 204).
+  List<int> incomeErrors;
 
-  /// Códigos HTTP con los que responden los primeros `PUT /expected-activity` (luego 200 con el score).
-  List<int> erroresMovimiento;
+  /// HTTP codes returned by the first `PUT /expected-activity` calls (then 200 with the score).
+  List<int> activityErrors;
 
-  /// Códigos HTTP con los que responden los primeros `POST /submit` (luego 200 con [numero]).
-  List<int> erroresEnvio;
+  /// HTTP codes returned by the first `POST /submit` calls (then 200 with [number]).
+  List<int> submitErrors;
 
-  /// Número que asigna el servidor al enviar.
-  final String numero;
+  /// Number the server assigns on submit.
+  final String number;
 
-  /// Si ya se envió: `GET` de la solicitud responde COMPLETED con [numero].
-  var enviada = false;
-  final llamadas = <http.Request>[];
+  /// Whether it was already submitted: `GET` of the request answers COMPLETED with [number].
+  var submitted = false;
+  final calls = <http.Request>[];
 
-  List<http.Request> get creaciones =>
-      llamadas.where((r) => r.method == 'POST' && r.url.path == '/api/onboarding/requests').toList();
-  List<http.Request> get avisos => llamadas.where((r) => r.url.path.endsWith('/privacy-consent')).toList();
-  List<http.Request> get basicos => llamadas.where((r) => r.url.path.endsWith('/basic-data')).toList();
-  List<http.Request> get envios => llamadas.where((r) => r.url.path.endsWith('/submit')).toList();
-  List<http.Request> get ingresos => llamadas.where((r) => r.url.path.endsWith('/income')).toList();
-  List<http.Request> get movimientos => llamadas.where((r) => r.url.path.endsWith('/expected-activity')).toList();
-  List<http.Request> get catalogos => llamadas.where((r) => r.url.path == '/api/catalogs').toList();
-  List<http.Request> get senales => llamadas.where((r) => r.url.path.endsWith('/signals')).toList();
+  List<http.Request> get starts =>
+      calls.where((r) => r.method == 'POST' && r.url.path == '/api/onboarding/requests').toList();
+  List<http.Request> get privacyConsents => calls.where((r) => r.url.path.endsWith('/privacy-consent')).toList();
+  List<http.Request> get basicData => calls.where((r) => r.url.path.endsWith('/basic-data')).toList();
+  List<http.Request> get submits => calls.where((r) => r.url.path.endsWith('/submit')).toList();
+  List<http.Request> get incomes => calls.where((r) => r.url.path.endsWith('/income')).toList();
+  List<http.Request> get activities => calls.where((r) => r.url.path.endsWith('/expected-activity')).toList();
+  List<http.Request> get catalogs => calls.where((r) => r.url.path == '/api/catalogs').toList();
+  List<http.Request> get signals => calls.where((r) => r.url.path.endsWith('/signals')).toList();
 
   OnboardingApi get api => OnboardingApi(
         baseUrl: 'https://api.test',
         client: MockClient((req) async {
-          llamadas.add(req);
+          calls.add(req);
           if (req.url.path == '/api/catalogs') {
-            if (fallarCatalogos > 0) {
-              fallarCatalogos--;
+            if (failCatalogsTimes > 0) {
+              failCatalogsTimes--;
               return http.Response('', 503);
             }
-            return http.Response.bytes(utf8.encode(jsonEncode(catalogoDev)), 200);
+            return http.Response.bytes(utf8.encode(jsonEncode(devCatalog)), 200);
           }
-          http.Response? error(List<int> errores, void Function(List<int>) quedan) {
-            if (errores.isEmpty) return null;
-            quedan(errores.sublist(1));
-            return http.Response('{"status":${errores.first},"detail":"error"}', errores.first);
+          http.Response? error(List<int> errors, void Function(List<int>) remaining) {
+            if (errors.isEmpty) return null;
+            remaining(errors.sublist(1));
+            return http.Response('{"status":${errors.first},"detail":"error"}', errors.first);
           }
 
           if (req.url.path.endsWith('/privacy-consent')) {
-            return error(erroresAviso, (r) => erroresAviso = r) ??
+            return error(privacyErrors, (r) => privacyErrors = r) ??
                 http.Response('{"status":"IN_PROGRESS","completedSteps":1}', 200);
           }
           if (req.url.path.endsWith('/basic-data')) {
-            return error(erroresBasicos, (r) => erroresBasicos = r) ??
+            return error(basicDataErrors, (r) => basicDataErrors = r) ??
                 http.Response('{"status":"IN_PROGRESS","completedSteps":2}', 200);
           }
           if (req.url.path.endsWith('/submit')) {
-            final fallo = error(erroresEnvio, (r) => erroresEnvio = r);
-            if (fallo != null) return fallo;
-            enviada = true;
-            return http.Response('{"number":"$numero","status":"COMPLETED","completedSteps":5}', 200);
+            final failure = error(submitErrors, (r) => submitErrors = r);
+            if (failure != null) return failure;
+            submitted = true;
+            return http.Response('{"number":"$number","status":"COMPLETED","completedSteps":5}', 200);
           }
           if (req.method == 'GET' && req.url.path.startsWith('/api/onboarding/requests/')) {
-            return enviada
-                ? http.Response('{"number":"$numero","status":"COMPLETED"}', 200)
+            return submitted
+                ? http.Response('{"number":"$number","status":"COMPLETED"}', 200)
                 : http.Response('{"number":null,"status":"IN_PROGRESS"}', 200);
           }
           if (req.url.path.endsWith('/income')) {
-            if (erroresIngresos.isNotEmpty) {
-              final status = erroresIngresos.first;
-              erroresIngresos = erroresIngresos.sublist(1);
-              return http.Response('{"status":$status,"detail":"error"}', status);
-            }
-            return http.Response('', 204);
+            return error(incomeErrors, (r) => incomeErrors = r) ?? http.Response('', 204);
           }
           if (req.url.path.endsWith('/expected-activity')) {
-            if (erroresMovimiento.isNotEmpty) {
-              final status = erroresMovimiento.first;
-              erroresMovimiento = erroresMovimiento.sublist(1);
-              return http.Response('{"status":$status,"detail":"error"}', status);
-            }
-            return http.Response('{"level":"LOW","ruleCode":"R-01"}', 200);
+            return error(activityErrors, (r) => activityErrors = r) ??
+                http.Response('{"level":"LOW","ruleCode":"R-01"}', 200);
           }
           if (req.url.path.endsWith('/signals')) {
-            if (fallarSenales > 0) {
-              fallarSenales--;
+            if (failSignalsTimes > 0) {
+              failSignalsTimes--;
               return http.Response('', 503);
             }
             return http.Response('', 204);
           }
-          if (fallarPrimeras > 0) {
-            fallarPrimeras--;
-            return http.Response('{"status":503,"detail":"Servicio no disponible"}', 503);
+          if (failStartTimes > 0) {
+            failStartTimes--;
+            return http.Response('{"status":503,"detail":"Service unavailable"}', 503);
           }
           return http.Response('{"id":"11111111-2222-3333-4444-555555555555","status":"IN_PROGRESS"}', 201);
         }),
       );
 }
 
-/// Dispositivo falso: cuenta cuántas veces se leyó.
-class DispositivoFalso implements FuenteDispositivo {
-  var lecturas = 0;
+/// Fake device: counts how many times it was read.
+class FakeDeviceInfo implements DeviceInfoSource {
+  var reads = 0;
 
   @override
-  Future<DatosDispositivo> leer() async {
-    lecturas++;
-    return const DatosDispositivo(
-      huella: 'd4f1·9a3c·e7b2',
-      modelo: 'Google Pixel 9',
-      sistemaOperativo: 'Android 16',
-      versionApp: '1.0.0+1',
+  Future<DeviceInfo> read() async {
+    reads++;
+    return const DeviceInfo(
+      fingerprint: 'd4f1·9a3c·e7b2',
+      model: 'Google Pixel 9',
+      operatingSystem: 'Android 16',
+      appVersion: '1.0.0+1',
     );
   }
 }
 
 void main() {
-  group('validación y formato', () {
-    test('máscaras de DUI y teléfono', () {
-      expect(formatearDui('048123775'), '04812377-5');
-      expect(formatearDui('04a8-12377599'), '04812377-5');
-      expect(formatearTel('78452310'), '7845-2310');
-      expect(formatearTel('784'), '784');
+  group('validation and formatting', () {
+    test('DUI and phone masks', () {
+      expect(formatDui('048123775'), '04812377-5');
+      expect(formatDui('04a8-12377599'), '04812377-5');
+      expect(formatPhone('78452310'), '7845-2310');
+      expect(formatPhone('784'), '784');
     });
 
-    test('datos básicos', () {
-      final s = Solicitud();
-      expect(s.pantallaValida(Pantalla.basicos), isFalse);
-      s
-        ..nombres = 'Marta'
-        ..apellidos = 'Rivas'
+    test('basic data', () {
+      final f = ApplicationForm();
+      expect(f.isScreenValid(Screen.basicData), isFalse);
+      f
+        ..firstNames = 'Marta'
+        ..lastNames = 'Rivas'
         ..dui = '04812377-5'
-        ..tel = '1845-2310';
-      expect(s.mensajes()['tel'], isNotEmpty, reason: 'el celular debe empezar con 6 o 7');
-      s.tel = '2245-6789';
-      expect(s.mensajes()['tel'], isNotEmpty, reason: 'los que empiezan con 2 son fijos y la API los rechaza');
-      s.tel = '7845-2310';
-      expect(s.pantallaValida(Pantalla.basicos), isTrue);
+        ..phone = '1845-2310';
+      expect(f.messages()['phone'], isNotEmpty, reason: 'the mobile number must start with 6 or 7');
+      f.phone = '2245-6789';
+      expect(f.messages()['phone'], isNotEmpty, reason: 'numbers starting with 2 are landlines and the API rejects them');
+      f.phone = '7845-2310';
+      expect(f.isScreenValid(Screen.basicData), isTrue);
     });
 
-    test('movimiento esperado pide tipo y rango de monto', () {
-      final s = Solicitud()..tipo = 'AHORRO';
-      expect(s.pantallaValida(Pantalla.movimiento), isFalse);
-      expect(s.mensajes()['rangoMonto'], 'Elige cuánto dinero moverás al mes.');
-      s.rangoMonto = '200_500';
-      expect(s.pantallaValida(Pantalla.movimiento), isTrue);
+    test('expected activity requires a transaction type and an amount range', () {
+      final f = ApplicationForm()..transactionType = 'AHORRO';
+      expect(f.isScreenValid(Screen.expectedActivity), isFalse);
+      expect(f.messages()['amountRange'], 'Elige cuánto dinero moverás al mes.');
+      f.amountRange = '200_500';
+      expect(f.isScreenValid(Screen.expectedActivity), isTrue);
     });
   });
 
-  group('flujo', () {
+  group('flow', () {
     setUp(() {
       final binding = TestWidgetsFlutterBinding.ensureInitialized();
       binding.platformDispatcher.views.first
@@ -219,53 +210,56 @@ void main() {
       ..resetPhysicalSize()
       ..resetDevicePixelRatio());
 
-    Future<void> tocar(WidgetTester tester, Finder f) async {
+    Future<void> tap(WidgetTester tester, Finder f) async {
       await tester.ensureVisible(f);
       await tester.pumpAndSettle();
       await tester.tap(f);
       await tester.pumpAndSettle();
     }
 
-    Future<void> continuar(WidgetTester tester) => tocar(tester, find.text('CONTINUAR'));
+    Future<void> tapContinue(WidgetTester tester) => tap(tester, find.text('CONTINUAR'));
 
-    testWidgets('completa la solicitud de principio a fin', (tester) async {
-      final falsa = ApiFalsa(erroresEnvio: [503]);
-      await tester.pumpWidget(OnboardingApp(
-        home: OnboardingFlow(
-          api: falsa.api,
-          dispositivo: DispositivoFalso(),
-        ),
-      ));
+    Widget app(FakeApi fake, {DeviceInfoSource? device, DateTime Function()? clock}) => OnboardingApp(
+          home: OnboardingFlow(
+            api: fake.api,
+            deviceInfo: device ?? FakeDeviceInfo(),
+            clock: clock ?? DateTime.now,
+          ),
+        );
+
+    testWidgets('completes the request from start to finish', (tester) async {
+      final fake = FakeApi(submitErrors: [503]);
+      await tester.pumpWidget(app(fake));
       expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
 
-      await tocar(tester, find.text('EMPEZAR'));
+      await tap(tester, find.text('EMPEZAR'));
 
-      // Privacidad: no avanza sin aceptar.
-      await continuar(tester);
+      // Privacy: does not move on without accepting.
+      await tapContinue(tester);
       expect(find.text('Para continuar necesitamos que aceptes el aviso de privacidad.'), findsOneWidget);
-      await tocar(tester, find.byType(Checkbox));
-      await continuar(tester);
+      await tap(tester, find.byType(Checkbox));
+      await tapContinue(tester);
 
-      // Datos básicos.
+      // Basic data.
       expect(find.text('Paso 1 de 4'), findsOneWidget);
-      await continuar(tester);
+      await tapContinue(tester);
       expect(find.text('Escribe tus nombres.'), findsOneWidget);
-      await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
-      await continuar(tester);
+      await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+      await tapContinue(tester);
 
-      // Ingresos.
+      // Income.
       expect(find.text('Paso 2 de 4'), findsOneWidget);
-      await tocar(tester, find.text('Remesas'));
-      await tocar(tester, find.text('USD 500.01 a 1,000'));
-      await continuar(tester);
+      await tap(tester, find.text('Remesas'));
+      await tap(tester, find.text('USD 500.01 a 1,000'));
+      await tapContinue(tester);
 
-      // Movimiento esperado.
+      // Expected activity.
       expect(find.text('Paso 3 de 4'), findsOneWidget);
-      await tocar(tester, find.text('Ahorro'));
-      await tocar(tester, find.text('Más de USD 1,000'));
-      await continuar(tester);
+      await tap(tester, find.text('Ahorro'));
+      await tap(tester, find.text('Más de USD 1,000'));
+      await tapContinue(tester);
 
-      // Revisión.
+      // Review.
       expect(find.text('Paso 4 de 4'), findsOneWidget);
       expect(find.text('Marta Alejandra Rivas Cruz'), findsOneWidget);
       expect(find.text('DUI 04812377-5 · Cel. 7845-2310'), findsOneWidget);
@@ -274,160 +268,160 @@ void main() {
       expect(find.text('Ahorro'), findsOneWidget);
       expect(find.text('Más de USD 1,000 al mes'), findsOneWidget);
 
-      // Cada paso quedó guardado en la API, en el orden que exige el envío.
-      expect(falsa.avisos, hasLength(1));
-      expect(jsonDecode(falsa.basicos.single.body), {
+      // Every step was saved in the API, in the order the submit requires.
+      expect(fake.privacyConsents, hasLength(1));
+      expect(jsonDecode(fake.basicData.single.body), {
         'firstNames': 'Marta Alejandra',
         'lastNames': 'Rivas Cruz',
         'dui': '04812377-5',
         'mobilePhone': '7845-2310',
       });
-      expect(falsa.ingresos, hasLength(1));
-      expect(falsa.movimientos, hasLength(1));
+      expect(fake.incomes, hasLength(1));
+      expect(fake.activities, hasLength(1));
 
-      // El primer envío falla (503) y el reintento funciona.
-      await tocar(tester, find.text('ENVIAR SOLICITUD'));
+      // The first submit fails (503) and the retry works.
+      await tap(tester, find.text('ENVIAR SOLICITUD'));
       expect(find.text('No pudimos enviar tu solicitud'), findsOneWidget);
-      await tocar(tester, find.text('REINTENTAR'));
+      await tap(tester, find.text('REINTENTAR'));
 
-      // El número es el que asignó el servidor, no uno de ejemplo.
-      expect(falsa.envios, hasLength(2));
+      // The number is the one the server assigned, not a sample one.
+      expect(fake.submits, hasLength(2));
       expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       expect(find.text('SOL-2026-00419'), findsOneWidget);
       expect(find.text('SOL-2026-00418'), findsNothing);
     });
 
-    testWidgets('si falla el registro del aviso, el reintento usa la misma solicitud', (tester) async {
-      final falsa = ApiFalsa(erroresAviso: [503]);
-      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-      await tocar(tester, find.text('EMPEZAR'));
-      await tocar(tester, find.byType(Checkbox));
+    testWidgets('if recording the notice fails, the retry reuses the same request', (tester) async {
+      final fake = FakeApi(privacyErrors: [503]);
+      await tester.pumpWidget(app(fake));
+      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.byType(Checkbox));
 
-      await continuar(tester);
-      expect(find.text('Paso 1 de 4'), findsNothing, reason: 'sin el aviso registrado no avanza');
-      await continuar(tester);
+      await tapContinue(tester);
+      expect(find.text('Paso 1 de 4'), findsNothing, reason: 'it does not move on without the notice recorded');
+      await tapContinue(tester);
 
       expect(find.text('Paso 1 de 4'), findsOneWidget);
-      expect(falsa.creaciones, hasLength(1), reason: 'no se crea una segunda solicitud');
-      expect(falsa.avisos, hasLength(2));
+      expect(fake.starts, hasLength(1), reason: 'no second request is created');
+      expect(fake.privacyConsents, hasLength(2));
     });
 
-    testWidgets('los datos básicos se guardan en la API antes de avanzar', (tester) async {
-      final falsa = ApiFalsa(erroresBasicos: [503]);
-      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-      await tocar(tester, find.text('EMPEZAR'));
-      await tocar(tester, find.byType(Checkbox));
-      await continuar(tester);
-      await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+    testWidgets('basic data is saved in the API before moving on', (tester) async {
+      final fake = FakeApi(basicDataErrors: [503]);
+      await tester.pumpWidget(app(fake));
+      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.byType(Checkbox));
+      await tapContinue(tester);
+      await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
 
-      await continuar(tester);
+      await tapContinue(tester);
       expect(find.text('No pudimos guardar tus datos'), findsOneWidget);
       expect(find.text('Paso 1 de 4'), findsOneWidget);
 
-      await continuar(tester);
+      await tapContinue(tester);
       expect(find.text('Paso 2 de 4'), findsOneWidget);
-      expect(falsa.basicos, hasLength(2));
+      expect(fake.basicData, hasLength(2));
     });
 
-    testWidgets('si se perdió la respuesta del envío, muestra el número que ya tiene la solicitud', (tester) async {
-      // El servidor guardó el envío pero el teléfono no recibió la respuesta: el reintento responde 409.
-      final falsa = ApiFalsa(erroresEnvio: [409], numero: 'SOL-2026-00420')..enviada = true;
-      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-      await tocar(tester, find.text('EMPEZAR'));
-      await tocar(tester, find.byType(Checkbox));
-      await continuar(tester);
-      await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
-      await continuar(tester);
-      await tocar(tester, find.text('Remesas'));
-      await tocar(tester, find.text('USD 500.01 a 1,000'));
-      await continuar(tester);
-      await tocar(tester, find.text('Ahorro'));
-      await tocar(tester, find.text('Más de USD 1,000'));
-      await continuar(tester);
+    testWidgets('if the submit response was lost, it shows the number the request already has', (tester) async {
+      // The server saved the submit but the phone did not get the response: the retry answers 409.
+      final fake = FakeApi(submitErrors: [409], number: 'SOL-2026-00420')..submitted = true;
+      await tester.pumpWidget(app(fake));
+      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.byType(Checkbox));
+      await tapContinue(tester);
+      await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+      await tapContinue(tester);
+      await tap(tester, find.text('Remesas'));
+      await tap(tester, find.text('USD 500.01 a 1,000'));
+      await tapContinue(tester);
+      await tap(tester, find.text('Ahorro'));
+      await tap(tester, find.text('Más de USD 1,000'));
+      await tapContinue(tester);
 
-      await tocar(tester, find.text('ENVIAR SOLICITUD'));
+      await tap(tester, find.text('ENVIAR SOLICITUD'));
       expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       expect(find.text('SOL-2026-00420'), findsOneWidget);
     });
 
-    testWidgets('la flecha de volver regresa al paso anterior', (tester) async {
-      await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: ApiFalsa().api, dispositivo: DispositivoFalso())));
-      await tocar(tester, find.text('EMPEZAR'));
+    testWidgets('the back arrow goes to the previous step', (tester) async {
+      await tester.pumpWidget(app(FakeApi()));
+      await tap(tester, find.text('EMPEZAR'));
       expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
-      await tocar(tester, find.byTooltip('Volver al paso anterior'));
+      await tap(tester, find.byTooltip('Volver al paso anterior'));
       expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
     });
 
-    group('aviso de privacidad (VDI-45)', () {
-      testWidgets('no crea la solicitud hasta aceptar el aviso', (tester) async {
-        final falsa = ApiFalsa();
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-        await tocar(tester, find.text('EMPEZAR'));
+    group('privacy notice (VDI-45)', () {
+      testWidgets('does not create the request until the notice is accepted', (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
         expect(find.text('Texto provisional · pendiente de revisión legal'), findsOneWidget);
 
-        await continuar(tester);
-        expect(falsa.creaciones, isEmpty);
+        await tapContinue(tester);
+        expect(fake.starts, isEmpty);
 
-        await tocar(tester, find.byType(Checkbox));
-        await continuar(tester);
-        expect(falsa.creaciones, hasLength(1));
-        expect(falsa.creaciones.single.url.path, '/api/onboarding/requests');
+        await tap(tester, find.byType(Checkbox));
+        await tapContinue(tester);
+        expect(fake.starts, hasLength(1));
+        expect(fake.starts.single.url.path, '/api/onboarding/requests');
         expect(find.text('Paso 1 de 4'), findsOneWidget);
       });
 
-      testWidgets('al volver, el aviso queda aceptado y no se crea otra solicitud', (tester) async {
-        final falsa = ApiFalsa();
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-        await tocar(tester, find.text('EMPEZAR'));
-        await tocar(tester, find.byType(Checkbox));
-        await continuar(tester);
+      testWidgets('when coming back, the notice stays accepted and no other request is created', (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.byType(Checkbox));
+        await tapContinue(tester);
 
-        await tocar(tester, find.byTooltip('Volver al paso anterior'));
+        await tap(tester, find.byTooltip('Volver al paso anterior'));
         final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
         expect(checkbox.value, isTrue);
-        expect(checkbox.onChanged, isNull, reason: 'no se puede retirar el consentimiento ya registrado');
+        expect(checkbox.onChanged, isNull, reason: 'a recorded consent cannot be withdrawn');
 
-        await continuar(tester);
+        await tapContinue(tester);
         expect(find.text('Paso 1 de 4'), findsOneWidget);
-        expect(falsa.creaciones, hasLength(1));
+        expect(fake.starts, hasLength(1));
       });
 
-      testWidgets('si falla la conexión muestra el error y permite reintentar', (tester) async {
-        final falsa = ApiFalsa(fallarPrimeras: 1);
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-        await tocar(tester, find.text('EMPEZAR'));
-        await tocar(tester, find.byType(Checkbox));
-        await continuar(tester);
+      testWidgets('if the connection fails it shows the error and allows a retry', (tester) async {
+        final fake = FakeApi(failStartTimes: 1);
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.byType(Checkbox));
+        await tapContinue(tester);
 
         expect(find.text('No pudimos iniciar tu solicitud'), findsOneWidget);
         expect(find.text('Paso 1 de 4'), findsNothing);
 
-        await tocar(tester, find.text('REINTENTAR'));
+        await tap(tester, find.text('REINTENTAR'));
         expect(find.text('Paso 1 de 4'), findsOneWidget);
-        expect(falsa.creaciones, hasLength(2));
+        expect(fake.starts, hasLength(2));
       });
     });
 
-    group('huella del dispositivo (VDI-40)', () {
-      testWidgets('no lee el dispositivo antes de aceptar el aviso', (tester) async {
-        final falsa = ApiFalsa();
-        final dispositivo = DispositivoFalso();
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: dispositivo)));
-        await tocar(tester, find.text('EMPEZAR'));
-        await continuar(tester);
-        expect(dispositivo.lecturas, 0);
-        expect(falsa.senales, isEmpty);
+    group('device fingerprint (VDI-40)', () {
+      testWidgets('does not read the device before the notice is accepted', (tester) async {
+        final fake = FakeApi();
+        final device = FakeDeviceInfo();
+        await tester.pumpWidget(app(fake, device: device));
+        await tap(tester, find.text('EMPEZAR'));
+        await tapContinue(tester);
+        expect(device.reads, 0);
+        expect(fake.signals, isEmpty);
       });
 
-      testWidgets('al aceptar envía la huella, el modelo, el sistema y la versión', (tester) async {
-        final falsa = ApiFalsa();
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-        await tocar(tester, find.text('EMPEZAR'));
-        await tocar(tester, find.byType(Checkbox));
-        await continuar(tester);
+      testWidgets('after accepting it sends the fingerprint, model, system and version', (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.byType(Checkbox));
+        await tapContinue(tester);
 
-        expect(falsa.senales, hasLength(1));
-        final req = falsa.senales.single;
+        expect(fake.signals, hasLength(1));
+        final req = fake.signals.single;
         expect(req.method, 'PUT');
         expect(req.url.path, '/api/onboarding/requests/11111111-2222-3333-4444-555555555555/signals');
         expect(
@@ -441,280 +435,285 @@ void main() {
         );
       });
 
-      testWidgets('si falla el envío no bloquea y se reintenta en la siguiente pantalla', (tester) async {
-        final falsa = ApiFalsa(fallarSenales: 1);
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-        await tocar(tester, find.text('EMPEZAR'));
-        await tocar(tester, find.byType(Checkbox));
-        await continuar(tester);
+      testWidgets('if sending fails it does not block and retries on the next screen', (tester) async {
+        final fake = FakeApi(failSignalsTimes: 1);
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.byType(Checkbox));
+        await tapContinue(tester);
         expect(find.text('Paso 1 de 4'), findsOneWidget);
-        expect(falsa.senales, hasLength(1));
+        expect(fake.signals, hasLength(1));
 
-        await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
-        await continuar(tester);
-        expect(falsa.senales, hasLength(2));
+        await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await tapContinue(tester);
+        expect(fake.signals, hasLength(2));
       });
     });
 
-    group('patrones de interacción (VDI-43)', () {
-      testWidgets('envía el ritmo de escritura y el tiempo e intentos de cada paso', (tester) async {
-        var ahora = DateTime.utc(2026, 10, 7, 10);
-        void avanzar(int ms) => ahora = ahora.add(Duration(milliseconds: ms));
-        final falsa = ApiFalsa();
-        await tester.pumpWidget(OnboardingApp(
-          home: OnboardingFlow(
-            api: falsa.api,
-            dispositivo: DispositivoFalso(),
-            reloj: () => ahora,
-          ),
-        ));
+    group('interaction patterns (VDI-43)', () {
+      testWidgets('sends the typing speed and the timing and attempts of each step', (tester) async {
+        var now = DateTime.utc(2026, 10, 7, 10);
+        void advance(int ms) => now = now.add(Duration(milliseconds: ms));
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake, clock: () => now));
 
-        await tocar(tester, find.text('EMPEZAR'));
-        avanzar(8000);
-        await tocar(tester, find.byType(Checkbox));
-        await continuar(tester);
+        await tap(tester, find.text('EMPEZAR'));
+        advance(8000);
+        await tap(tester, find.byType(Checkbox));
+        await tapContinue(tester);
 
-        // Datos básicos: un intento fallido y luego escritos letra por letra (una tecla cada 200 ms).
-        avanzar(1000);
-        await continuar(tester);
-        Future<void> escribir(int campo, String texto) async {
-          for (var i = 1; i <= texto.length; i++) {
-            avanzar(200);
-            await tester.enterText(find.byType(TextField).at(campo), texto.substring(0, i));
+        // Basic data: one failed attempt, then typed letter by letter (one keystroke every 200 ms).
+        advance(1000);
+        await tapContinue(tester);
+        Future<void> typeInto(int field, String text) async {
+          for (var i = 1; i <= text.length; i++) {
+            advance(200);
+            await tester.enterText(find.byType(TextField).at(field), text.substring(0, i));
           }
-          avanzar(2500); // pausa entre campos: no cuenta como tiempo escribiendo
+          advance(2500); // pause between fields: does not count as typing time
         }
 
-        await escribir(0, 'Marta Alejandra');
-        await escribir(1, 'Rivas Cruz');
-        await escribir(2, '048123775');
-        await escribir(3, '78452310');
-        await continuar(tester);
+        await typeInto(0, 'Marta Alejandra');
+        await typeInto(1, 'Rivas Cruz');
+        await typeInto(2, '048123775');
+        await typeInto(3, '78452310');
+        await tapContinue(tester);
 
-        await tocar(tester, find.text('Remesas'));
-        await tocar(tester, find.text('USD 500.01 a 1,000'));
-        avanzar(4000);
-        await continuar(tester);
+        await tap(tester, find.text('Remesas'));
+        await tap(tester, find.text('USD 500.01 a 1,000'));
+        advance(4000);
+        await tapContinue(tester);
 
-        await tocar(tester, find.text('Ahorro'));
-        await tocar(tester, find.text('USD 200.01 a 500'));
-        await continuar(tester);
+        await tap(tester, find.text('Ahorro'));
+        await tap(tester, find.text('USD 200.01 a 500'));
+        await tapContinue(tester);
 
-        avanzar(3000);
-        await tocar(tester, find.text('ENVIAR SOLICITUD'));
+        advance(3000);
+        await tap(tester, find.text('ENVIAR SOLICITUD'));
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
         await tester.pumpAndSettle();
 
-        final ultimo = jsonDecode(falsa.senales.last.body) as Map<String, dynamic>;
-        expect(ultimo['deviceFingerprint'], 'd4f1·9a3c·e7b2', reason: 'se sigue mandando la huella (VDI-40)');
-        expect(ultimo['typingSpeedCpm'], 300);
+        final last = jsonDecode(fake.signals.last.body) as Map<String, dynamic>;
+        expect(last['deviceFingerprint'], 'd4f1·9a3c·e7b2', reason: 'the fingerprint is still sent (VDI-40)');
+        expect(last['typingSpeedCpm'], 300);
 
-        final pasos = {for (final p in ultimo['steps'] as List) p['step']: p};
-        expect(pasos.keys, ['PRIVACY_NOTICE', 'BASIC_DATA', 'INCOME', 'EXPECTED_ACTIVITY', 'REVIEW']);
-        for (final p in pasos.values) {
-          expect(p['completedAt'], isNotNull, reason: '${p['step']} completado');
+        final steps = {for (final s in last['steps'] as List) s['step']: s};
+        expect(steps.keys, ['PRIVACY_NOTICE', 'BASIC_DATA', 'INCOME', 'EXPECTED_ACTIVITY', 'REVIEW']);
+        for (final s in steps.values) {
+          expect(s['completedAt'], isNotNull, reason: '${s['step']} completed');
         }
-        expect(pasos['PRIVACY_NOTICE']['startedAt'], '2026-10-07T10:00:00.000Z');
-        expect(pasos['PRIVACY_NOTICE']['completedAt'], '2026-10-07T10:00:08.000Z');
-        expect(pasos['BASIC_DATA']['attempts'], 2);
-        expect(pasos['INCOME']['attempts'], 1);
+        expect(steps['PRIVACY_NOTICE']['startedAt'], '2026-10-07T10:00:00.000Z');
+        expect(steps['PRIVACY_NOTICE']['completedAt'], '2026-10-07T10:00:08.000Z');
+        expect(steps['BASIC_DATA']['attempts'], 2);
+        expect(steps['INCOME']['attempts'], 1);
       });
 
-      testWidgets('no mide nada que se envíe antes de aceptar el aviso', (tester) async {
-        final falsa = ApiFalsa();
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-        await tocar(tester, find.text('EMPEZAR'));
-        await continuar(tester);
-        await continuar(tester);
-        expect(falsa.llamadas.where((r) => r.url.path != '/api/catalogs'), isEmpty);
+      testWidgets('measures nothing that is sent before the notice is accepted', (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+        await tapContinue(tester);
+        await tapContinue(tester);
+        expect(fake.calls.where((r) => r.url.path != '/api/catalogs'), isEmpty);
       });
     });
 
-    group('pantalla de ingresos (VDI-48)', () {
-      Future<void> irAIngresos(WidgetTester tester, ApiFalsa falsa) async {
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-        await tocar(tester, find.text('EMPEZAR'));
-        await tocar(tester, find.byType(Checkbox));
-        await continuar(tester);
-        await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
-        await continuar(tester);
+    group('income screen (VDI-48)', () {
+      Future<void> goToIncome(WidgetTester tester, FakeApi fake) async {
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.byType(Checkbox));
+        await tapContinue(tester);
+        await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await tapContinue(tester);
         expect(find.text('Paso 2 de 4'), findsOneWidget);
       }
 
-      testWidgets('muestra solo las opciones del catálogo de la UIF', (tester) async {
-        final falsa = ApiFalsa();
-        await irAIngresos(tester, falsa);
-        for (final texto in [
+      testWidgets('shows only the options of the UIF catalog', (tester) async {
+        final fake = FakeApi();
+        await goToIncome(tester, fake);
+        for (final text in [
           'Salario', 'Negocio propio', 'Remesas', 'Pensión', 'Otro', //
           'Hasta USD 500', 'USD 500.01 a 1,000', 'USD 1,000.01 a 2,500', 'Más de USD 2,500',
         ]) {
-          expect(find.text(texto), findsOneWidget, reason: texto);
+          expect(find.text(text), findsOneWidget, reason: text);
         }
-        expect(find.byType(OpcionTarjeta), findsNWidgets(9));
-        expect(find.text('USD 500 a 1,500'), findsNothing, reason: 'ya no se usan los rangos fijos');
-        expect(falsa.catalogos, hasLength(1));
+        expect(find.byType(OptionCard), findsNWidgets(9));
+        expect(find.text('USD 500 a 1,500'), findsNothing, reason: 'the hardcoded ranges are no longer used');
+        expect(fake.catalogs, hasLength(1));
       });
 
-      testWidgets('"Otro" pide el detalle y lo muestra en la revisión', (tester) async {
-        await irAIngresos(tester, ApiFalsa());
-        await tocar(tester, find.text('Otro'));
-        await tocar(tester, find.text('Hasta USD 500'));
-        await continuar(tester);
+      testWidgets('"Otro" asks for the detail and shows it in the review', (tester) async {
+        await goToIncome(tester, FakeApi());
+        await tap(tester, find.text('Otro'));
+        await tap(tester, find.text('Hasta USD 500'));
+        await tapContinue(tester);
         expect(find.text('Cuéntanos de dónde vienen tus ingresos.'), findsOneWidget);
         expect(find.text('Paso 2 de 4'), findsOneWidget);
 
         await tester.enterText(find.byType(TextField), 'Venta de artesanías');
-        await continuar(tester);
+        await tapContinue(tester);
         expect(find.text('Paso 3 de 4'), findsOneWidget);
 
-        await tocar(tester, find.text('Ahorro'));
-        await tocar(tester, find.text('USD 200.01 a 500'));
-        await continuar(tester);
+        await tap(tester, find.text('Ahorro'));
+        await tap(tester, find.text('USD 200.01 a 500'));
+        await tapContinue(tester);
         expect(find.text('Otro: Venta de artesanías'), findsOneWidget);
         expect(find.text('Hasta USD 500 al mes'), findsOneWidget);
       });
 
-      testWidgets('si no cargan las opciones muestra el error y permite reintentar', (tester) async {
-        final falsa = ApiFalsa(fallarCatalogos: 1);
-        await irAIngresos(tester, falsa);
+      testWidgets('if the options do not load it shows the error and allows a retry', (tester) async {
+        final fake = FakeApi(failCatalogsTimes: 1);
+        await goToIncome(tester, fake);
         expect(find.text('No pudimos cargar las opciones'), findsOneWidget);
-        expect(find.byType(OpcionTarjeta), findsNothing);
+        expect(find.byType(OptionCard), findsNothing);
 
-        await tocar(tester, find.text('REINTENTAR'));
-        expect(find.byType(OpcionTarjeta), findsNWidgets(9));
-        expect(falsa.catalogos, hasLength(2));
+        await tap(tester, find.text('REINTENTAR'));
+        expect(find.byType(OptionCard), findsNWidgets(9));
+        expect(fake.catalogs, hasLength(2));
       });
     });
 
-    group('guardar los ingresos (VDI-47)', () {
-      Future<void> irAIngresos(WidgetTester tester, ApiFalsa falsa) async {
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-        await tocar(tester, find.text('EMPEZAR'));
-        await tocar(tester, find.byType(Checkbox));
-        await continuar(tester);
-        await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
-        await continuar(tester);
+    group('saving the income (VDI-47)', () {
+      Future<void> goToIncome(WidgetTester tester, FakeApi fake) async {
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.byType(Checkbox));
+        await tapContinue(tester);
+        await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await tapContinue(tester);
       }
 
-      testWidgets('al continuar envía el origen y el rango con los códigos del catálogo', (tester) async {
-        final falsa = ApiFalsa();
-        await irAIngresos(tester, falsa);
-        await tocar(tester, find.text('Remesas'));
-        await tocar(tester, find.text('USD 500.01 a 1,000'));
-        expect(falsa.ingresos, isEmpty, reason: 'no se envía hasta tocar Continuar');
-        await continuar(tester);
+      testWidgets('on continue it sends the source and range with the catalog codes', (tester) async {
+        final fake = FakeApi();
+        await goToIncome(tester, fake);
+        await tap(tester, find.text('Remesas'));
+        await tap(tester, find.text('USD 500.01 a 1,000'));
+        expect(fake.incomes, isEmpty, reason: 'nothing is sent until Continuar is tapped');
+        await tapContinue(tester);
 
         expect(find.text('Paso 3 de 4'), findsOneWidget);
-        final req = falsa.ingresos.single;
+        final req = fake.incomes.single;
         expect(req.method, 'PUT');
         expect(req.url.path, '/api/onboarding/requests/11111111-2222-3333-4444-555555555555/income');
         expect(jsonDecode(req.body), {'sourceCode': 'REMESAS', 'rangeCode': '500_1000'});
       });
 
-      testWidgets('con "Otro" envía también el detalle', (tester) async {
-        final falsa = ApiFalsa();
-        await irAIngresos(tester, falsa);
-        await tocar(tester, find.text('Otro'));
-        await tocar(tester, find.text('Hasta USD 500'));
+      testWidgets('with "Otro" it also sends the detail', (tester) async {
+        final fake = FakeApi();
+        await goToIncome(tester, fake);
+        await tap(tester, find.text('Otro'));
+        await tap(tester, find.text('Hasta USD 500'));
         await tester.enterText(find.byType(TextField), '  Venta de artesanías ');
-        await continuar(tester);
-        expect(jsonDecode(falsa.ingresos.single.body), {
+        await tapContinue(tester);
+        expect(jsonDecode(fake.incomes.single.body), {
           'sourceCode': 'OTRO',
           'rangeCode': 'HASTA_500',
           'sourceDetail': 'Venta de artesanías',
         });
       });
 
-      testWidgets('si no se guarda no avanza; al reintentar sí', (tester) async {
-        final falsa = ApiFalsa(erroresIngresos: [503]);
-        await irAIngresos(tester, falsa);
-        await tocar(tester, find.text('Salario'));
-        await tocar(tester, find.text('Hasta USD 500'));
-        await continuar(tester);
+      testWidgets('if it is not saved it does not move on; the retry does', (tester) async {
+        final fake = FakeApi(incomeErrors: [503]);
+        await goToIncome(tester, fake);
+        await tap(tester, find.text('Salario'));
+        await tap(tester, find.text('Hasta USD 500'));
+        await tapContinue(tester);
 
         expect(find.text('No pudimos guardar tus ingresos'), findsOneWidget);
         expect(find.text('Paso 2 de 4'), findsOneWidget);
 
-        await tocar(tester, find.text('REINTENTAR'));
+        await tap(tester, find.text('REINTENTAR'));
         expect(find.text('Paso 3 de 4'), findsOneWidget);
-        expect(falsa.ingresos, hasLength(2));
+        expect(fake.incomes, hasLength(2));
       });
 
-      testWidgets('si la solicitud ya no está en progreso lo explica', (tester) async {
-        final falsa = ApiFalsa(erroresIngresos: [409]);
-        await irAIngresos(tester, falsa);
-        await tocar(tester, find.text('Salario'));
-        await tocar(tester, find.text('Hasta USD 500'));
-        await continuar(tester);
+      testWidgets('if the request is no longer in progress it explains it', (tester) async {
+        final fake = FakeApi(incomeErrors: [409]);
+        await goToIncome(tester, fake);
+        await tap(tester, find.text('Salario'));
+        await tap(tester, find.text('Hasta USD 500'));
+        await tapContinue(tester);
         expect(find.text('Tu solicitud ya fue enviada y no se puede modificar.'), findsOneWidget);
       });
     });
 
-    group('movimiento esperado (VDI-51)', () {
-      Future<void> irAMovimiento(WidgetTester tester, ApiFalsa falsa) async {
-        await tester.pumpWidget(OnboardingApp(home: OnboardingFlow(api: falsa.api, dispositivo: DispositivoFalso())));
-        await tocar(tester, find.text('EMPEZAR'));
-        await tocar(tester, find.byType(Checkbox));
-        await continuar(tester);
-        await tocar(tester, find.text('Rellenar con datos de ejemplo (demo)'));
-        await continuar(tester);
-        await tocar(tester, find.text('Salario'));
-        await tocar(tester, find.text('Hasta USD 500'));
-        await continuar(tester);
+    group('expected activity (VDI-51)', () {
+      Future<void> goToExpectedActivity(WidgetTester tester, FakeApi fake) async {
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.byType(Checkbox));
+        await tapContinue(tester);
+        await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await tapContinue(tester);
+        await tap(tester, find.text('Salario'));
+        await tap(tester, find.text('Hasta USD 500'));
+        await tapContinue(tester);
         expect(find.text('Paso 3 de 4'), findsOneWidget);
       }
 
-      testWidgets('solo se elige del catálogo: no hay campo de texto libre', (tester) async {
-        await irAMovimiento(tester, ApiFalsa());
-        for (final texto in [
+      testWidgets('options come only from the catalog: there is no free text field', (tester) async {
+        await goToExpectedActivity(tester, FakeApi());
+        for (final text in [
           'Pago de salario', 'Cobros de su negocio', 'Remesas familiares', 'Ahorro', //
           'Hasta USD 200', 'USD 200.01 a 500', 'USD 500.01 a 1,000', 'Más de USD 1,000',
         ]) {
-          expect(find.text(texto), findsOneWidget, reason: texto);
+          expect(find.text(text), findsOneWidget, reason: text);
         }
         expect(find.text('Tu empleador te depositará aquí el sueldo.'), findsOneWidget);
-        expect(find.byType(OpcionTarjeta), findsNWidgets(8));
+        expect(find.byType(OptionCard), findsNWidgets(8));
         expect(find.byType(TextField), findsNothing);
       });
 
-      testWidgets('pide elegir tipo y rango antes de continuar', (tester) async {
-        final falsa = ApiFalsa();
-        await irAMovimiento(tester, falsa);
-        await continuar(tester);
+      testWidgets('asks to choose a type and a range before continuing', (tester) async {
+        final fake = FakeApi();
+        await goToExpectedActivity(tester, fake);
+        await tapContinue(tester);
         expect(find.text('Elige qué tipo de dinero manejarás.'), findsOneWidget);
         expect(find.text('Elige cuánto dinero moverás al mes.'), findsOneWidget);
-        expect(falsa.movimientos, isEmpty);
+        expect(fake.activities, isEmpty);
       });
 
-      testWidgets('al continuar envía los códigos y pasa a la revisión', (tester) async {
-        final falsa = ApiFalsa();
-        await irAMovimiento(tester, falsa);
-        await tocar(tester, find.text('Remesas familiares'));
-        await tocar(tester, find.text('USD 200.01 a 500'));
-        await continuar(tester);
+      testWidgets('on continue it sends the codes and goes to the review', (tester) async {
+        final fake = FakeApi();
+        await goToExpectedActivity(tester, fake);
+        await tap(tester, find.text('Remesas familiares'));
+        await tap(tester, find.text('USD 200.01 a 500'));
+        await tapContinue(tester);
 
         expect(find.text('Paso 4 de 4'), findsOneWidget);
         expect(find.text('Remesas familiares'), findsOneWidget);
         expect(find.text('USD 200.01 a 500 al mes'), findsOneWidget);
-        final req = falsa.movimientos.single;
+        final req = fake.activities.single;
         expect(req.method, 'PUT');
         expect(req.url.path, '/api/onboarding/requests/11111111-2222-3333-4444-555555555555/expected-activity');
         expect(jsonDecode(req.body), {'transactionTypeCode': 'REMESAS', 'monthlyAmountRangeCode': '200_500'});
       });
 
-      testWidgets('si no se guarda no avanza; al reintentar sí', (tester) async {
-        final falsa = ApiFalsa(erroresMovimiento: [503]);
-        await irAMovimiento(tester, falsa);
-        await tocar(tester, find.text('Ahorro'));
-        await tocar(tester, find.text('Hasta USD 200'));
-        await continuar(tester);
+      testWidgets('if it is not saved it does not move on; the retry does', (tester) async {
+        final fake = FakeApi(activityErrors: [503]);
+        await goToExpectedActivity(tester, fake);
+        await tap(tester, find.text('Ahorro'));
+        await tap(tester, find.text('Hasta USD 200'));
+        await tapContinue(tester);
         expect(find.text('No pudimos guardar esta información'), findsOneWidget);
         expect(find.text('Paso 3 de 4'), findsOneWidget);
 
-        await tocar(tester, find.text('REINTENTAR'));
+        await tap(tester, find.text('REINTENTAR'));
         expect(find.text('Paso 4 de 4'), findsOneWidget);
-        expect(falsa.movimientos, hasLength(2));
+        expect(fake.activities, hasLength(2));
       });
+    });
+
+    testWidgets('Banco Tangamandapio brand: full logo on welcome and emblem on the steps', (tester) async {
+      await tester.pumpWidget(app(FakeApi()));
+      expect(find.byType(FullLogo), findsOneWidget);
+      expect(find.byType(Logo), findsNothing, reason: 'the brand is not repeated in the header on the welcome screen');
+      expect(find.text('Ceiba'), findsNothing);
+
+      await tap(tester, find.text('EMPEZAR'));
+      expect(find.byType(Logo), findsOneWidget);
+      expect(find.text('TANGAMANDAPIO'), findsOneWidget);
     });
   });
 }

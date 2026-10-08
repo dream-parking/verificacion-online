@@ -5,8 +5,8 @@
   --color-ink: #1a1b1a;
   --color-ink-soft: #4a4a4a;
   --color-muted: #5b5b5b;
-  --color-brand: #fdda24;
-  --color-brand-hover: #f2ce12;
+  --color-brand: #9ddfa6;
+  --color-brand-hover: #84d291;
   --color-dark: #2c2a29;
   --color-dark-hover: #3a3837;
   --color-dark-line: #4a4847;
@@ -231,6 +231,25 @@
     grid-template-columns: 120px 105px minmax(200px, 1fr) 130px 140px 130px 100px;
     min-width: 1030px;
   }
+  .g-usr {
+    grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1.5fr) minmax(170px, 1fr) 190px 110px 110px;
+    min-width: 1060px;
+  }
+  /* Ninguna celda se sale de su columna: el texto largo se parte y se recorta a 2 líneas. */
+  .gh > *,
+  .gr > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .clip2 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
   /* El enlace de la primera celda cubre toda la fila. */
   .rowlink {
     background: none;
@@ -403,7 +422,7 @@
       transform 120ms ease-out;
   }
   .btn:hover {
-    box-shadow: 0 4px 14px rgb(253 218 36 / 0.45);
+    box-shadow: 0 4px 14px rgb(132 210 145 / 0.5);
   }
   .btn:active,
   .btn2:active,

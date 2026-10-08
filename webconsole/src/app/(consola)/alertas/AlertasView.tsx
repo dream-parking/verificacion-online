@@ -385,14 +385,22 @@ function FilaAlerta({
         </button>
       </div>
       <div role="cell" data-label="Cuenta" className="tabular-nums">
-        {a.account}
+        <span className="clip2" title={a.account}>
+          {a.account}
+        </span>
       </div>
-      <div role="cell">{a.reason}</div>
+      <div role="cell">
+        <span className="clip2" title={a.reason}>
+          {a.reason}
+        </span>
+      </div>
       <div role="cell" data-label="Estado">
         {b.est}
       </div>
       <div role="cell" data-label="Responsable">
-        {a.assigneeName || "—"}
+        <span className="clip2" title={a.assigneeName || undefined}>
+          {a.assigneeName || "—"}
+        </span>
       </div>
       <div role="cell" data-label="Fecha" className="text-ink-soft">
         {fechaCorta(a.raisedAt)}

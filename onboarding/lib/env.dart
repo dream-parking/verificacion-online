@@ -1,9 +1,9 @@
 /// Build-time environment, injected with `--dart-define=APP_ENV=dev|qa`.
 const appEnv = String.fromEnvironment('APP_ENV', defaultValue: 'local');
 
-/// URL base de la API. Se puede forzar con `--dart-define=API_URL=http://10.0.2.2:8080`
-/// (backend corriendo en la Mac, visto desde el emulador de Android).
-/// Sin `API_URL`, `local` usa la API de Dev para no tener que levantar el backend.
+/// Base URL of the API. It can be forced with `--dart-define=API_URL=http://10.0.2.2:8080`
+/// (backend running on the Mac, as seen from the Android emulator).
+/// Without `API_URL`, `local` uses the Dev API so the backend does not have to be running.
 const apiBaseUrl = String.fromEnvironment(
   'API_URL',
   defaultValue: appEnv == 'qa'

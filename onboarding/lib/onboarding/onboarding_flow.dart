@@ -3,94 +3,94 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../api/catalogos.dart';
+import '../api/catalogs.dart';
 import '../api/onboarding_api.dart';
 import '../env.dart';
-import '../senales/huella_dispositivo.dart';
-import '../senales/senales.dart';
+import '../signals/device_fingerprint.dart';
+import '../signals/signals.dart';
 import '../theme.dart';
-import 'aviso_privacidad.dart';
-import 'solicitud.dart';
+import 'application_form.dart';
+import 'privacy_notice.dart';
 import 'widgets.dart';
 
-/// Flujo de apertura de cuenta: bienvenida → privacidad → 4 pasos → confirmación.
+/// Account opening flow: welcome → privacy → 4 steps → confirmation.
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({
     super.key,
     this.api,
-    this.dispositivo,
-    this.reloj = DateTime.now,
+    this.deviceInfo,
+    this.clock = DateTime.now,
   });
 
-  /// Cliente de la API; los tests pasan uno falso.
+  /// API client; tests pass a fake one.
   final OnboardingApi? api;
 
-  /// Lector del dispositivo (VDI-40); los tests pasan uno falso.
-  final FuenteDispositivo? dispositivo;
+  /// Device reader (VDI-40); tests pass a fake one.
+  final DeviceInfoSource? deviceInfo;
 
-  /// Hora actual para medir tiempos (VDI-43); los tests pasan una controlada.
-  final DateTime Function() reloj;
+  /// Current time used to measure timings (VDI-43); tests pass a controlled one.
+  final DateTime Function() clock;
 
   @override
   State<OnboardingFlow> createState() => _OnboardingFlowState();
 }
 
 class _OnboardingFlowState extends State<OnboardingFlow> {
-  static const _siguiente = {
-    Pantalla.bienvenida: Pantalla.privacidad,
-    Pantalla.privacidad: Pantalla.basicos,
-    Pantalla.basicos: Pantalla.ingresos,
-    Pantalla.ingresos: Pantalla.movimiento,
-    Pantalla.movimiento: Pantalla.revision,
+  static const _next = {
+    Screen.welcome: Screen.privacy,
+    Screen.privacy: Screen.basicData,
+    Screen.basicData: Screen.income,
+    Screen.income: Screen.expectedActivity,
+    Screen.expectedActivity: Screen.review,
   };
-  static const _anterior = {
-    Pantalla.privacidad: Pantalla.bienvenida,
-    Pantalla.basicos: Pantalla.privacidad,
-    Pantalla.ingresos: Pantalla.basicos,
-    Pantalla.movimiento: Pantalla.ingresos,
-    Pantalla.revision: Pantalla.movimiento,
+  static const _previous = {
+    Screen.privacy: Screen.welcome,
+    Screen.basicData: Screen.privacy,
+    Screen.income: Screen.basicData,
+    Screen.expectedActivity: Screen.income,
+    Screen.review: Screen.expectedActivity,
   };
-  static const _paso = {
-    Pantalla.basicos: 1,
-    Pantalla.ingresos: 2,
-    Pantalla.movimiento: 3,
-    Pantalla.revision: 4,
+  static const _stepNumber = {
+    Screen.basicData: 1,
+    Screen.income: 2,
+    Screen.expectedActivity: 3,
+    Screen.review: 4,
   };
 
   final _scroll = ScrollController();
-  final _nombres = TextEditingController();
-  final _apellidos = TextEditingController();
+  final _firstNames = TextEditingController();
+  final _lastNames = TextEditingController();
   final _dui = TextEditingController();
-  final _tel = TextEditingController();
-  final _detalleOrigen = TextEditingController();
+  final _phone = TextEditingController();
+  final _incomeSourceDetail = TextEditingController();
 
   late final OnboardingApi _api = widget.api ?? OnboardingApi();
-  late final FuenteDispositivo _dispositivo = widget.dispositivo ?? HuellaDispositivo();
-  var _s = Solicitud();
+  late final DeviceInfoSource _deviceInfo = widget.deviceInfo ?? PlatformDeviceInfoSource();
+  var _form = ApplicationForm();
 
-  /// Solicitud creada en el backend cuyo aviso todavía no se pudo registrar: el reintento la reutiliza.
-  String? _idCreado;
+  /// Request created in the backend whose privacy notice could not be recorded yet: the retry reuses it.
+  String? _createdRequestId;
 
-  /// Opciones de la API (VDI-48). No son datos personales: se piden al abrir la app.
-  Catalogos? _catalogos;
-  var _errorCatalogos = false;
-  var _senales = Senales();
-  var _senalesPendientes = false;
-  Future<void>? _envioEnCurso;
-  var _reenviar = false;
-  var _pantalla = Pantalla.bienvenida;
-  final _intentado = <Pantalla>{};
-  var _enviando = false;
-  var _preparando = false;
-  String? _errorInicio;
-  var _guardando = false;
-  String? _errorGuardar;
-  var _errorConexion = false;
-  var _copiado = false;
+  /// Options from the API (VDI-48). They are not personal data: they are requested when the app opens.
+  Catalogs? _catalogs;
+  var _catalogsFailed = false;
+  var _signals = Signals();
+  var _signalsPending = false;
+  Future<void>? _signalsInFlight;
+  var _resendSignals = false;
+  var _screen = Screen.welcome;
+  final _attempted = <Screen>{};
+  var _submitting = false;
+  var _starting = false;
+  String? _startError;
+  var _saving = false;
+  String? _saveError;
+  var _submitFailed = false;
+  var _copied = false;
 
   @override
   void dispose() {
-    for (final c in [_scroll, _nombres, _apellidos, _dui, _tel, _detalleOrigen]) {
+    for (final c in [_scroll, _firstNames, _lastNames, _dui, _phone, _incomeSourceDetail]) {
       c.dispose();
     }
     super.dispose();
@@ -99,257 +99,261 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   @override
   void initState() {
     super.initState();
-    _cargarCatalogos();
+    _loadCatalogs();
   }
 
-  Future<void> _cargarCatalogos() async {
-    if (_errorCatalogos) setState(() => _errorCatalogos = false);
+  Future<void> _loadCatalogs() async {
+    if (_catalogsFailed) setState(() => _catalogsFailed = false);
     try {
-      final catalogos = await _api.catalogos();
-      if (mounted) setState(() => _catalogos = catalogos);
+      final catalogs = await _api.catalogs();
+      if (mounted) setState(() => _catalogs = catalogs);
     } on ApiException catch (e) {
-      debugPrint('No se pudieron cargar los catálogos: $e');
-      if (mounted) setState(() => _errorCatalogos = true);
+      debugPrint('Could not load the catalogs: $e');
+      if (mounted) setState(() => _catalogsFailed = true);
     }
   }
 
-  void _ir(Pantalla p) {
+  void _goTo(Screen s) {
     FocusScope.of(context).unfocus();
     setState(() {
-      _pantalla = p;
-      _errorConexion = false;
-      _errorInicio = null;
-      _errorGuardar = null;
+      _screen = s;
+      _submitFailed = false;
+      _startError = null;
+      _saveError = null;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
-    // VDI-43: el inicio del paso queda en memoria; solo se envía después de aceptar el aviso.
-    _senales.pasos.iniciar(p, widget.reloj());
-    if (_senalesPendientes) unawaited(_enviarSenales());
+    // VDI-43: the step start stays in memory; it is only sent after the notice is accepted.
+    _signals.steps.start(s, widget.clock());
+    if (_signalsPending) unawaited(_sendSignals());
   }
 
-  /// VDI-43: marca el paso actual como completado y envía las señales.
-  void _completarPaso(Pantalla p) {
-    _senales.pasos.completar(p, widget.reloj());
-    unawaited(_enviarSenales());
+  /// VDI-43: marks the step as completed and sends the signals.
+  void _completeStep(Screen s) {
+    _signals.steps.complete(s, widget.clock());
+    unawaited(_sendSignals());
   }
 
-  /// VDI-43: ritmo de escritura en los campos de texto (solo después de aceptar el aviso).
-  void _escribio(String campo, String texto) {
-    if (_s.capturaPermitida) _senales.ritmo.registrar(campo, texto, widget.reloj());
+  /// VDI-43: typing speed in the text fields (only after the notice is accepted).
+  void _onTyped(String field, String text) {
+    if (_form.captureAllowed) _signals.typing.record(field, text, widget.clock());
   }
 
-  void _continuar() {
-    _senales.pasos.intento(_pantalla);
-    if (_pantalla == Pantalla.revision) {
-      _enviar();
+  void _continue() {
+    _signals.steps.attempt(_screen);
+    if (_screen == Screen.review) {
+      _submit();
       return;
     }
-    if (!_s.pantallaValida(_pantalla)) {
-      setState(() => _intentado.add(_pantalla));
+    if (!_form.isScreenValid(_screen)) {
+      setState(() => _attempted.add(_screen));
       return;
     }
-    if (_pantalla == Pantalla.privacidad && !_s.capturaPermitida) {
-      _iniciarSolicitud();
+    if (_screen == Screen.privacy && !_form.captureAllowed) {
+      _startRequest();
       return;
     }
-    if (_pantalla == Pantalla.basicos) {
-      _guardarYSeguir(_enviarDatosBasicos);
+    if (_screen == Screen.basicData) {
+      _saveAndContinue(_sendBasicData);
       return;
     }
-    if (_pantalla == Pantalla.ingresos) {
-      _guardarYSeguir(_declararIngresos);
+    if (_screen == Screen.income) {
+      _saveAndContinue(_declareIncome);
       return;
     }
-    if (_pantalla == Pantalla.movimiento) {
-      _guardarYSeguir(_declararMovimiento);
+    if (_screen == Screen.expectedActivity) {
+      _saveAndContinue(_declareExpectedActivity);
       return;
     }
-    _completarPaso(_pantalla);
-    _ir(_siguiente[_pantalla]!);
+    _completeStep(_screen);
+    _goTo(_next[_screen]!);
   }
 
-  /// Guarda nombres, apellidos, DUI y celular en la API.
-  Future<void> _enviarDatosBasicos() => _api.enviarDatosBasicos(
-        _s.id!,
-        nombres: _s.nombres.trim(),
-        apellidos: _s.apellidos.trim(),
-        dui: _s.dui,
-        celular: _s.tel,
+  /// Saves first names, last names, DUI and mobile number in the API.
+  Future<void> _sendBasicData() => _api.sendBasicData(
+        _form.id!,
+        firstNames: _form.firstNames.trim(),
+        lastNames: _form.lastNames.trim(),
+        dui: _form.dui,
+        mobilePhone: _form.phone,
       );
 
-  /// VDI-47: guarda el origen y el rango de ingresos en la API.
-  Future<void> _declararIngresos() => _api.declararIngresos(
-        _s.id!,
-        origen: _s.origen,
-        rango: _s.nivel,
-        detalle: _s.origen == origenOtro ? _s.detalleOrigen.trim() : null,
+  /// VDI-47: saves the income source and range in the API.
+  Future<void> _declareIncome() => _api.declareIncome(
+        _form.id!,
+        source: _form.incomeSource,
+        range: _form.incomeRange,
+        detail: _form.incomeSource == otherIncomeSource ? _form.incomeSourceDetail.trim() : null,
       );
 
-  /// VDI-51: guarda el tipo de movimiento y el rango de monto mensual en la API.
-  Future<void> _declararMovimiento() =>
-      _api.declararMovimiento(_s.id!, tipo: _s.tipo, rangoMonto: _s.rangoMonto);
+  /// VDI-51: saves the transaction type and the monthly amount range in the API.
+  Future<void> _declareExpectedActivity() => _api.declareExpectedActivity(
+        _form.id!,
+        transactionType: _form.transactionType,
+        amountRange: _form.amountRange,
+      );
 
-  /// Guarda el paso actual en la API y solo avanza si se guardó.
-  Future<void> _guardarYSeguir(Future<void> Function() guardar) async {
-    final paso = _pantalla;
+  /// Saves the current step in the API and only moves on if it was saved.
+  Future<void> _saveAndContinue(Future<void> Function() save) async {
+    final step = _screen;
     setState(() {
-      _guardando = true;
-      _errorGuardar = null;
+      _saving = true;
+      _saveError = null;
     });
     try {
-      await guardar();
+      await save();
       if (!mounted) return;
-      setState(() => _guardando = false);
-      _completarPaso(paso);
-      _ir(_siguiente[paso]!);
+      setState(() => _saving = false);
+      _completeStep(step);
+      _goTo(_next[step]!);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _guardando = false;
-        _errorGuardar = switch (e.status) {
+        _saving = false;
+        _saveError = switch (e.status) {
           409 => 'Tu solicitud ya fue enviada y no se puede modificar.',
-          400 => 'Revisa tus datos: ${e.mensaje}',
+          400 => 'Revisa tus datos: ${e.message}',
           _ => 'Revisa tu conexión a internet e inténtalo de nuevo.',
         };
       });
     }
   }
 
-  bool get _ocupado => _enviando || _preparando || _guardando;
+  bool get _busy => _submitting || _starting || _saving;
 
-  /// VDI-40: lee el dispositivo y envía su huella. Solo corre después de aceptar el aviso.
-  /// Si falla no interrumpe al cliente: las señales sirven para el score, no para continuar.
-  Future<void> _capturarDispositivo() async {
-    if (!_s.capturaPermitida) return;
+  /// VDI-40: reads the device and sends its fingerprint. It only runs after the notice is accepted.
+  /// If it fails it does not interrupt the customer: signals feed the score, they do not block the flow.
+  Future<void> _captureDevice() async {
+    if (!_form.captureAllowed) return;
     try {
-      _senales.dispositivo = await _dispositivo.leer();
+      _signals.device = await _deviceInfo.read();
     } on Exception catch (e) {
-      debugPrint('No se pudo leer el dispositivo: $e');
+      debugPrint('Could not read the device: $e');
       return;
     }
-    await _enviarSenales();
+    await _sendSignals();
   }
 
-  /// Envía todas las señales capturadas; si falla, se reintenta en el siguiente cambio de pantalla.
+  /// Sends all captured signals; if it fails, it is retried on the next screen change.
   ///
-  /// Los envíos van de uno en uno: como el backend reemplaza todo en cada envío, uno viejo que
-  /// llegara tarde borraría datos nuevos. Si se pide otro mientras hay uno en curso, se manda
-  /// una vez más al terminar, con lo último capturado.
-  Future<void> _enviarSenales() {
-    if (_envioEnCurso != null) {
-      _reenviar = true;
-      return _envioEnCurso!;
+  /// Requests go one at a time: since the backend replaces everything on each request, an old one
+  /// arriving late would erase newer data. If another one is requested while one is in flight, it
+  /// is sent once more when that one finishes, with the latest data.
+  Future<void> _sendSignals() {
+    if (_signalsInFlight != null) {
+      _resendSignals = true;
+      return _signalsInFlight!;
     }
-    return _envioEnCurso = _enviarEnOrden().whenComplete(() => _envioEnCurso = null);
+    return _signalsInFlight = _sendSignalsInOrder().whenComplete(() => _signalsInFlight = null);
   }
 
-  Future<void> _enviarEnOrden() async {
+  Future<void> _sendSignalsInOrder() async {
     do {
-      _reenviar = false;
-      final id = _s.id;
-      final senales = _senales;
-      if (id == null || senales.dispositivo == null) return;
-      _senalesPendientes = false;
+      _resendSignals = false;
+      final id = _form.id;
+      final signals = _signals;
+      if (id == null || signals.device == null) return;
+      _signalsPending = false;
       try {
-        await _api.enviarSenales(id, senales);
+        await _api.sendSignals(id, signals);
       } on ApiException catch (e) {
-        debugPrint('No se pudieron enviar las señales: $e');
-        _senalesPendientes = true;
+        debugPrint('Could not send the signals: $e');
+        _signalsPending = true;
         return;
       }
-    } while (_reenviar);
+    } while (_resendSignals);
   }
 
-  /// Crea la solicitud en el backend al aceptar el aviso y registra la aceptación. Hasta este momento
-  /// no se captura nada. Si se creó pero falló el registro del aviso, el reintento usa la misma solicitud.
-  Future<void> _iniciarSolicitud() async {
+  /// Creates the request in the backend when the notice is accepted and records the acceptance. Nothing
+  /// is captured before this. If the request was created but recording the notice failed, the retry
+  /// reuses the same request.
+  Future<void> _startRequest() async {
     setState(() {
-      _preparando = true;
-      _errorInicio = null;
+      _starting = true;
+      _startError = null;
     });
     try {
-      final id = _idCreado ??= await _api.iniciarSolicitud();
-      await _api.aceptarAviso(id);
+      final id = _createdRequestId ??= await _api.startRequest();
+      await _api.acceptPrivacyNotice(id);
       if (!mounted) return;
       setState(() {
-        _s
+        _form
           ..id = id
-          ..avisoAceptadoEn = widget.reloj();
-        _preparando = false;
+          ..privacyAcceptedAt = widget.clock();
+        _starting = false;
       });
-      _senales.pasos.completar(Pantalla.privacidad, _s.avisoAceptadoEn!);
-      _ir(Pantalla.basicos);
-      unawaited(_capturarDispositivo());
+      _signals.steps.complete(Screen.privacy, _form.privacyAcceptedAt!);
+      _goTo(Screen.basicData);
+      unawaited(_captureDevice());
     } on ApiException {
       if (!mounted) return;
       setState(() {
-        _preparando = false;
-        _errorInicio = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+        _starting = false;
+        _startError = 'Revisa tu conexión a internet e inténtalo de nuevo.';
       });
     }
   }
 
-  /// Envía la solicitud; el servidor le asigna su número único (SOL-AAAA-NNNNN).
-  Future<void> _enviar() async {
+  /// Submits the request; the server assigns its unique number (SOL-YYYY-NNNNN).
+  Future<void> _submit() async {
     setState(() {
-      _enviando = true;
-      _errorConexion = false;
+      _submitting = true;
+      _submitFailed = false;
     });
-    // VDI-43: las señales van antes del envío; una solicitud enviada ya no las acepta.
-    _senales.pasos.completar(Pantalla.revision, widget.reloj());
-    await _enviarSenales();
+    // VDI-43: signals go before submitting; a submitted request no longer accepts them.
+    _signals.steps.complete(Screen.review, widget.clock());
+    await _sendSignals();
     try {
-      final numero = await _api.enviarSolicitud(_s.id!);
+      final number = await _api.submitRequest(_form.id!);
       if (!mounted) return;
       setState(() {
-        _s.numero = numero;
-        _enviando = false;
+        _form.number = number;
+        _submitting = false;
       });
-      _ir(Pantalla.confirmacion);
+      _goTo(Screen.confirmation);
     } on ApiException catch (e) {
-      debugPrint('No se pudo enviar la solicitud: $e');
+      debugPrint('Could not submit the request: $e');
       if (!mounted) return;
       setState(() {
-        _enviando = false;
-        _errorConexion = true;
+        _submitting = false;
+        _submitFailed = true;
       });
     }
   }
 
-  void _reiniciar() {
-    for (final c in [_nombres, _apellidos, _dui, _tel, _detalleOrigen]) {
+  void _restart() {
+    for (final c in [_firstNames, _lastNames, _dui, _phone, _incomeSourceDetail]) {
       c.clear();
     }
     setState(() {
-      _s = Solicitud();
-      _idCreado = null;
-      _senales = Senales();
-      _senalesPendientes = false;
-      _reenviar = false;
-      _intentado.clear();
-      _errorInicio = null;
-      _errorGuardar = null;
-      _copiado = false;
+      _form = ApplicationForm();
+      _createdRequestId = null;
+      _signals = Signals();
+      _signalsPending = false;
+      _resendSignals = false;
+      _attempted.clear();
+      _startError = null;
+      _saveError = null;
+      _copied = false;
     });
-    _ir(Pantalla.bienvenida);
+    _goTo(Screen.welcome);
   }
 
-  /// Error visible de un campo: solo después de intentar continuar en esa pantalla.
-  String _error(String campo) {
-    if (!_intentado.contains(_pantalla) || !Solicitud.camposDe(_pantalla).contains(campo)) return '';
-    return _s.mensajes()[campo]!;
+  /// Visible error of a field: only after trying to continue on that screen.
+  String _errorFor(String field) {
+    if (!_attempted.contains(_screen) || !ApplicationForm.fieldsOf(_screen).contains(field)) return '';
+    return _form.messages()[field]!;
   }
 
   @override
   Widget build(BuildContext context) {
-    final anterior = _anterior[_pantalla];
-    final paso = _paso[_pantalla];
+    final previous = _previous[_screen];
+    final step = _stepNumber[_screen];
 
-    // En Android el botón "atrás" del sistema regresa al paso anterior en vez de cerrar la app.
+    // On Android the system "back" button goes to the previous step instead of closing the app.
     return PopScope(
-      canPop: anterior == null && !_ocupado,
+      canPop: previous == null && !_busy,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && anterior != null && !_ocupado) _ir(anterior);
+        if (!didPop && previous != null && !_busy) _goTo(previous);
       },
       child: Scaffold(
         body: SafeArea(
@@ -358,27 +362,28 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             children: [
               Column(
                 children: [
-                  _encabezado(anterior),
-                  if (paso != null) ProgresoPasos(paso: paso),
+                  // On the welcome screen the brand is shown large (full logo), not in the header.
+                  if (_screen != Screen.welcome) _header(previous),
+                  if (step != null) StepProgress(step: step),
                   Expanded(
                     child: SingleChildScrollView(
                       controller: _scroll,
                       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 200),
-                        child: KeyedSubtree(key: ValueKey(_pantalla), child: _contenido()),
+                        child: KeyedSubtree(key: ValueKey(_screen), child: _content()),
                       ),
                     ),
                   ),
-                  if (_pantalla != Pantalla.confirmacion) _barraAccion(),
+                  if (_screen != Screen.confirmation) _actionBar(),
                 ],
               ),
-              if (_enviando)
-                const _Cargando(titulo: 'Enviando tu solicitud…', detalle: 'No cierres la aplicación.'),
-              if (_guardando)
-                const _Cargando(titulo: 'Guardando tu información…', detalle: 'Un momento, por favor.'),
-              if (_preparando)
-                const _Cargando(titulo: 'Preparando tu solicitud…', detalle: 'Esto puede tardar unos segundos.'),
+              if (_submitting)
+                const _LoadingOverlay(title: 'Enviando tu solicitud…', detail: 'No cierres la aplicación.'),
+              if (_saving)
+                const _LoadingOverlay(title: 'Guardando tu información…', detail: 'Un momento, por favor.'),
+              if (_starting)
+                const _LoadingOverlay(title: 'Preparando tu solicitud…', detail: 'Esto puede tardar unos segundos.'),
             ],
           ),
         ),
@@ -386,17 +391,17 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  Widget _encabezado(Pantalla? anterior) {
+  Widget _header(Screen? previous) {
     return SizedBox(
       height: 60,
       child: Padding(
         padding: const EdgeInsets.only(left: 8, right: 12),
         child: Row(
           children: [
-            if (anterior != null && !_ocupado)
+            if (previous != null && !_busy)
               IconButton(
                 tooltip: 'Volver al paso anterior',
-                onPressed: () => _ir(anterior),
+                onPressed: () => _goTo(previous),
                 icon: const Icon(Icons.arrow_back_ios_new, size: 22, color: AppColors.ink),
               )
             else
@@ -409,10 +414,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  Widget _barraAccion() {
-    final texto = switch (_pantalla) {
-      Pantalla.bienvenida => 'Empezar',
-      Pantalla.revision => 'Enviar solicitud',
+  Widget _actionBar() {
+    final text = switch (_screen) {
+      Screen.welcome => 'Empezar',
+      Screen.review => 'Enviar solicitud',
       _ => 'Continuar',
     };
     return Container(
@@ -421,52 +426,52 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       padding: EdgeInsets.fromLTRB(24, 12, 24, 20 + MediaQuery.paddingOf(context).bottom),
-      child: BotonPrimario(texto: texto, onPressed: _ocupado ? null : _continuar),
+      child: PrimaryButton(text: text, onPressed: _busy ? null : _continue),
     );
   }
 
-  Widget _contenido() => switch (_pantalla) {
-        Pantalla.bienvenida => const _Bienvenida(),
-        Pantalla.privacidad => _privacidad(),
-        Pantalla.basicos => _basicos(),
-        Pantalla.ingresos => _ingresos(),
-        Pantalla.movimiento => _movimiento(),
-        Pantalla.revision => _revision(),
-        Pantalla.confirmacion => _confirmacion(),
+  Widget _content() => switch (_screen) {
+        Screen.welcome => const _Welcome(),
+        Screen.privacy => _privacy(),
+        Screen.basicData => _basicData(),
+        Screen.income => _income(),
+        Screen.expectedActivity => _expectedActivity(),
+        Screen.review => _review(),
+        Screen.confirmation => _confirmation(),
       };
 
-  // ---------------------------------------------------------------- 2. Privacidad
+  // ---------------------------------------------------------------- 2. Privacy
 
-  Widget _privacidad() {
-    final error = _error('aceptado');
-    final yaAceptado = _s.capturaPermitida;
+  Widget _privacy() {
+    final error = _errorFor('accepted');
+    final alreadyAccepted = _form.captureAllowed;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (AvisoPrivacidad.esProvisional) ...[
-            const _EtiquetaProvisional(),
+          if (PrivacyNotice.isProvisional) ...[
+            const _ProvisionalLabel(),
             const SizedBox(height: 14),
           ],
-          const Titulo(AvisoPrivacidad.titulo),
+          const ScreenTitle(PrivacyNotice.title),
           const SizedBox(height: 12),
-          const Text(AvisoPrivacidad.introduccion, style: AppText.body),
+          const Text(PrivacyNotice.intro, style: AppText.body),
           const SizedBox(height: 20),
-          for (final (icono, titulo, desc) in AvisoPrivacidad.senales) ...[
-            FilaIcono(
-              leading: Icon(icono, size: 32, color: AppColors.blue),
-              titulo: titulo,
-              descripcion: desc,
+          for (final (icon, title, description) in PrivacyNotice.signals) ...[
+            IconRow(
+              leading: Icon(icon, size: 32, color: AppColors.blue),
+              title: title,
+              description: description,
             ),
             const SizedBox(height: 16),
           ],
           const SizedBox(height: 8),
-          const Text(AvisoPrivacidad.cierre, style: AppText.body),
+          const Text(PrivacyNotice.closing, style: AppText.body),
           const SizedBox(height: 16),
-          // Una vez creada la solicitud el consentimiento ya se registró: no se puede desmarcar.
+          // Once the request exists, the consent is already recorded: it cannot be unchecked.
           InkWell(
-            onTap: yaAceptado ? null : () => setState(() => _s.aceptado = !_s.aceptado),
+            onTap: alreadyAccepted ? null : () => setState(() => _form.accepted = !_form.accepted),
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 56),
               child: Row(
@@ -474,23 +479,23 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   Transform.scale(
                     scale: 1.3,
                     child: Checkbox(
-                      value: _s.aceptado,
-                      onChanged: yaAceptado ? null : (v) => setState(() => _s.aceptado = v ?? false),
+                      value: _form.accepted,
+                      onChanged: alreadyAccepted ? null : (v) => setState(() => _form.accepted = v ?? false),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(child: Text(AvisoPrivacidad.aceptacion, style: AppText.body)),
+                  const Expanded(child: Text(PrivacyNotice.acceptance, style: AppText.body)),
                 ],
               ),
             ),
           ),
-          if (error.isNotEmpty) TextoError(error),
-          if (_errorInicio != null) ...[
+          if (error.isNotEmpty) ErrorText(error),
+          if (_startError != null) ...[
             const SizedBox(height: 16),
-            _ErrorConexion(
-              titulo: 'No pudimos iniciar tu solicitud',
-              mensaje: _errorInicio!,
-              onReintentar: _iniciarSolicitud,
+            _ConnectionError(
+              title: 'No pudimos iniciar tu solicitud',
+              message: _startError!,
+              onRetry: _startRequest,
             ),
           ],
         ],
@@ -498,77 +503,77 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  // ---------------------------------------------------------------- 3. Datos básicos
+  // ---------------------------------------------------------------- 3. Basic data
 
-  Widget _basicos() {
+  Widget _basicData() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
       child: AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Titulo('Cuéntanos quién eres'),
+            const ScreenTitle('Cuéntanos quién eres'),
             const SizedBox(height: 20),
-            CampoTexto(
-              controller: _nombres,
-              etiqueta: 'Nombres',
+            LabeledTextField(
+              controller: _firstNames,
+              label: 'Nombres',
               placeholder: 'Por ejemplo, Marta Alejandra',
-              autofill: const [AutofillHints.givenName],
-              error: _error('nombres'),
+              autofillHints: const [AutofillHints.givenName],
+              error: _errorFor('firstNames'),
               onChanged: (v) {
-                _escribio('nombres', v);
-                setState(() => _s.nombres = v);
+                _onTyped('firstNames', v);
+                setState(() => _form.firstNames = v);
               },
             ),
             const SizedBox(height: 20),
-            CampoTexto(
-              controller: _apellidos,
-              etiqueta: 'Apellidos',
+            LabeledTextField(
+              controller: _lastNames,
+              label: 'Apellidos',
               placeholder: 'Por ejemplo, Rivas Cruz',
-              autofill: const [AutofillHints.familyName],
-              error: _error('apellidos'),
+              autofillHints: const [AutofillHints.familyName],
+              error: _errorFor('lastNames'),
               onChanged: (v) {
-                _escribio('apellidos', v);
-                setState(() => _s.apellidos = v);
+                _onTyped('lastNames', v);
+                setState(() => _form.lastNames = v);
               },
             ),
             const SizedBox(height: 20),
-            CampoTexto(
+            LabeledTextField(
               controller: _dui,
-              etiqueta: 'Número de DUI',
+              label: 'Número de DUI',
               placeholder: '00000000-0',
-              teclado: TextInputType.number,
-              formatters: [mascara(formatearDui)],
-              error: _error('dui'),
+              keyboardType: TextInputType.number,
+              formatters: [maskFormatter(formatDui)],
+              error: _errorFor('dui'),
               onChanged: (v) {
-                _escribio('dui', v);
-                setState(() => _s.dui = v);
+                _onTyped('dui', v);
+                setState(() => _form.dui = v);
               },
             ),
             const SizedBox(height: 20),
-            CampoTexto(
-              controller: _tel,
-              etiqueta: 'Teléfono celular',
+            LabeledTextField(
+              controller: _phone,
+              label: 'Teléfono celular',
               placeholder: '0000-0000',
-              teclado: TextInputType.phone,
-              autofill: const [AutofillHints.telephoneNumberNational],
-              formatters: [mascara(formatearTel)],
-              error: _error('tel'),
+              keyboardType: TextInputType.phone,
+              autofillHints: const [AutofillHints.telephoneNumberNational],
+              formatters: [maskFormatter(formatPhone)],
+              error: _errorFor('phone'),
               onChanged: (v) {
-                _escribio('tel', v);
-                setState(() => _s.tel = v);
+                _onTyped('phone', v);
+                setState(() => _form.phone = v);
               },
             ),
             if (appEnv != 'prod') ...[
               const SizedBox(height: 12),
-              BotonEnlace(texto: 'Rellenar con datos de ejemplo (demo)', onPressed: _rellenarDemo),
+              LinkButton(text: 'Rellenar con datos de ejemplo (demo)', onPressed: _fillDemoData),
             ],
-            if (_errorGuardar != null) ...[
+            if (_saveError != null) ...[
               const SizedBox(height: 16),
-              _ErrorConexion(
-                titulo: 'No pudimos guardar tus datos',
-                mensaje: _errorGuardar!,
-                onReintentar: _continuar,
+              _ConnectionError(
+                title: 'No pudimos guardar tus datos',
+                message: _saveError!,
+                onRetry: _continue,
               ),
             ],
           ],
@@ -577,77 +582,77 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  void _rellenarDemo() {
-    _nombres.text = 'Marta Alejandra';
-    _apellidos.text = 'Rivas Cruz';
+  void _fillDemoData() {
+    _firstNames.text = 'Marta Alejandra';
+    _lastNames.text = 'Rivas Cruz';
     _dui.text = '04812377-5';
-    _tel.text = '7845-2310';
+    _phone.text = '7845-2310';
     setState(() {
-      _s
-        ..nombres = _nombres.text
-        ..apellidos = _apellidos.text
+      _form
+        ..firstNames = _firstNames.text
+        ..lastNames = _lastNames.text
         ..dui = _dui.text
-        ..tel = _tel.text;
+        ..phone = _phone.text;
     });
   }
 
-  // ---------------------------------------------------------------- 4. Ingresos
+  // ---------------------------------------------------------------- 4. Income
 
-  Widget _ingresos() {
-    final errOrigen = _error('origen');
-    final errDetalle = _error('detalleOrigen');
-    final errNivel = _error('nivel');
-    final catalogos = _catalogos;
+  Widget _income() {
+    final sourceError = _errorFor('incomeSource');
+    final detailError = _errorFor('incomeSourceDetail');
+    final rangeError = _errorFor('incomeRange');
+    final catalogs = _catalogs;
     return Column(
       children: [
-        const Cabecera(
+        const ColorHeader(
           color: AppColors.skyblue,
           eyebrow: 'Tus ingresos',
-          titulo: '¿De dónde viene tu dinero?',
+          title: '¿De dónde viene tu dinero?',
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Aviso(
-                destacado: '¿Por qué lo preguntamos?',
-                texto: 'La ley exige que el banco conozca el origen de tus ingresos. '
+              const InfoBox(
+                highlight: '¿Por qué lo preguntamos?',
+                text: 'La ley exige que el banco conozca el origen de tus ingresos. '
                     'Se llama «Conozca a su Cliente».',
               ),
               const SizedBox(height: 24),
-              if (catalogos == null)
-                _cargandoOpciones()
+              if (catalogs == null)
+                _optionsPlaceholder()
               else ...[
-                const Subtitulo('Origen de tus ingresos'),
+                const SectionTitle('Origen de tus ingresos'),
                 const SizedBox(height: 12),
-                ..._opciones(catalogos.origenesIngreso, _s.origen, (v) => _s.origen = v),
-                if (errOrigen.isNotEmpty) TextoError(errOrigen),
-                if (_s.origen == origenOtro) ...[
+                ..._options(catalogs.incomeSources, _form.incomeSource, (v) => _form.incomeSource = v),
+                if (sourceError.isNotEmpty) ErrorText(sourceError),
+                if (_form.incomeSource == otherIncomeSource) ...[
                   const SizedBox(height: 8),
-                  CampoTexto(
-                    controller: _detalleOrigen,
-                    etiqueta: '¿De dónde vienen tus ingresos?',
+                  LabeledTextField(
+                    controller: _incomeSourceDetail,
+                    label: '¿De dónde vienen tus ingresos?',
                     placeholder: 'Por ejemplo, venta de artesanías',
                     formatters: [LengthLimitingTextInputFormatter(150)],
-                    error: errDetalle,
+                    error: detailError,
                     onChanged: (v) {
-                      _escribio('detalleOrigen', v);
-                      setState(() => _s.detalleOrigen = v);
+                      _onTyped('incomeSourceDetail', v);
+                      setState(() => _form.incomeSourceDetail = v);
                     },
                   ),
                 ],
                 const SizedBox(height: 28),
-                const Subtitulo('¿Cuánto ganas al mes?'),
+                const SectionTitle('¿Cuánto ganas al mes?'),
                 const SizedBox(height: 12),
-                ..._opciones(catalogos.rangosIngreso, _s.nivel, (v) => _s.nivel = v),
-                if (errNivel.isNotEmpty) TextoError(errNivel),
-                if (_errorGuardar != null) ...[
+                ..._options(catalogs.incomeRanges, _form.incomeRange, (v) => _form.incomeRange = v),
+                if (rangeError.isNotEmpty) ErrorText(rangeError),
+                if (_saveError != null) ...[
                   const SizedBox(height: 16),
-                  _ErrorConexion(
-                    titulo: 'No pudimos guardar tus ingresos',
-                    mensaje: _errorGuardar!,
-                    onReintentar: _continuar,
+                  _ConnectionError(
+                    title: 'No pudimos guardar tus ingresos',
+                    message: _saveError!,
+                    onRetry: _continue,
                   ),
                 ],
               ],
@@ -658,13 +663,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  /// Mientras llegan las opciones de la API, o si fallaron.
-  Widget _cargandoOpciones() {
-    if (_errorCatalogos) {
-      return _ErrorConexion(
-        titulo: 'No pudimos cargar las opciones',
-        mensaje: 'Revisa tu conexión a internet e inténtalo de nuevo.',
-        onReintentar: _cargarCatalogos,
+  /// While the API options load, or if they failed.
+  Widget _optionsPlaceholder() {
+    if (_catalogsFailed) {
+      return _ConnectionError(
+        title: 'No pudimos cargar las opciones',
+        message: 'Revisa tu conexión a internet e inténtalo de nuevo.',
+        onRetry: _loadCatalogs,
       );
     }
     return const Padding(
@@ -673,74 +678,74 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  List<Widget> _opciones(List<Opcion> lista, String actual, void Function(String) elegir) {
+  List<Widget> _options(List<Option> options, String current, void Function(String) choose) {
     return [
-      for (final o in lista)
+      for (final o in options)
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: OpcionTarjeta(
-            titulo: o.etiqueta,
-            descripcion: o.descripcion,
-            seleccionada: actual == o.valor,
-            onTap: () => setState(() => elegir(o.valor)),
+          child: OptionCard(
+            title: o.label,
+            description: o.description,
+            selected: current == o.value,
+            onTap: () => setState(() => choose(o.value)),
           ),
         ),
     ];
   }
 
-  // ---------------------------------------------------------------- 5. Movimiento esperado
+  // ---------------------------------------------------------------- 5. Expected activity
 
-  Widget _movimiento() {
-    final errTipo = _error('tipo');
-    final errRango = _error('rangoMonto');
-    final catalogos = _catalogos;
+  Widget _expectedActivity() {
+    final typeError = _errorFor('transactionType');
+    final rangeError = _errorFor('amountRange');
+    final catalogs = _catalogs;
     return Column(
       children: [
-        const Cabecera(
+        const ColorHeader(
           color: AppColors.pink,
           eyebrow: 'El dinero de tu cuenta',
-          titulo: '¿Qué dinero pasará por esta cuenta?',
+          title: '¿Qué dinero pasará por esta cuenta?',
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Aviso(
-                destacado: 'No es lo mismo que tus ingresos.',
-                texto: 'Aquí nos dices qué dinero esperas mover en esta cuenta cada mes.',
+              const InfoBox(
+                highlight: 'No es lo mismo que tus ingresos.',
+                text: 'Aquí nos dices qué dinero esperas mover en esta cuenta cada mes.',
               ),
               const SizedBox(height: 24),
-              if (catalogos == null)
-                _cargandoOpciones()
+              if (catalogs == null)
+                _optionsPlaceholder()
               else ...[
-                const Subtitulo('Tipo de dinero que manejarás'),
+                const SectionTitle('Tipo de dinero que manejarás'),
                 const SizedBox(height: 12),
-                ..._opciones(
+                ..._options(
                   [
-                    for (final t in catalogos.tiposMovimiento)
-                      Opcion(t.valor, t.etiqueta, descripcionesMovimiento[t.valor] ?? ''),
+                    for (final t in catalogs.transactionTypes)
+                      Option(t.value, t.label, transactionTypeDescriptions[t.value] ?? ''),
                   ],
-                  _s.tipo,
-                  (v) => _s.tipo = v,
+                  _form.transactionType,
+                  (v) => _form.transactionType = v,
                 ),
-                if (errTipo.isNotEmpty) TextoError(errTipo),
+                if (typeError.isNotEmpty) ErrorText(typeError),
                 const SizedBox(height: 28),
-                const Subtitulo('Monto mensual estimado'),
+                const SectionTitle('Monto mensual estimado'),
                 const SizedBox(height: 4),
                 const Text(
                   'Un cálculo aproximado de lo que moverás en un mes, en dólares.',
                   style: AppText.small,
                 ),
                 const SizedBox(height: 12),
-                ..._opciones(catalogos.rangosMonto, _s.rangoMonto, (v) => _s.rangoMonto = v),
-                if (errRango.isNotEmpty) TextoError(errRango),
-                if (_errorGuardar != null) ...[
+                ..._options(catalogs.amountRanges, _form.amountRange, (v) => _form.amountRange = v),
+                if (rangeError.isNotEmpty) ErrorText(rangeError),
+                if (_saveError != null) ...[
                   const SizedBox(height: 16),
-                  _ErrorConexion(
-                    titulo: 'No pudimos guardar esta información',
-                    mensaje: _errorGuardar!,
-                    onReintentar: _continuar,
+                  _ConnectionError(
+                    title: 'No pudimos guardar esta información',
+                    message: _saveError!,
+                    onRetry: _continue,
                   ),
                 ],
               ],
@@ -751,60 +756,60 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  // ---------------------------------------------------------------- 6. Revisión
+  // ---------------------------------------------------------------- 6. Review
 
-  Widget _revision() {
+  Widget _review() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Titulo('Revisa tu solicitud'),
+          const ScreenTitle('Revisa tu solicitud'),
           const SizedBox(height: 6),
           const Text('Si algo no está bien, puedes corregirlo antes de enviar.', style: AppText.bodyMuted),
           const SizedBox(height: 20),
-          if (_errorConexion) ...[
-            _ErrorConexion(
-              titulo: 'No pudimos enviar tu solicitud',
-              mensaje: 'Parece que se perdió la conexión. Tus datos siguen aquí. '
+          if (_submitFailed) ...[
+            _ConnectionError(
+              title: 'No pudimos enviar tu solicitud',
+              message: 'Parece que se perdió la conexión. Tus datos siguen aquí. '
                   'Revisa tu internet e inténtalo de nuevo.',
-              onReintentar: _enviar,
+              onRetry: _submit,
             ),
             const SizedBox(height: 20),
           ],
-          _Resumen(
-            titulo: 'Datos básicos',
-            semanticaEditar: 'Editar datos básicos',
-            linea1: _s.nombreCompleto,
-            linea2: 'DUI ${_s.dui} · Cel. ${_s.tel}',
-            onEditar: () => _ir(Pantalla.basicos),
+          _SummaryCard(
+            title: 'Datos básicos',
+            editSemanticLabel: 'Editar datos básicos',
+            line1: _form.fullName,
+            line2: 'DUI ${_form.dui} · Cel. ${_form.phone}',
+            onEdit: () => _goTo(Screen.basicData),
           ),
           const SizedBox(height: 14),
-          _Resumen(
-            titulo: 'Tus ingresos',
-            semanticaEditar: 'Editar ingresos',
-            linea1: _s.origen == origenOtro
-                ? 'Otro: ${_s.detalleOrigen.trim()}'
-                : etiquetaDe(_catalogos?.origenesIngreso ?? const [], _s.origen),
-            linea2: '${etiquetaDe(_catalogos?.rangosIngreso ?? const [], _s.nivel)} al mes',
-            onEditar: () => _ir(Pantalla.ingresos),
+          _SummaryCard(
+            title: 'Tus ingresos',
+            editSemanticLabel: 'Editar ingresos',
+            line1: _form.incomeSource == otherIncomeSource
+                ? 'Otro: ${_form.incomeSourceDetail.trim()}'
+                : labelOf(_catalogs?.incomeSources ?? const [], _form.incomeSource),
+            line2: '${labelOf(_catalogs?.incomeRanges ?? const [], _form.incomeRange)} al mes',
+            onEdit: () => _goTo(Screen.income),
           ),
           const SizedBox(height: 14),
-          _Resumen(
-            titulo: 'Dinero de tu cuenta',
-            semanticaEditar: 'Editar movimiento esperado',
-            linea1: etiquetaDe(_catalogos?.tiposMovimiento ?? const [], _s.tipo),
-            linea2: '${etiquetaDe(_catalogos?.rangosMonto ?? const [], _s.rangoMonto)} al mes',
-            onEditar: () => _ir(Pantalla.movimiento),
+          _SummaryCard(
+            title: 'Dinero de tu cuenta',
+            editSemanticLabel: 'Editar movimiento esperado',
+            line1: labelOf(_catalogs?.transactionTypes ?? const [], _form.transactionType),
+            line2: '${labelOf(_catalogs?.amountRanges ?? const [], _form.amountRange)} al mes',
+            onEdit: () => _goTo(Screen.expectedActivity),
           ),
         ],
       ),
     );
   }
 
-  // ---------------------------------------------------------------- 7. Confirmación
+  // ---------------------------------------------------------------- 7. Confirmation
 
-  Widget _confirmacion() {
+  Widget _confirmation() {
     return Padding(
       padding: EdgeInsets.fromLTRB(24, 16, 24, 32 + MediaQuery.paddingOf(context).bottom),
       child: Column(
@@ -817,7 +822,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             child: const Icon(Icons.check_rounded, size: 40, color: AppColors.ink),
           ),
           const SizedBox(height: 20),
-          const Titulo('¡Recibimos tu solicitud!', size: 32),
+          const ScreenTitle('¡Recibimos tu solicitud!', size: 32),
           const SizedBox(height: 8),
           const Text('Te avisaremos cuando tu cuenta esté lista.', style: AppText.body),
           const SizedBox(height: 20),
@@ -835,17 +840,17 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 const Text('Tu número de solicitud', style: AppText.label),
                 const SizedBox(height: 2),
                 Text(
-                  _s.numero ?? '',
+                  _form.number ?? '',
                   style: AppText.heading(28).copyWith(letterSpacing: 0.5),
                 ),
                 const SizedBox(height: 12),
                 Semantics(
                   liveRegion: true,
-                  child: BotonSecundario(
-                    texto: _copiado ? '¡Número copiado!' : 'Copiar número',
+                  child: SecondaryButton(
+                    text: _copied ? '¡Número copiado!' : 'Copiar número',
                     onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: _s.numero ?? ''));
-                      if (mounted) setState(() => _copiado = true);
+                      await Clipboard.setData(ClipboardData(text: _form.number ?? ''));
+                      if (mounted) setState(() => _copied = true);
                     },
                   ),
                 ),
@@ -853,9 +858,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             ),
           ),
           const SizedBox(height: 24),
-          const Subtitulo('¿Qué sigue?', size: 20),
+          const SectionTitle('¿Qué sigue?', size: 20),
           const SizedBox(height: 12),
-          for (final (i, t) in const [
+          for (final (i, text) in const [
             (1, 'Revisamos tu solicitud con calma.'),
             (2, 'Te avisaremos cuando tu cuenta esté lista.'),
             (3, 'Guarda tu número de solicitud por si necesitas consultarlo.'),
@@ -863,9 +868,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Numero(i, size: 28),
+                NumberBadge(i, size: 28),
                 const SizedBox(width: 12),
-                Expanded(child: Text(t, style: AppText.body)),
+                Expanded(child: Text(text, style: AppText.body)),
               ],
             ),
             const SizedBox(height: 12),
@@ -873,19 +878,19 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           const SizedBox(height: 16),
           const Divider(color: AppColors.border, height: 1),
           const SizedBox(height: 12),
-          Center(child: BotonEnlace(texto: 'Volver al inicio', onPressed: _reiniciar)),
+          Center(child: LinkButton(text: 'Volver al inicio', onPressed: _restart)),
         ],
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------- 1. Bienvenida
+// ---------------------------------------------------------------- 1. Welcome
 
-class _Bienvenida extends StatelessWidget {
-  const _Bienvenida();
+class _Welcome extends StatelessWidget {
+  const _Welcome();
 
-  static const _pasos = [
+  static const _steps = [
     ('Datos básicos', 'Tu nombre, DUI y celular.'),
     ('Tus ingresos', 'De dónde viene tu dinero y cuánto ganas.'),
     ('El dinero de tu cuenta', 'Qué dinero esperas mover cada mes.'),
@@ -897,6 +902,10 @@ class _Bienvenida extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(24, 16, 24, 20),
+          child: Center(child: FullLogo()),
+        ),
         Container(
           width: double.infinity,
           color: AppColors.orange,
@@ -937,10 +946,10 @@ class _Bienvenida extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Subtitulo('Esto es lo que te vamos a pedir', size: 22),
+              const SectionTitle('Esto es lo que te vamos a pedir', size: 22),
               const SizedBox(height: 16),
-              for (var i = 0; i < _pasos.length; i++) ...[
-                FilaIcono(leading: Numero(i + 1), titulo: _pasos[i].$1, descripcion: _pasos[i].$2),
+              for (var i = 0; i < _steps.length; i++) ...[
+                IconRow(leading: NumberBadge(i + 1), title: _steps[i].$1, description: _steps[i].$2),
                 const SizedBox(height: 14),
               ],
             ],
@@ -951,12 +960,12 @@ class _Bienvenida extends StatelessWidget {
   }
 }
 
-class _EtiquetaProvisional extends StatelessWidget {
-  const _EtiquetaProvisional();
+class _ProvisionalLabel extends StatelessWidget {
+  const _ProvisionalLabel();
 
   @override
   Widget build(BuildContext context) {
-    // Recuadro punteado del diseño; se aproxima con borde sólido gris.
+    // Dashed box in the design; approximated with a solid gray border.
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -968,20 +977,20 @@ class _EtiquetaProvisional extends StatelessWidget {
   }
 }
 
-class _Resumen extends StatelessWidget {
-  const _Resumen({
-    required this.titulo,
-    required this.semanticaEditar,
-    required this.linea1,
-    required this.linea2,
-    required this.onEditar,
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
+    required this.title,
+    required this.editSemanticLabel,
+    required this.line1,
+    required this.line2,
+    required this.onEdit,
   });
 
-  final String titulo;
-  final String semanticaEditar;
-  final String linea1;
-  final String linea2;
-  final VoidCallback onEditar;
+  final String title;
+  final String editSemanticLabel;
+  final String line1;
+  final String line2;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -998,24 +1007,24 @@ class _Resumen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(child: Subtitulo(titulo)),
-              BotonEnlace(texto: 'Editar', semanticLabel: semanticaEditar, onPressed: onEditar),
+              Expanded(child: SectionTitle(title)),
+              LinkButton(text: 'Editar', semanticLabel: editSemanticLabel, onPressed: onEdit),
             ],
           ),
-          Text(linea1, style: AppText.body),
-          Text(linea2, style: AppText.bodyMuted),
+          Text(line1, style: AppText.body),
+          Text(line2, style: AppText.bodyMuted),
         ],
       ),
     );
   }
 }
 
-class _ErrorConexion extends StatelessWidget {
-  const _ErrorConexion({required this.titulo, required this.mensaje, required this.onReintentar});
+class _ConnectionError extends StatelessWidget {
+  const _ConnectionError({required this.title, required this.message, required this.onRetry});
 
-  final String titulo;
-  final String mensaje;
-  final VoidCallback onReintentar;
+  final String title;
+  final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -1032,13 +1041,13 @@ class _ErrorConexion extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(titulo, style: const TextStyle(
+            Text(title, style: const TextStyle(
               fontSize: 16, height: 1.5, fontWeight: FontWeight.w700, color: AppColors.errorDark,
             )),
             const SizedBox(height: 2),
-            Text(mensaje, style: AppText.body),
+            Text(message, style: AppText.body),
             const SizedBox(height: 12),
-            BotonSecundario(texto: 'Reintentar', onPressed: onReintentar),
+            SecondaryButton(text: 'Reintentar', onPressed: onRetry),
           ],
         ),
       ),
@@ -1046,11 +1055,11 @@ class _ErrorConexion extends StatelessWidget {
   }
 }
 
-class _Cargando extends StatelessWidget {
-  const _Cargando({required this.titulo, required this.detalle});
+class _LoadingOverlay extends StatelessWidget {
+  const _LoadingOverlay({required this.title, required this.detail});
 
-  final String titulo;
-  final String detalle;
+  final String title;
+  final String detail;
 
   @override
   Widget build(BuildContext context) {
@@ -1073,9 +1082,9 @@ class _Cargando extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(titulo, style: AppText.heading(20)),
+              Text(title, style: AppText.heading(20)),
               const SizedBox(height: 16),
-              Text(detalle, style: AppText.bodyMuted),
+              Text(detail, style: AppText.bodyMuted),
             ],
           ),
         ),

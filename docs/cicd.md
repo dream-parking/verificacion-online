@@ -46,10 +46,18 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 - Documentación de la API: con el perfil `dev` el backend publica Swagger UI en `/swagger-ui.html` y el OpenAPI en `/v3/api-docs` (springdoc). El archivo que se entrega a front y móvil es `docs/openapi.json`; una prueba falla si no coincide con el API. Por defecto (Prod) ambos están apagados (`application.properties`).
 
 ### Análisis estático: SonarQube Cloud
-- El repo es público, así que SonarQube Cloud es gratis y sin límite de líneas; no hay VM ni recurso de Azure (nada que registrar en `azure-resources.csv`).
-- `backend-ci.yml` corre `sonar:sonar` después de `verify` (reusa clases y el informe JaCoCo) en PRs y en pushes a `main`. La línea base de Sonar es `main` (el plan gratis no permite cambiar la rama principal), así que se actualiza al liberar, y los PRs a `dev` se analizan como PR. Si el Quality Gate falla, falla el check. Sin el secret `SONAR_TOKEN` el paso se omite.
-- Alta única (manual): sonarcloud.io → entrar con GitHub → importar la organización `dream-parking` y el repo → en el proyecto, *Administration → Analysis Method* desactivar **Automatic Analysis** (si no, choca con el análisis del CI) → *My Account → Security* generar un token → GitHub → Settings → Secrets → Actions → `SONAR_TOKEN`. Organización `alambritos-esen`, proyecto `dream-parking_verificacion-online` (en `backend/pom.xml`).
-- Para bloquear el merge: Settings → Branches → regla de `dev` → exigir los checks `test` y `SonarCloud Code Analysis`.
+- El repo es público, así que SonarQube Cloud es gratis; no hay VM ni recurso de Azure (nada que registrar en `azure-resources.csv`). Organización `alambritos-esen`; un proyecto por componente:
+
+| Componente | Proyecto de Sonar | CI (job) | Cobertura |
+|---|---|---|---|
+| Backend | `dream-parking_verificacion-online` | `backend-ci` (`test`) | JaCoCo (`target/site/jacoco/jacoco.xml`) |
+| Webconsole | `dream-parking_verificacion-online-webconsole` | `webconsole-ci` (`lint-build`) | Excluida: aún no hay tests (`sonar.coverage.exclusions` en `webconsole/sonar-project.properties`; quitarla al agregar tests) |
+| Onboarding (Flutter) | `dream-parking_verificacion-online-onboarding` | `onboarding-ci` (`analyze-test`) | `flutter test --coverage` → `coverage/lcov.info` |
+
+- Cada CI corre el análisis al final del job (backend: `sonar:sonar` con Maven, reusa `target/`; los otros: `SonarSource/sonarqube-scan-action`). Si el Quality Gate falla, falla el job. Sin el secret `SONAR_TOKEN` (forks) el paso se omite. El token es el secret de repositorio `SONAR_TOKEN`.
+- Los CI corren en todo PR a `dev`, `QA` y `main` (sin filtro de rutas) para poder exigirlos. También corren en push a `main`: la rama principal de Sonar es `main` y el plan gratis no permite cambiarla, así que la línea base se actualiza al liberar; los PRs a `dev` se analizan como PR.
+- Checks obligatorios: la regla (ruleset) `required checks` en `dev`, `QA` y `main` exige `test`, `lint-build` y `analyze-test`. No se exige "SonarCloud Code Analysis" porque los tres proyectos publican un check con ese mismo nombre y se pisarían; el Quality Gate ya hace fallar el job de cada CI.
+- Alta de un proyecto nuevo: basta con agregar su `sonar-project.properties` y el paso de Sonar; el primer análisis lo crea. Los proyectos creados así quedan privados; para hacerlos públicos: proyecto → *Administration → Permissions → Project visibility*. Desactivar **Automatic Analysis** en cada uno (*Administration → Analysis Method*).
 
 ### Paso manual único: hacer público el paquete
 GitHub no permite cambiar la visibilidad de un paquete por API. Tras el **primer** push de la imagen: GitHub → organización `dream-parking` → Packages → `verificacion-online-backend` → Package settings → Change visibility → Public. Si falla, revisar en la organización que se permita crear paquetes públicos. Luego, re-ejecutar el workflow.

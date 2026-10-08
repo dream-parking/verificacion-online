@@ -62,7 +62,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # Banco Tangamandapio brand (same images as webconsole/public/marca).
+  # Banco Tangamandapio brand (same images as webconsole/public/brand).
   assets:
     - assets/brand/
 

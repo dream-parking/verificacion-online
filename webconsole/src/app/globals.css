@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Tokens de la consola administrativa (ver docs/styles.md). */
+/* Design tokens of the administrative console (see docs/styles.md). */
 @theme inline {
   --color-ink: #1a1b1a;
   --color-ink-soft: #4a4a4a;
@@ -20,10 +20,10 @@
   --color-danger: #8c1d18;
   --font-sans: var(--font-open-sans), sans-serif;
   --font-display: var(--font-nunito), sans-serif;
-  --font-marca: var(--font-cinzel), serif;
+  --font-brand: var(--font-cinzel), serif;
 }
 
-/* En una capa para que las clases de componentes (.btn, .fld…) puedan sobrescribirlo. */
+/* In a layer so component classes (.btn, .fld…) can override it. */
 @layer base {
   body {
     background: var(--color-surface);
@@ -38,7 +38,7 @@
 }
 
 @layer components {
-  /* Botones */
+  /* Buttons */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -94,7 +94,7 @@
     color: #fff;
   }
 
-  /* Navegación lateral */
+  /* Side navigation */
   .nav-item {
     display: flex;
     align-items: center;
@@ -131,7 +131,7 @@
     font-size: 13px;
   }
 
-  /* Campos de formulario */
+  /* Form fields */
   .fld {
     height: 44px;
     border: 0;
@@ -162,7 +162,7 @@
     color: var(--color-muted);
   }
 
-  /* Filtro rápido */
+  /* Quick filter */
   .tab {
     display: inline-flex;
     align-items: center;
@@ -185,7 +185,7 @@
     color: #fff;
   }
 
-  /* Tarjetas y tablas */
+  /* Cards and tables */
   .card {
     background: #fff;
     border: 1px solid var(--color-line);
@@ -223,19 +223,19 @@
   .gr:hover {
     background: var(--color-soft);
   }
-  .g-sol {
+  .g-requests {
     grid-template-columns: 150px minmax(210px, 1.6fr) 150px 180px 140px 200px 130px;
     min-width: 1100px;
   }
-  .g-ale {
+  .g-alerts {
     grid-template-columns: 120px 105px minmax(200px, 1fr) 130px 140px 130px 100px;
     min-width: 1030px;
   }
-  .g-usr {
+  .g-users {
     grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1.5fr) minmax(170px, 1fr) 190px 110px 110px;
     min-width: 1060px;
   }
-  /* Ninguna celda se sale de su columna: el texto largo se parte y se recorta a 2 líneas. */
+  /* No cell overflows its column: long text wraps and is clipped to 2 lines. */
   .gh > *,
   .gr > * {
     min-width: 0;
@@ -250,7 +250,7 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
-  /* El enlace de la primera celda cubre toda la fila. */
+  /* The link in the first cell covers the whole row. */
   .rowlink {
     background: none;
     border: 0;
@@ -261,7 +261,7 @@
     font-weight: 700;
     cursor: pointer;
   }
-  .rowlink.u {
+  .rowlink.underline {
     text-decoration: underline;
   }
   .rowlink::after {
@@ -275,7 +275,7 @@
     background: var(--color-line-soft);
   }
 
-  /* Insignias */
+  /* Badges */
   .badge {
     display: inline-flex;
     align-items: center;
@@ -288,21 +288,21 @@
     white-space: nowrap;
     border: 1px solid transparent;
   }
-  .b-bajo { background: #e3edf8; color: #00448c; border-color: #00448c; }
-  .b-pend { background: #f4f4f4; color: #4a4a4a; border-color: #989696; }
-  .b-sin { background: #fff; color: #5b5b5b; border: 1px dashed #989696; }
-  .c-crit { background: #8e1238; color: #fff; }
-  .c-alta { background: #b24a00; color: #fff; }
-  .c-media { background: #fff0c2; color: #1a1b1a; border-color: #7a4b00; }
-  .c-baja { background: #e3edf8; color: #00448c; border-color: #00448c; }
-  .s-sin { background: #fff; color: #1a1b1a; border-color: #1a1b1a; }
-  .s-asig { background: #e3edf8; color: #00448c; }
-  .s-rev { background: #eee8f6; color: #4a2f78; }
+  .b-low { background: #e3edf8; color: #00448c; border-color: #00448c; }
+  .b-pending { background: #f4f4f4; color: #4a4a4a; border-color: #989696; }
+  .b-none { background: #fff; color: #5b5b5b; border: 1px dashed #989696; }
+  .c-critical { background: #8e1238; color: #fff; }
+  .c-high { background: #b24a00; color: #fff; }
+  .c-medium { background: #fff0c2; color: #1a1b1a; border-color: #7a4b00; }
+  .c-low { background: #e3edf8; color: #00448c; border-color: #00448c; }
+  .s-unassigned { background: #fff; color: #1a1b1a; border-color: #1a1b1a; }
+  .s-assigned { background: #e3edf8; color: #00448c; }
+  .s-review { background: #eee8f6; color: #4a2f78; }
   .s-ok { background: #e2f5ec; color: #0b6b4a; }
-  .s-prog { background: #f4f4f4; color: #4a4a4a; border-color: #989696; }
-  .s-aband { background: #fbeaea; color: #8c1d18; border-color: #8c1d18; }
+  .s-progress { background: #f4f4f4; color: #4a4a4a; border-color: #989696; }
+  .s-abandoned { background: #fbeaea; color: #8c1d18; border-color: #8c1d18; }
 
-  /* Pares clave / valor */
+  /* Key / value pairs */
   .kv {
     display: grid;
     grid-template-columns: minmax(120px, 170px) 1fr;
@@ -321,8 +321,8 @@
     overflow-wrap: anywhere;
   }
 
-  /* Móvil: cada fila de tabla se muestra como tarjeta; las celdas con
-     data-label muestran su encabezado a la izquierda. */
+  /* Mobile: each table row shows as a card; cells with
+     data-label show their header on the left. */
   @media (width < 48rem) {
     .tblwrap {
       overflow-x: visible;
@@ -359,14 +359,14 @@
   }
 }
 
-/* ---- Animaciones ----
-   Las entradas usan fill-mode "backwards": al terminar no dejan un transform
-   aplicado, que rompería los elementos position: fixed dentro de la página. */
+/* ---- Animations ----
+   Entrances use fill-mode "backwards": when they end they leave no transform
+   applied, which would break position: fixed elements inside the page. */
 @theme {
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@keyframes aparecer-arriba {
+@keyframes fade-up {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -376,22 +376,22 @@
     transform: none;
   }
 }
-@keyframes aparecer {
+@keyframes fade-in {
   from {
     opacity: 0;
   }
 }
-@keyframes entrar-derecha {
+@keyframes slide-in-right {
   from {
     transform: translateX(100%);
   }
 }
-@keyframes entrar-abajo {
+@keyframes slide-in-bottom {
   from {
     transform: translateY(100%);
   }
 }
-@keyframes rebote {
+@keyframes bounce {
   0% {
     transform: scale(0.6);
   }
@@ -402,14 +402,14 @@
     transform: none;
   }
 }
-@keyframes brillo {
+@keyframes shimmer {
   to {
     background-position: -200% 0;
   }
 }
 
 @layer components {
-  /* Transiciones de los elementos interactivos */
+  /* Transitions of interactive elements */
   .btn,
   .btn2,
   .tab,
@@ -448,58 +448,58 @@
     box-shadow: 0 6px 20px rgb(26 27 26 / 0.06);
   }
 
-  /* Entrada de cada página */
-  .anim-pagina {
-    animation: aparecer-arriba 360ms var(--ease-out-soft) backwards;
+  /* Entrance of each page */
+  .anim-page {
+    animation: fade-up 360ms var(--ease-out-soft) backwards;
   }
 
-  /* Hijos que aparecen uno tras otro */
-  .anim-escalonado > * {
-    animation: aparecer-arriba 420ms var(--ease-out-soft) backwards;
+  /* Children that appear one after another */
+  .anim-stagger > * {
+    animation: fade-up 420ms var(--ease-out-soft) backwards;
   }
-  .anim-escalonado > :nth-child(2) { animation-delay: 50ms; }
-  .anim-escalonado > :nth-child(3) { animation-delay: 100ms; }
-  .anim-escalonado > :nth-child(4) { animation-delay: 150ms; }
-  .anim-escalonado > :nth-child(5) { animation-delay: 200ms; }
-  .anim-escalonado > :nth-child(6) { animation-delay: 250ms; }
-  .anim-escalonado > :nth-child(7) { animation-delay: 300ms; }
-  .anim-escalonado > :nth-child(n + 8) { animation-delay: 350ms; }
+  .anim-stagger > :nth-child(2) { animation-delay: 50ms; }
+  .anim-stagger > :nth-child(3) { animation-delay: 100ms; }
+  .anim-stagger > :nth-child(4) { animation-delay: 150ms; }
+  .anim-stagger > :nth-child(5) { animation-delay: 200ms; }
+  .anim-stagger > :nth-child(6) { animation-delay: 250ms; }
+  .anim-stagger > :nth-child(7) { animation-delay: 300ms; }
+  .anim-stagger > :nth-child(n + 8) { animation-delay: 350ms; }
 
-  /* Filas de tabla: el retraso lo da --i (posición de la fila) */
-  .anim-fila {
-    animation: aparecer-arriba 380ms var(--ease-out-soft) backwards;
+  /* Table rows: the delay comes from --i (row position) */
+  .anim-row {
+    animation: fade-up 380ms var(--ease-out-soft) backwards;
     animation-delay: calc(min(var(--i, 0), 12) * 35ms);
   }
 
-  .anim-aparecer {
-    animation: aparecer 200ms ease-out backwards;
+  .anim-fade {
+    animation: fade-in 200ms ease-out backwards;
   }
-  .anim-rebote {
-    animation: rebote 360ms var(--ease-out-soft) backwards;
+  .anim-bounce {
+    animation: bounce 360ms var(--ease-out-soft) backwards;
   }
-  .anim-aviso {
-    animation: aparecer-arriba 320ms var(--ease-out-soft) backwards;
+  .anim-notice {
+    animation: fade-up 320ms var(--ease-out-soft) backwards;
   }
 
-  /* Vista previa: sube desde abajo en móvil, entra por la derecha en tableta */
+  /* Preview: slides up from the bottom on mobile, enters from the right on tablet */
   .anim-panel {
-    animation: entrar-abajo 320ms var(--ease-out-soft) backwards;
+    animation: slide-in-bottom 320ms var(--ease-out-soft) backwards;
   }
   @media (width >= 40rem) {
     .anim-panel {
-      animation-name: entrar-derecha;
+      animation-name: slide-in-right;
     }
   }
   @media (width >= 80rem) {
     .anim-panel {
-      animation: aparecer-arriba 320ms var(--ease-out-soft) backwards;
+      animation: fade-up 320ms var(--ease-out-soft) backwards;
     }
   }
 
-  /* Esqueletos de carga con brillo */
+  /* Loading skeletons with shimmer */
   .skel {
     background: linear-gradient(90deg, #e8e8e8 0%, #f4f4f4 40%, #e8e8e8 80%) 0 0 / 200% 100%;
-    animation: brillo 1.4s linear infinite;
+    animation: shimmer 1.4s linear infinite;
   }
 }
 
@@ -515,7 +515,7 @@
 }
 
 @layer components {
-  /* Botones de paginación */
+  /* Pagination buttons */
   .pag {
     display: inline-flex;
     align-items: center;

@@ -2,27 +2,27 @@
 
 import { useSyncExternalStore } from "react";
 
-// El panel de la derecha solo existe desde 1024 px (lg) y el video pesa unos 3,4 MB: en teléfonos
-// y tabletas no se descarga. Con «reducir movimiento» activado tampoco se reproduce: queda la foto.
-const CONSULTA = "(min-width: 1024px) and (prefers-reduced-motion: no-preference)";
+// The right panel only exists from 1024 px (lg) and the video weighs about 3.4 MB: on phones and
+// tablets it is not downloaded. With "reduce motion" enabled it does not play either: the photo stays.
+const MEDIA_QUERY = "(min-width: 1024px) and (prefers-reduced-motion: no-preference)";
 
-function suscribir(avisar: () => void) {
-  const mq = window.matchMedia(CONSULTA);
-  mq.addEventListener("change", avisar);
-  return () => mq.removeEventListener("change", avisar);
+function subscribe(notify: () => void) {
+  const mq = window.matchMedia(MEDIA_QUERY);
+  mq.addEventListener("change", notify);
+  return () => mq.removeEventListener("change", notify);
 }
 
-/** Video decorativo en bucle, sin sonido. Se coloca sobre la foto, que se ve mientras carga. */
+/** Decorative looping video, without sound. It sits over the photo, which shows while it loads. */
 export function LoginVideo({ src, poster }: { src: string; poster: string }) {
-  const reproducir = useSyncExternalStore(
-    suscribir,
-    () => window.matchMedia(CONSULTA).matches,
+  const play = useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(MEDIA_QUERY).matches,
     () => false,
   );
-  if (!reproducir) return null;
+  if (!play) return null;
   return (
     <video
-      className="anim-aparecer absolute inset-0 size-full object-cover object-[50%_40%]"
+      className="anim-fade absolute inset-0 size-full object-cover object-[50%_40%]"
       src={src}
       poster={poster}
       autoPlay

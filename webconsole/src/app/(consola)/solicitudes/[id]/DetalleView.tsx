@@ -55,23 +55,6 @@ function Volver() {
 
 const sinDato = (v: string | null | undefined) => v || "—";
 
-/** VDI-41: coordenadas si el solicitante dio permiso; si no, «No disponible» con el motivo. */
-function ubicacion(s: NonNullable<SolicitudDetalle["signals"]>): string {
-  switch (s.locationStatus) {
-    case "AVAILABLE": {
-      const coordenadas = `${s.latitude?.toFixed(4)}, ${s.longitude?.toFixed(4)}`;
-      const precision = s.locationAccuracyMeters != null ? ` (± ${s.locationAccuracyMeters} m)` : "";
-      return `${coordenadas}${precision}${s.approximateLocation ? ` · ${s.approximateLocation}` : ""}`;
-    }
-    case "PERMISSION_DENIED":
-      return "No disponible · el solicitante no dio permiso de ubicación";
-    case "UNAVAILABLE":
-      return "No disponible · el teléfono no pudo obtener la ubicación";
-    default:
-      return sinDato(s.approximateLocation);
-  }
-}
-
 /** «Registrado» y, si la persona lo corrigió después, «Última corrección». */
 function registro(registeredAt: string, updatedAt: string | null): Par[] {
   const pares: Par[] = [{ k: "Registrado", v: fechaHora(registeredAt) }];
@@ -172,7 +155,7 @@ export function DetalleView({ id }: { id: string }) {
   const senales: Par[] = s
     ? [
         { k: "Dirección IP", v: sinDato(s.ip) },
-        { k: "Ubicación aproximada", v: ubicacion(s) },
+        { k: "Ubicación aproximada", v: sinDato(s.approximateLocation) },
         { k: "Huella de dispositivo", v: sinDato(s.deviceFingerprint) },
         { k: "Dispositivo", v: sinDato(s.device) },
         {

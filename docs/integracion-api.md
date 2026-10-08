@@ -33,7 +33,7 @@ Orden: `POST /` → `PUT /{id}/privacy-consent` → `PUT /{id}/basic-data` → `
 | `PUT /{id}/income` | Paso 3: `sourceCode`, `rangeCode`, `sourceDetail` (obligatorio si es `OTRO`). | VDI-47 |
 | `PUT /{id}/expected-activity` | Paso 4: `transactionTypeCode` y `monthlyAmountRangeCode`, ambos del catálogo (sin monto libre). Responde el score. | VDI-52, VDI-55 |
 | `POST /{id}/submit` | Envía la solicitud. Responde el `number` único que asigna el servidor (`SOL-AAAA-NNNNN`). Si ya estaba enviada responde `409`: consultar `GET /{id}` para leer su número. | |
-| `PUT /{id}/signals` | Huella, modelo, SO, ubicación, ritmo de escritura y tiempo por paso. La IP la toma el servidor. **Ubicación (VDI-41):** `locationStatus` = `AVAILABLE` con `latitude`, `longitude` y `locationAccuracyMeters` opcional; `PERMISSION_DENIED` si el solicitante no dio permiso o `UNAVAILABLE` si el teléfono no pudo ubicarse, ambos sin coordenadas (la consola los muestra como «no disponible»). Enviar coordenadas sin `AVAILABLE`, o `AVAILABLE` sin ellas, responde `400`. La app es la única fuente de los tiempos e intentos por paso; el servidor rechaza horas imposibles (antes de crear la solicitud o en el futuro, con 5 min de tolerancia). | VDI-41, VDI-42, VDI-43 |
+| `PUT /{id}/signals` | Huella, modelo, SO, ubicación, ritmo de escritura y tiempo por paso. La IP la toma el servidor. La app es la única fuente de los tiempos e intentos por paso; el servidor rechaza horas imposibles (antes de crear la solicitud o en el futuro, con 5 min de tolerancia). | VDI-41, VDI-42, VDI-43 |
 | `GET /{id}`, `GET /{id}/risk-assessment` | Resumen y score vigente. | |
 
 Reglas:

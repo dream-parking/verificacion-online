@@ -18,6 +18,7 @@ import com.dreamparking.backend.customer.repository.DeviceRepository;
 import com.dreamparking.backend.onboarding.dto.CaptureSignalsRequest;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.OnboardingSession;
+import com.dreamparking.backend.onboarding.entity.SessionLocation;
 import com.dreamparking.backend.onboarding.entity.RequestStep;
 import com.dreamparking.backend.onboarding.entity.RequestStepId;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
@@ -80,8 +81,8 @@ public class SignalsService {
 		session.setAppVersion(body.appVersion());
 		session.setApproximateLocation(body.approximateLocation());
 		session.setCountryIso(body.countryIso() == null ? null : body.countryIso().toUpperCase());
-		session.setLocation(body.locationStatus(), coordinate(body.latitude()), coordinate(body.longitude()),
-				body.locationAccuracyMeters());
+		session.setLocation(new SessionLocation(body.locationStatus(), coordinate(body.latitude()),
+				coordinate(body.longitude()), body.locationAccuracyMeters()));
 		session.setTypingSpeedCpm(body.typingSpeedCpm());
 		session.setTypingPace(paceOf(body.typingSpeedCpm()));
 		sessions.save(session);

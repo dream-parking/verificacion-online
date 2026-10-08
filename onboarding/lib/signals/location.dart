@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart' show Geolocator, LocationAccuracy, LocationPermission, LocationSettings;
 
 /// Whether the approximate location could be captured (VDI-41). Same values as `locationStatus` in the API.
 enum LocationStatus {
@@ -52,12 +52,49 @@ abstract interface class LocationSource {
   Future<ApproximateLocation> read();
 }
 
+/// The calls to the phone's location services; tests replace them.
+abstract interface class LocationPlatform {
+  Future<LocationPermission> checkPermission();
+
+  Future<LocationPermission> requestPermission();
+
+  Future<bool> isLocationServiceEnabled();
+
+  /// One low-accuracy position: latitude, longitude and accuracy radius in meters.
+  Future<({double latitude, double longitude, double accuracy})> currentPosition();
+}
+
+/// [LocationPlatform] backed by the geolocator plugin.
+class GeolocatorLocationPlatform implements LocationPlatform {
+  const GeolocatorLocationPlatform();
+
+  @override
+  Future<LocationPermission> checkPermission() => Geolocator.checkPermission();
+
+  @override
+  Future<LocationPermission> requestPermission() => Geolocator.requestPermission();
+
+  @override
+  Future<bool> isLocationServiceEnabled() => Geolocator.isLocationServiceEnabled();
+
+  @override
+  Future<({double latitude, double longitude, double accuracy})> currentPosition() async {
+    final p = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.low));
+    return (latitude: p.latitude, longitude: p.longitude, accuracy: p.accuracy);
+  }
+}
+
 /// Asks for the location permission ("while using the app") and reads one approximate position.
 ///
 /// Android only declares the approximate location permission, and the reading uses low accuracy:
 /// the risk score needs the area, not the exact address.
 class PlatformLocationSource implements LocationSource {
-  const PlatformLocationSource({this.timeout = const Duration(seconds: 15)});
+  const PlatformLocationSource({
+    this.platform = const GeolocatorLocationPlatform(),
+    this.timeout = const Duration(seconds: 15),
+  });
+
+  final LocationPlatform platform;
 
   /// The location must not delay the signals: after this time it is reported as unavailable.
   final Duration timeout;
@@ -65,19 +102,17 @@ class PlatformLocationSource implements LocationSource {
   @override
   Future<ApproximateLocation> read() async {
     try {
-      var permission = await Geolocator.checkPermission();
+      var permission = await platform.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await platform.requestPermission();
       }
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         return const ApproximateLocation.notAvailable(LocationStatus.permissionDenied);
       }
-      if (permission == LocationPermission.unableToDetermine || !await Geolocator.isLocationServiceEnabled()) {
+      if (permission == LocationPermission.unableToDetermine || !await platform.isLocationServiceEnabled()) {
         return const ApproximateLocation.notAvailable(LocationStatus.unavailable);
       }
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
-      ).timeout(timeout);
+      final position = await platform.currentPosition().timeout(timeout);
       return ApproximateLocation.available(
         latitude: position.latitude,
         longitude: position.longitude,

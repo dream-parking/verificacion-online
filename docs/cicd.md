@@ -7,7 +7,12 @@
 | PR a `dev`/`QA`/`main` | — | lint + build | analyze + test |
 
 Los tokens están como secret `AZURE_STATIC_WEB_APPS_API_TOKEN` en los GitHub Environments `dev` y `qa`.
-Workflows en `.github/workflows/`. Flujo: feature → PR a `dev` (despliega Dev) → PR de `dev` a `QA` (despliega QA) → PR de `QA` a `main` al liberar. `main` es la rama estable: **no despliega nada** (reservada para Prod), así que ediciones menores o merges de documentación no disparan despliegues. Los PRs a `dev`, `QA` y `main` corren CI.
+Workflows en `.github/workflows/`. Flujo de ramas:
+1. **`main`** es la rama de integración: cada feature entra por PR a `main` y ahí se junta el trabajo del equipo. No despliega nada, así que merges frecuentes y ediciones menores no disparan despliegues.
+2. Cuando el equipo de desarrollo considera estable y probado lo que hay en `main`, se promueve con un PR de `main` a **`dev`**, que despliega el ambiente Dev, donde QA prueba.
+3. Al cerrar el sprint, lo aprobado en `dev` se mergea con un PR a **`QA`**, que es la versión estable y despliega el ambiente QA.
+
+Los PRs a `main`, `dev` y `QA` corren CI y no se puede hacer push directo a ninguna de las tres.
 
 ## URLs y DNS
 
@@ -44,6 +49,20 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 - Contra la base Dev desde tu PC: perfil `dev-remote` (`SPRING_PROFILES_ACTIVE=dev-remote`) más `DB_URL`, `DB_USER` y `DB_PASSWORD` de Dev (`sslmode=require`, y tu IP en el firewall del servidor). Incluye `dev` pero **no** ejecuta Flyway: las migraciones las aplica el despliegue de Azure al hacer merge a `dev` (Dev) o `QA`. Como `ddl-auto=validate` sigue activo, si tu rama cambia entidades y la migración aún no está en Dev, la app no arranca.
 - Autenticación de la consola: `APP_JWT_SECRET`, `APP_BOOTSTRAP_ADMIN_EMAIL` y `APP_BOOTSTRAP_ADMIN_PASSWORD` van como variables/secrets de cada Container App (detalle y comandos en `docs/integracion-api.md`). Sin ellas la app arranca igual, pero nadie puede iniciar sesión en la consola y los tokens no sobreviven a un reinicio. `APP_CORS_ALLOWED_ORIGINS` debe incluir la URL de la consola del ambiente.
 - Documentación de la API: con el perfil `dev` el backend publica Swagger UI en `/swagger-ui.html` y el OpenAPI en `/v3/api-docs` (springdoc). El archivo que se entrega a front y móvil es `docs/openapi.json`; una prueba falla si no coincide con el API. Por defecto (Prod) ambos están apagados (`application.properties`).
+
+### Análisis estático: SonarQube Cloud
+- El repo es público, así que SonarQube Cloud es gratis; no hay VM ni recurso de Azure (nada que registrar en `azure-resources.csv`). Organización `alambritos-esen`; un proyecto por componente:
+
+| Componente | Proyecto de Sonar | CI (job) | Cobertura |
+|---|---|---|---|
+| Backend | `dream-parking_verificacion-online` | `backend-ci` (`test`) | JaCoCo (`target/site/jacoco/jacoco.xml`) |
+| Webconsole | `dream-parking_verificacion-online-webconsole` | `webconsole-ci` (`lint-build`) | Excluida: aún no hay tests (`sonar.coverage.exclusions` en `webconsole/sonar-project.properties`; quitarla al agregar tests) |
+| Onboarding (Flutter) | `dream-parking_verificacion-online-onboarding` | `onboarding-ci` (`analyze-test`) | `flutter test --coverage` → `coverage/lcov.info` |
+
+- Cada CI corre el análisis al final del job (backend: `sonar:sonar` con Maven, reusa `target/`; los otros: `SonarSource/sonarqube-scan-action`). Si el Quality Gate falla, falla el job. Sin el secret `SONAR_TOKEN` (forks) el paso se omite. El token es el secret de repositorio `SONAR_TOKEN`.
+- Los CI corren en todo PR a `dev`, `QA` y `main` (sin filtro de rutas) para poder exigirlos. También corren en push a `main`: la rama principal de Sonar es `main` (el plan gratis no permite cambiarla) y es donde se integra todo el trabajo, así que la línea base de Sonar se actualiza con cada merge y los PRs a `main` se comparan contra ella.
+- Checks obligatorios: la regla (ruleset) `required checks` en `dev`, `QA` y `main` exige `test`, `lint-build` y `analyze-test`. No se exige "SonarCloud Code Analysis" porque los tres proyectos publican un check con ese mismo nombre y se pisarían; el Quality Gate ya hace fallar el job de cada CI.
+- Alta de un proyecto nuevo: basta con agregar su `sonar-project.properties` y el paso de Sonar; el primer análisis lo crea. Los proyectos creados así quedan privados; para hacerlos públicos: proyecto → *Administration → Permissions → Project visibility*. Desactivar **Automatic Analysis** en cada uno (*Administration → Analysis Method*).
 
 ### Paso manual único: hacer público el paquete
 GitHub no permite cambiar la visibilidad de un paquete por API. Tras el **primer** push de la imagen: GitHub → organización `dream-parking` → Packages → `verificacion-online-backend` → Package settings → Change visibility → Public. Si falla, revisar en la organización que se permita crear paquetes públicos. Luego, re-ejecutar el workflow.

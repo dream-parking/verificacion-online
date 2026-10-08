@@ -122,13 +122,16 @@ public class ConsoleRequestService {
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {
-		var ipDetails = new ConsoleRequestDetail.IpDetails(s.getCountry(), s.getCountryCode(), s.getRegion(),
-				s.getRegionName(), s.getCity(), s.getZip(), s.getTimezone(), s.getIsp(), s.getOrg(), s.getAsName(),
-				s.getFailure(), s.getLookedUpAt());
+		var geo = s.getGeolocation();
+		var ipDetails = geo == null || geo.getLookedUpAt() == null ? null
+				: new ConsoleRequestDetail.IpDetails(geo.getCountry(), geo.getCountryCode(), geo.getRegion(),
+						geo.getRegionName(), geo.getCity(), geo.getZip(), geo.getTimezone(), geo.getIsp(),
+						geo.getOrg(), geo.getAsName(), geo.getFailure(), geo.getLookedUpAt());
 		return new ConsoleRequestDetail.Signals(s.getIp() == null ? null : s.getIp().getHostAddress(),
 				s.getApproximateLocation(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
 				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice(),
-				s.getLocationStatus(), s.getLatitude(), s.getLongitude(), s.getLookedUpAt() == null ? null : ipDetails);
+				geo == null ? null : geo.getStatus(), geo == null ? null : geo.getLatitude(),
+				geo == null ? null : geo.getLongitude(), ipDetails);
 	}
 
 	private static String escapeLike(String text) {

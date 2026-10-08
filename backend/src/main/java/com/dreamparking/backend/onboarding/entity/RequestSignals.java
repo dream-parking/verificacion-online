@@ -1,11 +1,11 @@
 package com.dreamparking.backend.onboarding.entity;
 
-import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -17,7 +17,6 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Synchronize;
 import org.hibernate.type.SqlTypes;
 
-import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 
 /** Session and device signals of a request, as shown in the console (view). */
@@ -68,52 +67,9 @@ public class RequestSignals {
 	@Column(name = "requests_from_same_device")
 	private Long requestsFromSameDevice;
 
-	@Enumerated(EnumType.STRING)
-	@Column(name = "location_status", length = 12)
-	private LocationStatus locationStatus;
-
-	@Column(name = "geo_latitude")
-	private BigDecimal latitude;
-
-	@Column(name = "geo_longitude")
-	private BigDecimal longitude;
-
-	@Column(name = "geo_country")
-	private String country;
-
-	@Column(name = "geo_country_code", length = 2)
-	@JdbcTypeCode(SqlTypes.CHAR)
-	private String countryCode;
-
-	@Column(name = "geo_region")
-	private String region;
-
-	@Column(name = "geo_region_name")
-	private String regionName;
-
-	@Column(name = "geo_city")
-	private String city;
-
-	@Column(name = "geo_zip")
-	private String zip;
-
-	@Column(name = "geo_timezone")
-	private String timezone;
-
-	@Column(name = "geo_isp")
-	private String isp;
-
-	@Column(name = "geo_org")
-	private String org;
-
-	@Column(name = "geo_as")
-	private String asName;
-
-	@Column(name = "geo_failure")
-	private String failure;
-
-	@Column(name = "geo_looked_up_at")
-	private Instant lookedUpAt;
+	/** Same columns as {@link OnboardingSession}; all null when the request has no session yet. */
+	@Embedded
+	private SessionGeolocation geolocation;
 
 	public UUID getRequestId() {
 		return requestId;
@@ -163,64 +119,8 @@ public class RequestSignals {
 		return requestsFromSameDevice;
 	}
 
-	public LocationStatus getLocationStatus() {
-		return locationStatus;
-	}
-
-	public BigDecimal getLatitude() {
-		return latitude;
-	}
-
-	public BigDecimal getLongitude() {
-		return longitude;
-	}
-
-	public String getCountry() {
-		return country;
-	}
-
-	public String getCountryCode() {
-		return countryCode;
-	}
-
-	public String getRegion() {
-		return region;
-	}
-
-	public String getRegionName() {
-		return regionName;
-	}
-
-	public String getCity() {
-		return city;
-	}
-
-	public String getZip() {
-		return zip;
-	}
-
-	public String getTimezone() {
-		return timezone;
-	}
-
-	public String getIsp() {
-		return isp;
-	}
-
-	public String getOrg() {
-		return org;
-	}
-
-	public String getAsName() {
-		return asName;
-	}
-
-	public String getFailure() {
-		return failure;
-	}
-
-	public Instant getLookedUpAt() {
-		return lookedUpAt;
+	public SessionGeolocation getGeolocation() {
+		return geolocation;
 	}
 
 }

@@ -8,10 +8,14 @@ import 'catalogs.dart';
 
 /// Error talking to the API: no connection, timeout or an error response.
 class ApiException implements Exception {
-  const ApiException(this.message, {this.status});
+  const ApiException(this.message, {this.status, this.fields = const []});
 
+  /// Technical detail from the server, in English: for logs only, never shown to the customer.
   final String message;
   final int? status;
+
+  /// Fields the API rejected (`errors` of a 400), for example `firstNames`.
+  final List<String> fields;
 
   @override
   String toString() => 'ApiException($status): $message';
@@ -124,10 +128,20 @@ class OnboardingApi {
     }
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw ApiException(_detail(res), status: res.statusCode);
+      throw ApiException(_detail(res), status: res.statusCode, fields: _fields(res));
     }
     if (res.body.isEmpty) return const {};
     return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  /// Names of the invalid fields of a validation error (`errors` in the problem+json).
+  static List<String> _fields(http.Response res) {
+    try {
+      final errors = (jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>)['errors'];
+      return errors is Map ? errors.keys.map((k) => k.toString()).toList() : const [];
+    } on FormatException {
+      return const [];
+    }
   }
 
   /// Errors come as `application/problem+json` with `detail`.

@@ -2,7 +2,7 @@ name: webconsole-ci
 
 on:
   pull_request:
-    branches: [main, QA]
+    branches: [dev, QA, main]
     paths: ["webconsole/**", ".github/workflows/webconsole-*.yml"]
 
 concurrency:

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Tokens de color de la guía de estilos (docs/styles.md) usados en el diseño
-/// "App móvil · Onboarding".
+/// Color tokens from the style guide (docs/styles.md) used in the
+/// "App móvil · Onboarding" design.
 abstract final class AppColors {
   static const ink = Color(0xFF1A1B1A);
   static const muted = Color(0xFF5B5B5B);
@@ -23,14 +23,14 @@ abstract final class AppColors {
   static const errorDark = Color(0xFF8C1D18);
   static const errorBg = Color(0xFFFDECEA);
 
-  /// Colores del logo Banco Tangamandapio (webconsole/public/marca).
-  static const marcaAzul = Color(0xFF081B39);
-  static const marcaVerde = Color(0xFF0A402B);
+  /// Colors of the Banco Tangamandapio logo (webconsole/public/marca).
+  static const brandNavy = Color(0xFF081B39);
+  static const brandGreen = Color(0xFF0A402B);
 }
 
-/// Estilos de texto. El diseño usa Nunito para títulos y Open Sans para el
-/// cuerpo; mientras no se agreguen las fuentes como assets se usa la fuente
-/// del sistema (San Francisco en iOS, Roboto en Android).
+/// Text styles. The design uses Nunito for headings and Open Sans for body
+/// text; until those fonts are added as assets, the system font is used
+/// (San Francisco on iOS, Roboto on Android).
 abstract final class AppText {
   static TextStyle heading(double size, {Color color = AppColors.ink, double? height}) =>
       TextStyle(fontSize: size, fontWeight: FontWeight.w800, color: color, height: height, letterSpacing: -0.2);
@@ -42,16 +42,17 @@ abstract final class AppText {
   static const small = TextStyle(fontSize: 14, height: 20 / 14, color: AppColors.muted);
   static const error = TextStyle(fontSize: 14, height: 20 / 14, fontWeight: FontWeight.w600, color: AppColors.error);
 
-  /// Nombre del banco en Cinzel, como en la consola web (`font-marca`). Cinzel es una fuente
-  /// variable: el grosor se pide con [FontVariation] además de [FontWeight].
-  static TextStyle marca(double size, {required Color color, int peso = 700, double espaciado = 0}) => TextStyle(
+  /// Bank name in Cinzel, as in the web console (`font-marca`). Cinzel is a variable font:
+  /// the weight is requested with [FontVariation] in addition to [FontWeight].
+  static TextStyle brand(double size, {required Color color, int weight = 700, double letterSpacing = 0}) =>
+      TextStyle(
         fontFamily: 'Cinzel',
         fontSize: size,
         height: 1.1,
         color: color,
-        letterSpacing: espaciado,
-        fontWeight: FontWeight.values[(peso ~/ 100) - 1],
-        fontVariations: [FontVariation.weight(peso.toDouble())],
+        letterSpacing: letterSpacing,
+        fontWeight: FontWeight.values[(weight ~/ 100) - 1],
+        fontVariations: [FontVariation.weight(weight.toDouble())],
       );
 }
 

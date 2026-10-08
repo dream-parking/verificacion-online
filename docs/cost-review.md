@@ -15,7 +15,7 @@ Suscripción "Azure subscription 1" (ID omitido porque el repo es público) — 
 - **WebConsole**: Azure Static Web Apps, plan **Free** (100 GB/mes, 10 apps/suscripción, 250 MB por app). Un SWA por ambiente (`dev`, `qa`).
 - **Onboarding (Flutter)**: no requiere hosting. El CI genera el APK como artefacto de GitHub Actions.
 - Evitar: Container Registry, App Service Plan (Basic+), Log Analytics/App Insights con ingesta alta, Key Vault premium, Front Door, bases de datos de pago.
-- GitHub Actions en repo privado: minutos gratuitos limitados; los runners macOS cuentan 10x, por eso solo se compila Android en Linux.
+- GitHub Actions: el repo es **público**, así que los runners estándar de Linux son gratis. Si el repo pasara a privado, la organización (plan Free) tiene 2 000 min/mes, y los runners macOS cuentan 10x, por eso solo se compila Android en Linux. Octubre 2026: ~430 min facturados en 8 días (con descuento del 100 %); `.github/workflows/ci.yml` ejecuta solo los componentes que cambian para reducirlo. No se usa runner propio: es inseguro en un repo público (PRs de forks ejecutarían código en esa máquina) y una VM de Azure costaría.
 
 Cada recurso creado se registra en [`azure-resources.csv`](azure-resources.csv).
 

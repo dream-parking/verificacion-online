@@ -558,6 +558,48 @@
         },
         "type" : "object"
       },
+      "ConsoleRequestIpDetails" : {
+        "properties" : {
+          "asName" : {
+            "type" : "string"
+          },
+          "city" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "countryCode" : {
+            "type" : "string"
+          },
+          "failure" : {
+            "type" : "string"
+          },
+          "isp" : {
+            "type" : "string"
+          },
+          "lookedUpAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "org" : {
+            "type" : "string"
+          },
+          "region" : {
+            "type" : "string"
+          },
+          "regionName" : {
+            "type" : "string"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "zip" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ConsoleRequestListItem" : {
         "properties" : {
           "completedSteps" : {
@@ -608,6 +650,19 @@
           },
           "ip" : {
             "type" : "string"
+          },
+          "ipDetails" : {
+            "$ref" : "#/components/schemas/ConsoleRequestIpDetails"
+          },
+          "latitude" : {
+            "type" : "number"
+          },
+          "locationStatus" : {
+            "enum" : [ "AVAILABLE", "UNAVAILABLE" ],
+            "type" : "string"
+          },
+          "longitude" : {
+            "type" : "number"
           },
           "nightTime" : {
             "type" : "boolean"

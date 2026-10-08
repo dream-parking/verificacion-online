@@ -122,9 +122,13 @@ public class ConsoleRequestService {
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {
+		var ipDetails = new ConsoleRequestDetail.IpDetails(s.getCountry(), s.getCountryCode(), s.getRegion(),
+				s.getRegionName(), s.getCity(), s.getZip(), s.getTimezone(), s.getIsp(), s.getOrg(), s.getAsName(),
+				s.getFailure(), s.getLookedUpAt());
 		return new ConsoleRequestDetail.Signals(s.getIp() == null ? null : s.getIp().getHostAddress(),
 				s.getApproximateLocation(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
-				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice());
+				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice(),
+				s.getLocationStatus(), s.getLatitude(), s.getLongitude(), s.getLookedUpAt() == null ? null : ipDetails);
 	}
 
 	private static String escapeLike(String text) {

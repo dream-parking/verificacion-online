@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -48,10 +47,6 @@ public class OnboardingSession {
 
 	@Column(name = "approximate_location", length = 120)
 	private String approximateLocation;
-
-	/** VDI-41. Null when the app did not report the location (Hibernate leaves it null when all its columns are). */
-	@Embedded
-	private SessionLocation location;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
 	@Column(name = "country_iso", length = 2)
@@ -108,14 +103,6 @@ public class OnboardingSession {
 
 	public String getApproximateLocation() {
 		return approximateLocation;
-	}
-
-	public SessionLocation getLocation() {
-		return location;
-	}
-
-	public void setLocation(SessionLocation location) {
-		this.location = location;
 	}
 
 	public void setApproximateLocation(String approximateLocation) {

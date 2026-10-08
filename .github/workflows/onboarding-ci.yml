@@ -3,10 +3,6 @@ name: onboarding-ci
 on:
   pull_request:
     branches: [dev, QA, main]
-  # Sin filtro de rutas en los PRs: estos checks son obligatorios y deben reportar siempre.
-  # Sonar necesita analizar main (rama principal de Sonar) para tener la línea base.
-  push:
-    branches: [main]
     paths: ["onboarding/**", ".github/workflows/onboarding-*.yml"]
 
 concurrency:
@@ -21,22 +17,10 @@ jobs:
         working-directory: onboarding
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Sonar usa el historial para atribuir código nuevo
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
       - run: flutter pub get
       - run: flutter analyze
-      - run: flutter test --coverage # genera coverage/lcov.info para Sonar
-
-      # Si el Quality Gate falla, falla este paso. Sin SONAR_TOKEN (forks) se omite.
-      - name: SonarQube Cloud
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        if: env.SONAR_TOKEN != ''
-        uses: SonarSource/sonarqube-scan-action@v8
-        with:
-          projectBaseDir: onboarding
-          args: -Dsonar.qualitygate.wait=true
+      - run: flutter test

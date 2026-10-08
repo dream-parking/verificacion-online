@@ -1,47 +1,45 @@
 "use client";
 
 import { useCallback, useState, type CSSProperties } from "react";
-import { useConsola } from "@/components/consola/ConsolaProvider";
+import { useConsole } from "@/components/console/ConsoleProvider";
 import {
-  Cargando,
-  Encabezado,
-  ErrorCarga,
-  FiltroSelect,
-  FiltroTexto,
-  mensajeDeError,
-  Paginacion,
-  PanelFiltros,
-  useCarga,
-  useFiltrosPaginados,
-  Vacio,
-} from "@/components/consola/ui";
-import { apiFetch, type Rol, type UsuarioConsola } from "@/lib/consola/api";
-import { ROL } from "@/lib/consola/formato";
+  Loading,
+  PageHeading,
+  LoadError,
+  SelectFilter,
+  TextFilter,
+  Pagination,
+  FiltersPanel,
+  Empty,
+} from "@/components/console/Ui";
+import { errorMessage, useLoad, usePaginatedFilters } from "@/lib/console/hooks";
+import { apiFetch, type Role, type ConsoleUser } from "@/lib/console/api";
+import { ROLE_LABEL } from "@/lib/console/format";
 import { PasswordDialog } from "./PasswordDialog";
 
-const INITIAL_FILTERS = { text: "", role: "todos", status: "todos" };
+const INITIAL_FILTERS = { text: "", role: "all", status: "all" };
 
-function matches(u: UsuarioConsola, f: typeof INITIAL_FILTERS) {
+function matches(u: ConsoleUser, f: typeof INITIAL_FILTERS) {
   const text = f.text.trim().toLowerCase();
   if (text && !`${u.fullName} ${u.email}`.toLowerCase().includes(text)) return false;
-  if (f.role !== "todos" && u.role !== f.role) return false;
-  if (f.status === "activos" && !u.active) return false;
-  if (f.status === "inactivos" && u.active) return false;
+  if (f.role !== "all" && u.role !== f.role) return false;
+  if (f.status === "active" && !u.active) return false;
+  if (f.status === "inactive" && u.active) return false;
   return true;
 }
 
 type Notice = { text: string };
 
 export function UsersView() {
-  const { usuario, token } = useConsola();
-  const isAdmin = usuario.role === "ADMIN";
-  // Solo un administrador puede pedir la lista completa (con inactivos) y definir contraseñas.
-  const users = useCarga(isAdmin ? "users" : null, (t) =>
-    apiFetch<UsuarioConsola[]>("/api/console/users?includeInactive=true", { token: t }),
+  const { user, token } = useConsole();
+  const isAdmin = user.role === "ADMIN";
+  // Only an administrator can request the full list (with inactive users) and set passwords.
+  const users = useLoad(isAdmin ? "users" : null, (t) =>
+    apiFetch<ConsoleUser[]>("/api/console/users?includeInactive=true", { token: t }),
   );
-  const { filtros: f, setFiltro, limpiar, hayFiltros, tamano, setTamano, setPagina, paginar } =
-    useFiltrosPaginados(INITIAL_FILTERS);
-  const [target, setTarget] = useState<UsuarioConsola | null>(null);
+  const { filters: f, setFilter, clear, hasFilters, size, setSize, setPage, paginate } =
+    usePaginatedFilters(INITIAL_FILTERS);
+  const [target, setTarget] = useState<ConsoleUser | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
 
   const closeDialog = useCallback(() => setTarget(null), []);
@@ -49,11 +47,11 @@ export function UsersView() {
   if (!isAdmin) {
     return (
       <div className="flex max-w-[860px] min-w-0 flex-col gap-5">
-        <Encabezado titulo="Usuarios">Gestión de las personas que entran a la consola.</Encabezado>
+        <PageHeading title="Usuarios">Gestión de las personas que entran a la consola.</PageHeading>
         <div className="card" role="alert">
           <div className="font-display text-xl font-extrabold">Solo para administradores</div>
           <p className="mt-2 mb-0 max-w-[520px] text-[15px] leading-[22px] text-muted">
-            Tu rol ({ROL[usuario.role]}) no puede ver ni gestionar usuarios. Si necesitas una contraseña nueva, pídesela
+            Tu rol ({ROLE_LABEL[user.role]}) no puede ver ni gestionar usuarios. Si necesitas una contraseña nueva, pídesela
             a un administrador.
           </p>
         </div>
@@ -61,51 +59,51 @@ export function UsersView() {
     );
   }
 
-  const list = users.datos ?? [];
+  const list = users.data ?? [];
   const filtered = list.filter((u) => matches(u, f));
-  const pag = paginar(filtered);
-  const roles = Object.keys(ROL) as Rol[];
+  const pagination = paginate(filtered);
+  const roles = Object.keys(ROLE_LABEL) as Role[];
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
-      <Encabezado titulo="Usuarios">
-        {users.datos ? `${filtered.length} de ${list.length} usuarios. ` : ""}Define la contraseña de cada persona para que
+      <PageHeading title="Usuarios">
+        {users.data ? `${filtered.length} de ${list.length} usuarios. ` : ""}Define la contraseña de cada persona para que
         pueda entrar a la consola.
-      </Encabezado>
+      </PageHeading>
 
-      <PanelFiltros etiqueta="usuarios" hayFiltros={hayFiltros} onLimpiar={limpiar}>
-        <FiltroTexto
+      <FiltersPanel label="usuarios" hasFilters={hasFilters} onClear={clear}>
+        <TextFilter
           id="u-q"
           label="Nombre o correo"
           placeholder="Por ejemplo, Ana"
           value={f.text}
-          onChange={(v) => setFiltro("text", v)}
+          onChange={(v) => setFilter("text", v)}
         />
-        <FiltroSelect
+        <SelectFilter
           id="u-r"
           label="Rol"
           value={f.role}
-          onChange={(v) => setFiltro("role", v)}
-          opciones={[{ value: "todos", label: "Todos" }, ...roles.map((r) => ({ value: r, label: ROL[r] }))]}
+          onChange={(v) => setFilter("role", v)}
+          options={[{ value: "all", label: "Todos" }, ...roles.map((r) => ({ value: r, label: ROLE_LABEL[r] }))]}
         />
-        <FiltroSelect
+        <SelectFilter
           id="u-e"
           label="Estado"
           value={f.status}
-          onChange={(v) => setFiltro("status", v)}
-          opciones={[
-            { value: "todos", label: "Todos" },
-            { value: "activos", label: "Activos" },
-            { value: "inactivos", label: "Inactivos" },
+          onChange={(v) => setFilter("status", v)}
+          options={[
+            { value: "all", label: "Todos" },
+            { value: "active", label: "Activos" },
+            { value: "inactive", label: "Inactivos" },
           ]}
         />
-      </PanelFiltros>
+      </FiltersPanel>
 
       {notice && (
         <div
           key={notice.text}
           role="status"
-          className="anim-aviso flex items-start justify-between gap-3 border border-[#0b6b4a] bg-[#e2f5ec] px-4 py-3 text-[15px] leading-[22px] font-semibold text-[#0b4f37]"
+          className="anim-notice flex items-start justify-between gap-3 border border-[#0b6b4a] bg-[#e2f5ec] px-4 py-3 text-[15px] leading-[22px] font-semibold text-[#0b4f37]"
         >
           <span className="[overflow-wrap:anywhere]">✓ {notice.text}</span>
           <button
@@ -120,7 +118,7 @@ export function UsersView() {
       )}
 
       <div className="tblwrap" role="table" aria-label="Usuarios de la consola">
-        <div className="gh g-usr" role="row">
+        <div className="gh g-users" role="row">
           <div role="columnheader">Nombre</div>
           <div role="columnheader">Correo</div>
           <div role="columnheader">Cargo</div>
@@ -129,33 +127,33 @@ export function UsersView() {
           <div role="columnheader">Contraseña</div>
         </div>
 
-        {users.cargando && (
-          <Cargando
-            etiqueta="usuarios"
+        {users.loading && (
+          <Loading
+            label="usuarios"
             className="md:min-w-[1100px]"
-            grid="g-usr"
-            anchos={["70%", "80%", "70%", "110px", "70px", "120px"]}
+            grid="g-users"
+            widths={["70%", "80%", "70%", "110px", "70px", "120px"]}
           />
         )}
         {users.error && (
-          <ErrorCarga
-            titulo="No pudimos cargar los usuarios"
-            texto={mensajeDeError(users.error, "Hubo un problema con el servidor. Intenta de nuevo en un momento.")}
-            onRetry={users.recargar}
+          <LoadError
+            title="No pudimos cargar los usuarios"
+            text={errorMessage(users.error, "Hubo un problema con el servidor. Intenta de nuevo en un momento.")}
+            onRetry={users.reload}
           />
         )}
-        {users.datos && list.length === 0 && (
-          <Vacio titulo="Todavía no hay usuarios" texto="Los usuarios de la consola aparecerán aquí." />
+        {users.data && list.length === 0 && (
+          <Empty title="Todavía no hay usuarios" text="Los usuarios de la consola aparecerán aquí." />
         )}
         {list.length > 0 && filtered.length === 0 && (
-          <Vacio
-            titulo="No encontramos usuarios"
-            texto="Prueba con otros filtros, o quítalos para ver todos."
-            onLimpiar={hayFiltros ? limpiar : undefined}
+          <Empty
+            title="No encontramos usuarios"
+            text="Prueba con otros filtros, o quítalos para ver todos."
+            onClear={hasFilters ? clear : undefined}
           />
         )}
-        {pag.visibles.map((u, i) => (
-          <div key={u.id} className="gr g-usr anim-fila" style={{ "--i": i } as CSSProperties} role="row">
+        {pagination.visibleItems.map((u, i) => (
+          <div key={u.id} className="gr g-users anim-row" style={{ "--i": i } as CSSProperties} role="row">
             <div role="cell" className="font-semibold">
               <span className="clip2" title={u.fullName}>
                 {u.fullName}
@@ -172,10 +170,10 @@ export function UsersView() {
               </span>
             </div>
             <div role="cell" data-label="Rol">
-              {ROL[u.role]}
+              {ROLE_LABEL[u.role]}
             </div>
             <div role="cell" data-label="Estado">
-              <span className={`badge ${u.active ? "s-ok" : "s-aband"}`}>{u.active ? "✓ Activo" : "✕ Inactivo"}</span>
+              <span className={`badge ${u.active ? "s-ok" : "s-abandoned"}`}>{u.active ? "✓ Activo" : "✕ Inactivo"}</span>
             </div>
             <div role="cell" data-label="Contraseña">
               <button
@@ -195,14 +193,14 @@ export function UsersView() {
       </div>
 
       {filtered.length > 0 && (
-        <Paginacion
-          etiqueta="usuarios"
-          total={pag.total}
-          pagina={pag.pagina}
-          totalPaginas={pag.totalPaginas}
-          tamano={tamano}
-          onPagina={setPagina}
-          onTamano={setTamano}
+        <Pagination
+          label="usuarios"
+          total={pagination.total}
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          size={size}
+          onPage={setPage}
+          onSize={setSize}
         />
       )}
 

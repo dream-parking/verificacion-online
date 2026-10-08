@@ -23,7 +23,7 @@ abstract final class AppColors {
   static const errorDark = Color(0xFF8C1D18);
   static const errorBg = Color(0xFFFDECEA);
 
-  /// Colors of the Banco Tangamandapio logo (webconsole/public/marca).
+  /// Colors of the Banco Tangamandapio logo (webconsole/public/brand).
   static const brandNavy = Color(0xFF081B39);
   static const brandGreen = Color(0xFF0A402B);
 }

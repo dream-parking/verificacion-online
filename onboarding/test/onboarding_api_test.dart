@@ -5,11 +5,11 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:onboarding/api/onboarding_api.dart';
-import 'package:onboarding/senales/huella_dispositivo.dart';
-import 'package:onboarding/senales/senales.dart';
+import 'package:onboarding/signals/device_fingerprint.dart';
+import 'package:onboarding/signals/signals.dart';
 
 void main() {
-  test('iniciarSolicitud devuelve el id', () async {
+  test('startRequest returns the id', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async {
@@ -18,57 +18,57 @@ void main() {
         return http.Response('{"id":"abc","status":"IN_PROGRESS"}', 201);
       }),
     );
-    expect(await api.iniciarSolicitud(), 'abc');
+    expect(await api.startRequest(), 'abc');
   });
 
-  test('un error HTTP se convierte en ApiException con el detail', () async {
+  test('an HTTP error becomes an ApiException with the detail', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
-      // El backend responde en UTF-8 (application/problem+json).
+      // The backend responds in UTF-8 (application/problem+json).
       client: MockClient(
         (_) async => http.Response.bytes(utf8.encode('{"status":409,"detail":"Ya no está en progreso"}'), 409),
       ),
     );
     expect(
-      api.iniciarSolicitud(),
+      api.startRequest(),
       throwsA(isA<ApiException>()
           .having((e) => e.status, 'status', 409)
-          .having((e) => e.mensaje, 'mensaje', 'Ya no está en progreso')),
+          .having((e) => e.message, 'message', 'Ya no está en progreso')),
     );
   });
 
-  test('sin conexión lanza ApiException', () async {
+  test('without a connection it throws ApiException', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
-      client: MockClient((_) async => throw http.ClientException('sin red')),
+      client: MockClient((_) async => throw http.ClientException('no network')),
     );
-    expect(api.iniciarSolicitud(), throwsA(isA<ApiException>()));
+    expect(api.startRequest(), throwsA(isA<ApiException>()));
   });
 
-  test('enviarSenales hace PUT con el JSON de las señales', () async {
-    late http.Request enviada;
+  test('sendSignals PUTs the signals JSON', () async {
+    late http.Request sent;
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async {
-        enviada = req;
+        sent = req;
         return http.Response('', 204);
       }),
     );
-    final senales = Senales()
-      ..dispositivo = const DatosDispositivo(
-        huella: 'd4f1·9a3c·e7b2',
-        modelo: 'iPhone 15',
-        sistemaOperativo: 'iOS 18.1',
-        versionApp: '1.0.0+1',
+    final signals = Signals()
+      ..device = const DeviceInfo(
+        fingerprint: 'd4f1·9a3c·e7b2',
+        model: 'iPhone 15',
+        operatingSystem: 'iOS 18.1',
+        appVersion: '1.0.0+1',
       );
-    await api.enviarSenales('abc', senales);
-    expect(enviada.method, 'PUT');
-    expect(enviada.url.toString(), 'https://api.test/api/onboarding/requests/abc/signals');
-    expect(enviada.headers['Content-Type'], startsWith('application/json'));
-    expect(jsonDecode(enviada.body)['deviceFingerprint'], 'd4f1·9a3c·e7b2');
+    await api.sendSignals('abc', signals);
+    expect(sent.method, 'PUT');
+    expect(sent.url.toString(), 'https://api.test/api/onboarding/requests/abc/signals');
+    expect(sent.headers['Content-Type'], startsWith('application/json'));
+    expect(jsonDecode(sent.body)['deviceFingerprint'], 'd4f1·9a3c·e7b2');
   });
 
-  test('catalogos lee las cuatro listas con código y etiqueta', () async {
+  test('catalogs reads the four lists with code and label', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async {
@@ -89,79 +89,79 @@ void main() {
         );
       }),
     );
-    final c = await api.catalogos();
-    expect(c.origenesIngreso.single.valor, 'PENSION');
-    expect(c.origenesIngreso.single.etiqueta, 'Pensión');
-    expect(c.rangosIngreso.single.valor, 'HASTA_500');
-    expect(c.tiposMovimiento, isEmpty);
+    final c = await api.catalogs();
+    expect(c.incomeSources.single.value, 'PENSION');
+    expect(c.incomeSources.single.label, 'Pensión');
+    expect(c.incomeRanges.single.value, 'HASTA_500');
+    expect(c.transactionTypes, isEmpty);
   });
 
-  test('declararIngresos manda sourceDetail solo si hay detalle', () async {
-    final cuerpos = <Object?>[];
+  test('declareIncome sends sourceDetail only when there is a detail', () async {
+    final bodies = <Object?>[];
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async {
         expect(req.method, 'PUT');
         expect(req.url.path, '/api/onboarding/requests/abc/income');
-        cuerpos.add(jsonDecode(req.body));
+        bodies.add(jsonDecode(req.body));
         return http.Response('', 204);
       }),
     );
-    await api.declararIngresos('abc', origen: 'SALARIO', rango: 'HASTA_500');
-    await api.declararIngresos('abc', origen: 'OTRO', rango: 'MAS_2500', detalle: 'Herencia');
-    expect(cuerpos, [
+    await api.declareIncome('abc', source: 'SALARIO', range: 'HASTA_500');
+    await api.declareIncome('abc', source: 'OTRO', range: 'MAS_2500', detail: 'Herencia');
+    expect(bodies, [
       {'sourceCode': 'SALARIO', 'rangeCode': 'HASTA_500'},
       {'sourceCode': 'OTRO', 'rangeCode': 'MAS_2500', 'sourceDetail': 'Herencia'},
     ]);
   });
 
-  test('declararMovimiento manda el tipo y el rango de monto', () async {
-    late http.Request enviada;
+  test('declareExpectedActivity sends the transaction type and the amount range', () async {
+    late http.Request sent;
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async {
-        enviada = req;
+        sent = req;
         return http.Response('{"level":"LOW"}', 200);
       }),
     );
-    await api.declararMovimiento('abc', tipo: 'AHORRO', rangoMonto: 'HASTA_200');
-    expect(enviada.method, 'PUT');
-    expect(enviada.url.path, '/api/onboarding/requests/abc/expected-activity');
-    expect(jsonDecode(enviada.body), {'transactionTypeCode': 'AHORRO', 'monthlyAmountRangeCode': 'HASTA_200'});
+    await api.declareExpectedActivity('abc', transactionType: 'AHORRO', amountRange: 'HASTA_200');
+    expect(sent.method, 'PUT');
+    expect(sent.url.path, '/api/onboarding/requests/abc/expected-activity');
+    expect(jsonDecode(sent.body), {'transactionTypeCode': 'AHORRO', 'monthlyAmountRangeCode': 'HASTA_200'});
   });
 
-  test('aceptarAviso registra la aceptación con la captura de señales', () async {
-    late http.Request enviada;
+  test('acceptPrivacyNotice records the acceptance including signal capture', () async {
+    late http.Request sent;
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async {
-        enviada = req;
+        sent = req;
         return http.Response('{"completedSteps":1}', 200);
       }),
     );
-    await api.aceptarAviso('abc');
-    expect(enviada.method, 'PUT');
-    expect(enviada.url.path, '/api/onboarding/requests/abc/privacy-consent');
-    expect(jsonDecode(enviada.body), {'signalsAccepted': true});
+    await api.acceptPrivacyNotice('abc');
+    expect(sent.method, 'PUT');
+    expect(sent.url.path, '/api/onboarding/requests/abc/privacy-consent');
+    expect(jsonDecode(sent.body), {'signalsAccepted': true});
   });
 
-  test('enviarDatosBasicos manda nombres, apellidos, DUI y celular', () async {
-    late http.Request enviada;
+  test('sendBasicData sends first names, last names, DUI and mobile number', () async {
+    late http.Request sent;
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async {
-        enviada = req;
+        sent = req;
         return http.Response('{"completedSteps":2}', 200);
       }),
     );
-    await api.enviarDatosBasicos('abc', nombres: 'Ana', apellidos: 'Pérez', dui: '01234567-8', celular: '7123-4567');
-    expect(enviada.method, 'PUT');
-    expect(enviada.url.path, '/api/onboarding/requests/abc/basic-data');
-    expect(jsonDecode(utf8.decode(enviada.bodyBytes)),
+    await api.sendBasicData('abc', firstNames: 'Ana', lastNames: 'Pérez', dui: '01234567-8', mobilePhone: '7123-4567');
+    expect(sent.method, 'PUT');
+    expect(sent.url.path, '/api/onboarding/requests/abc/basic-data');
+    expect(jsonDecode(utf8.decode(sent.bodyBytes)),
         {'firstNames': 'Ana', 'lastNames': 'Pérez', 'dui': '01234567-8', 'mobilePhone': '7123-4567'});
   });
 
-  test('enviarSolicitud devuelve el número que asigna el servidor', () async {
+  test('submitRequest returns the number assigned by the server', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async {
@@ -170,20 +170,20 @@ void main() {
         return http.Response('{"number":"SOL-2026-00419","status":"COMPLETED"}', 200);
       }),
     );
-    expect(await api.enviarSolicitud('abc'), 'SOL-2026-00419');
+    expect(await api.submitRequest('abc'), 'SOL-2026-00419');
   });
 
-  test('si la solicitud ya estaba enviada, enviarSolicitud devuelve su número', () async {
+  test('if the request was already submitted, submitRequest returns its number', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async => req.method == 'POST'
           ? http.Response('{"status":409,"detail":"Onboarding request abc is COMPLETED"}', 409)
           : http.Response('{"number":"SOL-2026-00419","status":"COMPLETED"}', 200)),
     );
-    expect(await api.enviarSolicitud('abc'), 'SOL-2026-00419');
+    expect(await api.submitRequest('abc'), 'SOL-2026-00419');
   });
 
-  test('si faltan pasos, enviarSolicitud falla con el detalle del servidor', () async {
+  test('if steps are missing, submitRequest fails with the server detail', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async => req.method == 'POST'
@@ -191,8 +191,8 @@ void main() {
           : http.Response('{"number":null,"status":"IN_PROGRESS"}', 200)),
     );
     expect(
-      api.enviarSolicitud('abc'),
-      throwsA(isA<ApiException>().having((e) => e.mensaje, 'mensaje', 'Complete the 4 previous steps before submitting')),
+      api.submitRequest('abc'),
+      throwsA(isA<ApiException>().having((e) => e.message, 'message', 'Complete the 4 previous steps before submitting')),
     );
   });
 }

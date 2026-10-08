@@ -37,6 +37,19 @@ void main() {
     );
   });
 
+  test('a 400 keeps the names of the invalid fields', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((_) async => http.Response(
+          '{"status":400,"detail":"Some fields are invalid: firstNames, dui","errors":{"firstNames":"x","dui":"y"}}',
+          400)),
+    );
+    expect(
+      api.startRequest(),
+      throwsA(isA<ApiException>().having((e) => e.fields, 'fields', ['firstNames', 'dui'])),
+    );
+  });
+
   test('without a connection it throws ApiException', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',

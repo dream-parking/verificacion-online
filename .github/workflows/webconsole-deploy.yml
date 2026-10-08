@@ -1,10 +1,10 @@
 name: webconsole-deploy
 
-# main -> Dev, QA -> QA. Each GitHub Environment (dev / qa) holds its own
+# dev -> Dev, QA -> QA. Each GitHub Environment (dev / qa) holds its own
 # AZURE_STATIC_WEB_APPS_API_TOKEN secret, pointing to a different Static Web App (Free plan).
 on:
   push:
-    branches: [main, QA]
+    branches: [dev, QA]
     paths: ["webconsole/**", ".github/workflows/webconsole-deploy.yml"]
   workflow_dispatch:
 
@@ -15,7 +15,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'dev' || 'qa' }}
+    environment: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
     steps:
       - uses: actions/checkout@v4
       - name: Build and deploy to Azure Static Web Apps
@@ -28,4 +28,4 @@ jobs:
           api_location: ""
           output_location: ""
         env:
-          NEXT_PUBLIC_APP_ENV: ${{ github.ref_name == 'main' && 'dev' || 'qa' }}
+          NEXT_PUBLIC_APP_ENV: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}

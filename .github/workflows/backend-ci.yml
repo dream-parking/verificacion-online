@@ -2,7 +2,11 @@ name: backend-ci
 
 on:
   pull_request:
-    branches: [main, QA]
+    branches: [dev, QA, main]
+  # Sin filtro de rutas en los PRs: estos checks son obligatorios y deben reportar siempre.
+  # Sonar necesita analizar main (rama principal de Sonar, no se puede cambiar en el plan gratis) para tener la línea base contra la que compara los PRs.
+  push:
+    branches: [main]
     paths: ["backend/**", ".github/workflows/backend-*.yml"]
 
 concurrency:
@@ -17,9 +21,19 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Sonar usa el historial para atribuir código nuevo
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
           cache: maven
       - run: ./mvnw -B verify
+
+      # Reutiliza target/ (clases y jacoco.xml) del verify anterior. Sin SONAR_TOKEN (forks, secret aún no creado) se omite.
+      # El Quality Gate de Sonar falla este paso: sonar.qualitygate.wait espera el resultado.
+      - name: SonarQube Cloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        if: env.SONAR_TOKEN != ''
+        run: ./mvnw -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.qualitygate.wait=true

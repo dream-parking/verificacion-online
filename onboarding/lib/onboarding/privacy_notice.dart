@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 
-/// Aviso de privacidad que se muestra antes de capturar cualquier señal (VDI-45).
+/// Privacy notice shown before any signal is captured (VDI-45).
 ///
-/// TEXTO PROVISIONAL: se reemplaza cuando Legal apruebe el aviso definitivo (VDI-34).
-/// Mientras [esProvisional] sea `true`, la pantalla muestra la etiqueta
+/// PROVISIONAL TEXT: replace it when Legal approves the final notice (VDI-34).
+/// While [isProvisional] is `true`, the screen shows the label
 /// "Texto provisional · pendiente de revisión legal".
-abstract final class AvisoPrivacidad {
-  static const esProvisional = true;
+abstract final class PrivacyNotice {
+  static const isProvisional = true;
 
-  static const titulo = 'Cuidamos tu cuenta desde el primer paso';
+  static const title = 'Cuidamos tu cuenta desde el primer paso';
 
-  static const introduccion =
+  static const intro =
       'Mientras llenas tu solicitud, recopilamos algunos datos para protegerte contra el fraude:';
 
-  /// Señales que se capturan una vez aceptado el aviso.
-  static const senales = [
+  /// Signals captured once the notice is accepted.
+  static const signals = [
     (
       Icons.place_outlined,
       'Tu ubicación aproximada',
@@ -32,7 +32,7 @@ abstract final class AvisoPrivacidad {
     ),
   ];
 
-  static const cierre = 'Solo usamos esta información para proteger tu cuenta.';
+  static const closing = 'Solo usamos esta información para proteger tu cuenta.';
 
-  static const aceptacion = 'He leído y acepto el aviso de privacidad.';
+  static const acceptance = 'He leído y acepto el aviso de privacidad.';
 }

@@ -15,7 +15,7 @@ class OnboardingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Ceiba · Abre tu cuenta',
+      title: 'Banco Tangamandapio · Abre tu cuenta',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       home: home,

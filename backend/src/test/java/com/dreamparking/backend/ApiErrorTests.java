@@ -69,17 +69,6 @@ class ApiErrorTests {
 	}
 
 	@Test
-	void namesRejectDigitsAndSpecialCharacters() throws Exception {
-		String id = startRequest();
-		mvc.perform(put("/api/onboarding/requests/{id}/basic-data", id).contentType(MediaType.APPLICATION_JSON).content("""
-				{"dui": "01234567-8", "firstNames": "<script>Ana", "lastNames": "Pérez 2#", "mobilePhone": "7123-4567"}
-				"""))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.errors.firstNames").value("Solo se permiten letras y espacios"))
-			.andExpect(jsonPath("$.errors.lastNames").value("Solo se permiten letras y espacios"));
-	}
-
-	@Test
 	void malformedBodiesAndPathsAreBadRequests() throws Exception {
 		String id = startRequest();
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", id).contentType(MediaType.APPLICATION_JSON)

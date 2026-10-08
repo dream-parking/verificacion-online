@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { LogoCompleto } from "@/components/consola/Logo";
 import { ApiError, login } from "@/lib/consola/api";
 import { iniciarSesion, useSesion } from "@/lib/consola/sesion";
+import { LoginVideo } from "./LoginVideo";
 
 function mensajeLogin(e: unknown) {
   if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
@@ -125,6 +126,7 @@ export default function LoginPage() {
           sizes="64vw"
           className="anim-aparecer object-cover object-[50%_40%]"
         />
+        <LoginVideo src="/marca/login-cartero.mp4" poster="/marca/login-cartero.webp" />
       </aside>
     </div>
   );

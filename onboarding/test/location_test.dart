@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:geolocator/geolocator.dart' show LocationPermission;
+import 'package:geolocator/geolocator.dart'
+    show GeolocatorPlatform, LocationAccuracy, LocationPermission, LocationSettings, Position;
 
 import 'package:onboarding/signals/device_fingerprint.dart';
 import 'package:onboarding/signals/location.dart';
@@ -37,6 +38,41 @@ class FakePlatform implements LocationPlatform {
   @override
   Future<({double latitude, double longitude, double accuracy})> currentPosition() =>
       position?.call() ?? Future.value((latitude: 13.6929, longitude: -89.2182, accuracy: 1199.6));
+}
+
+/// Replaces the geolocator plugin itself, to test the adapter that calls it.
+class FakeGeolocatorPlatform extends GeolocatorPlatform {
+  LocationSettings? settings;
+  var requests = 0;
+
+  @override
+  Future<LocationPermission> checkPermission() async => LocationPermission.denied;
+
+  @override
+  Future<LocationPermission> requestPermission() async {
+    requests++;
+    return LocationPermission.whileInUse;
+  }
+
+  @override
+  Future<bool> isLocationServiceEnabled() async => true;
+
+  @override
+  Future<Position> getCurrentPosition({LocationSettings? locationSettings}) async {
+    settings = locationSettings;
+    return Position(
+      latitude: 13.6929,
+      longitude: -89.2182,
+      accuracy: 1200,
+      timestamp: DateTime.utc(2026, 10, 8),
+      altitude: 0,
+      altitudeAccuracy: 0,
+      heading: 0,
+      headingAccuracy: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    );
+  }
 }
 
 void main() {
@@ -112,6 +148,41 @@ void main() {
 
       final slow = FakePlatform(position: () => Completer<({double latitude, double longitude, double accuracy})>().future);
       expect((await read(slow, timeout: const Duration(milliseconds: 10))).status, LocationStatus.unavailable);
+    });
+  });
+
+  group('GeolocatorLocationPlatform', () {
+    late FakeGeolocatorPlatform plugin;
+
+    setUp(() {
+      final original = GeolocatorPlatform.instance;
+      plugin = FakeGeolocatorPlatform();
+      GeolocatorPlatform.instance = plugin;
+      addTearDown(() => GeolocatorPlatform.instance = original);
+    });
+
+    test('asks the plugin for the permission and a low-accuracy position', () async {
+      const platform = GeolocatorLocationPlatform();
+      expect(await platform.checkPermission(), LocationPermission.denied);
+      expect(await platform.requestPermission(), LocationPermission.whileInUse);
+      expect(await platform.isLocationServiceEnabled(), isTrue);
+
+      final position = await platform.currentPosition();
+      expect(position.latitude, 13.6929);
+      expect(position.longitude, -89.2182);
+      expect(position.accuracy, 1200);
+      expect(plugin.settings?.accuracy, LocationAccuracy.low, reason: 'only the approximate area is needed');
+    });
+
+    test('the default reader uses the plugin end to end', () async {
+      final location = await const PlatformLocationSource().read();
+      expect(location.toJson(), {
+        'locationStatus': 'AVAILABLE',
+        'latitude': 13.6929,
+        'longitude': -89.2182,
+        'locationAccuracyMeters': 1200,
+      });
+      expect(plugin.requests, 1);
     });
   });
 }

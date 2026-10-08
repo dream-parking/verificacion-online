@@ -209,16 +209,22 @@ export function SolicitudesView() {
                 </Link>
               </div>
               <div role="cell" className={r.name ? "font-semibold" : "text-muted"}>
-                {nombre}
+                <span className="clip2" title={nombre}>
+                  {nombre}
+                </span>
               </div>
               <div role="cell" data-label="Fecha" className="text-ink-soft">
                 {fechaCorta(r.date)}
               </div>
               <div role="cell" data-label="Tipo de dinero">
-                {r.transactionTypeLabel || "—"}
+                <span className="clip2" title={r.transactionTypeLabel || undefined}>
+                  {r.transactionTypeLabel || "—"}
+                </span>
               </div>
               <div role="cell" data-label="Monto mensual" className="font-semibold">
-                {r.monthlyAmountRangeLabel || "—"}
+                <span className="clip2" title={r.monthlyAmountRangeLabel || undefined}>
+                  {r.monthlyAmountRangeLabel || "—"}
+                </span>
               </div>
               <div role="cell" data-label="Nivel de riesgo">
                 <span className={`badge ${rk.cls}`}>{rk.label}</span>

@@ -13,7 +13,7 @@ public record BasicDataRequest(@NotBlank @Pattern(regexp = "[0-9]{8}-[0-9]") Str
 		@NotBlank @Size(max = 100) @Pattern(regexp = BasicDataRequest.NAME, message = Customer.NAME_MESSAGE) String lastNames,
 		@NotBlank @Pattern(regexp = "[67][0-9]{3}-[0-9]{4}") String mobilePhone) {
 
-	/** Same rule as the entity, tolerating the surrounding blanks that the service trims. */
+	/** {@link Customer#NAME_PATTERN}, tolerating the surrounding blanks that the service trims. */
 	static final String NAME = "\\s*" + Customer.NAME_PATTERN + "\\s*";
 
 }

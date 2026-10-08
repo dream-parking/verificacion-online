@@ -7,7 +7,12 @@
 | PR a `dev`/`QA`/`main` | — | lint + build | analyze + test |
 
 Los tokens están como secret `AZURE_STATIC_WEB_APPS_API_TOKEN` en los GitHub Environments `dev` y `qa`.
-Workflows en `.github/workflows/`. Flujo: feature → PR a `dev` (despliega Dev) → PR de `dev` a `QA` (despliega QA) → PR de `QA` a `main` al liberar. `main` es la rama estable: **no despliega nada** (reservada para Prod), así que ediciones menores o merges de documentación no disparan despliegues. Los PRs a `dev`, `QA` y `main` corren CI.
+Workflows en `.github/workflows/`. Flujo de ramas:
+1. **`main`** es la rama de integración: cada feature entra por PR a `main` y ahí se junta el trabajo del equipo. No despliega nada, así que merges frecuentes y ediciones menores no disparan despliegues.
+2. Cuando el equipo de desarrollo considera estable y probado lo que hay en `main`, se promueve con un PR de `main` a **`dev`**, que despliega el ambiente Dev, donde QA prueba.
+3. Al cerrar el sprint, lo aprobado en `dev` se mergea con un PR a **`QA`**, que es la versión estable y despliega el ambiente QA.
+
+Los PRs a `main`, `dev` y `QA` corren CI y no se puede hacer push directo a ninguna de las tres.
 
 ## URLs y DNS
 
@@ -50,12 +55,13 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 
 | Componente | Proyecto de Sonar | CI (job) | Cobertura |
 |---|---|---|---|
-| Backend | `dream-parking_verificacion-online` | `backend-ci` (`test`) | JaCoCo (`target/site/jacoco/jacoco.xml`) |
-| Webconsole | `dream-parking_verificacion-online-webconsole` | `webconsole-ci` (`lint-build`) | Excluida: aún no hay tests (`sonar.coverage.exclusions` en `webconsole/sonar-project.properties`; quitarla al agregar tests) |
-| Onboarding (Flutter) | `dream-parking_verificacion-online-onboarding` | `onboarding-ci` (`analyze-test`) | `flutter test --coverage` → `coverage/lcov.info` |
+| Backend | `dream-parking_verificacion-online` | `ci` → job `test` | JaCoCo (`target/site/jacoco/jacoco.xml`) |
+| Webconsole | `dream-parking_verificacion-online-webconsole` | `ci` → job `lint-build` | Excluida: aún no hay tests (`sonar.coverage.exclusions` en `webconsole/sonar-project.properties`; quitarla al agregar tests) |
+| Onboarding (Flutter) | `dream-parking_verificacion-online-onboarding` | `ci` → job `analyze-test` | `flutter test --coverage` → `coverage/lcov.info` |
 
+- **Ahorro de minutos de Actions:** los tres CI viven en un solo workflow (`.github/workflows/ci.yml`). Un job inicial (`changes`) mira qué carpetas tocó el PR y solo se ejecutan los jobs de esos componentes; los demás se omiten con `if`, GitHub los reporta como *skipped* (cuenta como éxito para los checks obligatorios) y no gastan minutos. Los PRs en borrador no corren nada. Un PR de solo documentación gasta ~1 minuto. Si se modifica `ci.yml`, se prueba todo. Se descartó un runner propio: el repo es público y un runner propio es inseguro con PRs de forks.
 - Cada CI corre el análisis al final del job (backend: `sonar:sonar` con Maven, reusa `target/`; los otros: `SonarSource/sonarqube-scan-action`). Si el Quality Gate falla, falla el job. Sin el secret `SONAR_TOKEN` (forks) el paso se omite. El token es el secret de repositorio `SONAR_TOKEN`.
-- Los CI corren en todo PR a `dev`, `QA` y `main` (sin filtro de rutas) para poder exigirlos. También corren en push a `main`: la rama principal de Sonar es `main` y el plan gratis no permite cambiarla, así que la línea base se actualiza al liberar; los PRs a `dev` se analizan como PR.
+- Los CI corren en todo PR a `dev`, `QA` y `main` (sin filtro de rutas) para poder exigirlos. También corren en push a `main`: la rama principal de Sonar es `main` (el plan gratis no permite cambiarla) y es donde se integra todo el trabajo, así que la línea base de Sonar se actualiza con cada merge y los PRs a `main` se comparan contra ella.
 - Checks obligatorios: la regla (ruleset) `required checks` en `dev`, `QA` y `main` exige `test`, `lint-build` y `analyze-test`. No se exige "SonarCloud Code Analysis" porque los tres proyectos publican un check con ese mismo nombre y se pisarían; el Quality Gate ya hace fallar el job de cada CI.
 - Alta de un proyecto nuevo: basta con agregar su `sonar-project.properties` y el paso de Sonar; el primer análisis lo crea. Los proyectos creados así quedan privados; para hacerlos públicos: proyecto → *Administration → Permissions → Project visibility*. Desactivar **Automatic Analysis** en cada uno (*Administration → Analysis Method*).
 

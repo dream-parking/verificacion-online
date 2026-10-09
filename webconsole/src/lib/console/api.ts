@@ -119,6 +119,8 @@ export type RequestDetail = {
     latitude?: number | null;
     longitude?: number | null;
     ipDetails?: IpDetails | null;
+    /** When the app last sent the signals (VDI-70). Missing in responses of older API versions. */
+    capturedAt?: string | null;
     deviceFingerprint: string | null;
     device: string | null;
     nightTime: boolean | null;

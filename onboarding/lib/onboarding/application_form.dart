@@ -60,6 +60,7 @@ class ApplicationForm {
   String? number;
 
   bool accepted = false;
+  bool termsAccepted = false;
   String firstNames = '';
   String lastNames = '';
   String dui = '';
@@ -75,7 +76,7 @@ class ApplicationForm {
   /// Error message per field; empty string when the field is valid.
   Map<String, String> messages() {
     return {
-      'accepted': accepted ? '' : 'Para continuar necesitamos que aceptes el aviso de privacidad.',
+      'accepted': _acceptanceMessage(),
       'firstNames': _nameMessage(firstNames, 'Escribe tus nombres.'),
       'lastNames': _nameMessage(lastNames, 'Escribe tus apellidos.'),
       'dui': RegExp(r'^\d{8}-\d$').hasMatch(dui) ? '' : 'Escribe tu DUI con el formato 00000000-0.',
@@ -91,6 +92,15 @@ class ApplicationForm {
       'transactionType': transactionType.isNotEmpty ? '' : 'Elige qué tipo de dinero manejarás.',
       'amountRange': amountRange.isNotEmpty ? '' : 'Elige cuánto dinero moverás al mes.',
     };
+  }
+
+  /// One message for both checkboxes of the privacy screen, naming what is missing.
+  String _acceptanceMessage() {
+    final missing = [
+      if (!accepted) 'el aviso de privacidad',
+      if (!termsAccepted) 'los términos y condiciones',
+    ];
+    return missing.isEmpty ? '' : 'Para continuar necesitamos que aceptes ${missing.join(' y ')}.';
   }
 
   static List<String> fieldsOf(Screen s) => switch (s) {

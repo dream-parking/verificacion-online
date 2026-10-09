@@ -1,11 +1,18 @@
 name: onboarding-build
 
-# main -> Dev build, QA -> QA build. Runs on Linux (Android only) to stay inside the
+# dev -> Dev build, QA -> QA build, each sent to its Firebase App Distribution testers. Runs on Linux (Android only) to stay inside the
 # free GitHub Actions minutes; macOS runners are billed at 10x.
+# No analyze/test here: the required `analyze-test` check (ci.yml) already ran them in the PR.
+# Docs, tests and iOS-only changes don't affect the APK, so they don't trigger a build.
 on:
   push:
-    branches: [main, QA]
-    paths: ["onboarding/**", ".github/workflows/onboarding-build.yml"]
+    branches: [dev, QA]
+    paths:
+      - "onboarding/**"
+      - "!onboarding/**/*.md"
+      - "!onboarding/test/**"
+      - "!onboarding/ios/**"
+      - ".github/workflows/onboarding-build.yml"
   workflow_dispatch:
 
 concurrency:
@@ -15,9 +22,13 @@ concurrency:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'dev' || 'qa' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # keyless login to Google Cloud (Workload Identity Federation)
+    environment: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
     env:
-      APP_ENV: ${{ github.ref_name == 'main' && 'dev' || 'qa' }}
+      APP_ENV: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
     defaults:
       run:
         working-directory: onboarding
@@ -27,16 +38,42 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            onboarding/android/*.gradle*
+            onboarding/android/**/gradle-wrapper.properties
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
-      - run: flutter build apk --release --dart-define=APP_ENV=$APP_ENV
+      - name: Decode release keystore
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload-keystore.jks" >> "$GITHUB_ENV"
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      # run_number keeps the versionCode growing, so testers can update without reinstalling.
+      - run: flutter build apk --release --dart-define=APP_ENV=$APP_ENV --build-number=${{ github.run_number }}
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ vars.ANDROID_KEY_ALIAS }}
       - uses: actions/upload-artifact@v4
         with:
           name: onboarding-${{ env.APP_ENV }}-apk
           path: onboarding/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 14
+      - if: github.ref_name == 'dev' || github.ref_name == 'QA'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - name: Distribute to Firebase testers
+        if: github.ref_name == 'dev' || github.ref_name == 'QA'
+        run: |
+          npx --yes firebase-tools@15.30.2 appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
+            --app "${{ vars.FIREBASE_APP_ID }}" \
+            --groups "$APP_ENV" \
+            --release-notes "${{ github.ref_name }} @ ${GITHUB_SHA::7}: $COMMIT_MESSAGE"
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'manual build' }}

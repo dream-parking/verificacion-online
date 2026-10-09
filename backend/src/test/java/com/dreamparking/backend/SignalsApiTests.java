@@ -1,11 +1,14 @@
 package com.dreamparking.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
@@ -51,6 +54,8 @@ class SignalsApiTests {
 	@Test
 	void storesSignalsAndShowsThemInTheConsole() throws Exception {
 		String id = startRequest();
+		Instant shown = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+		Instant done = shown.plusSeconds(68);
 
 		mvc.perform(put("/api/onboarding/requests/{id}/signals", id).contentType(MediaType.APPLICATION_JSON)
 			.header(HttpHeaders.USER_AGENT, "verificacion-app/1.0")
@@ -58,9 +63,9 @@ class SignalsApiTests {
 					{"deviceFingerprint": "aa11·bb22·cc33", "deviceModel": "iPhone 15", "operatingSystem": "iOS",
 					 "appVersion": "1.0.0+1", "approximateLocation": "San Salvador, El Salvador", "countryIso": "sv",
 					 "typingSpeedCpm": 185,
-					 "steps": [{"step": "PRIVACY_NOTICE", "startedAt": "2026-10-06T10:00:00Z", "completedAt": "2026-10-06T10:01:08Z"},
-					           {"step": "INCOME", "startedAt": "2026-10-06T10:01:08Z", "attempts": 2}]}
-					"""))
+					 "steps": [{"step": "PRIVACY_NOTICE", "startedAt": "%s", "completedAt": "%s"},
+					           {"step": "INCOME", "startedAt": "%s", "attempts": 2, "typingSpeedCps": 3.257}]}
+					""".formatted(shown, done, done)))
 			.andExpect(status().isNoContent());
 
 		flushAndClear();
@@ -76,7 +81,25 @@ class SignalsApiTests {
 			.andExpect(jsonPath("$.steps.length()").value(2))
 			.andExpect(jsonPath("$.steps[0].step").value("PRIVACY_NOTICE"))
 			.andExpect(jsonPath("$.steps[0].durationSeconds").value(68))
-			.andExpect(jsonPath("$.steps[1].attempts").value(2));
+			.andExpect(jsonPath("$.steps[1].attempts").value(2))
+			.andExpect(jsonPath("$.steps[1].typingSpeedCps").value(3.26));
+	}
+
+	@Test
+	void showsWhenTheSignalsWereCapturedAndMovesItWhenTheyAreSentAgain() throws Exception {
+		String id = startRequest();
+		Instant before = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+
+		capture(id, "{\"deviceFingerprint\": \"fp-captura\"}", 204);
+		flushAndClear();
+		Instant first = capturedAt(id);
+		assertThat(first).isBetween(before, Instant.now());
+
+		em.createNativeQuery("update onboarding_session set captured_at = captured_at - interval '1 hour'"
+				+ " where request_id = cast(:id as uuid)").setParameter("id", id).executeUpdate();
+		capture(id, "{\"deviceFingerprint\": \"fp-captura\"}", 204);
+		flushAndClear();
+		assertThat(capturedAt(id)).isAfterOrEqualTo(first);
 	}
 
 	@Test
@@ -115,10 +138,11 @@ class SignalsApiTests {
 		capture(id, "{\"deviceFingerprint\": \"fp\", \"typingSpeedCpm\": 5000}", 400);
 		capture(id, "{\"deviceFingerprint\": \"fp\", \"typingSpeedCpm\": -1}", 400);
 		capture(id, "{\"deviceFingerprint\": \"fp\", \"countryIso\": \"SLV\"}", 400);
-		capture(id, "{\"deviceFingerprint\": \"fp\", \"steps\": [{\"step\": \"NO_EXISTE\", \"startedAt\": \"2026-10-06T10:00:00Z\"}]}",
+		Instant now = Instant.now();
+		capture(id, "{\"deviceFingerprint\": \"fp\", \"steps\": [{\"step\": \"NO_EXISTE\", \"startedAt\": \"" + now + "\"}]}",
 				400);
-		capture(id, "{\"deviceFingerprint\": \"fp\", \"steps\": [{\"step\": \"INCOME\", \"startedAt\": \"2026-10-06T10:00:00Z\", \"completedAt\": \"2026-10-06T09:00:00Z\"}]}",
-				400);
+		capture(id, "{\"deviceFingerprint\": \"fp\", \"steps\": [{\"step\": \"INCOME\", \"startedAt\": \"" + now
+				+ "\", \"completedAt\": \"" + now.minusSeconds(60) + "\"}]}", 400);
 	}
 
 	@Test
@@ -130,6 +154,11 @@ class SignalsApiTests {
 	private void capture(String id, String body, int expectedStatus) throws Exception {
 		mvc.perform(put("/api/onboarding/requests/{id}/signals", id).contentType(MediaType.APPLICATION_JSON)
 			.content(body)).andExpect(status().is(expectedStatus));
+	}
+
+	private Instant capturedAt(String id) throws Exception {
+		String body = mvc.perform(get("/api/console/requests/{id}", id)).andReturn().getResponse().getContentAsString();
+		return Instant.parse(JsonPath.read(body, "$.signals.capturedAt"));
 	}
 
 	private String startRequest() throws Exception {

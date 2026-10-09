@@ -210,11 +210,13 @@
           "firstNames" : {
             "maxLength" : 100,
             "minLength" : 0,
+            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
             "type" : "string"
           },
           "lastNames" : {
             "maxLength" : 100,
             "minLength" : 0,
+            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
             "type" : "string"
           },
           "mobilePhone" : {
@@ -308,9 +310,40 @@
           "step" : {
             "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
             "type" : "string"
+          },
+          "typingSpeedCps" : {
+            "description" : "Velocidad de escritura en la pantalla, en caracteres por segundo; se omite si no se escribió nada",
+            "example" : 3.25,
+            "maximum" : 50,
+            "minimum" : 0,
+            "type" : "number"
           }
         },
         "required" : [ "startedAt", "step" ],
+        "type" : "object"
+      },
+      "CatalogEntryResponse" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "maxUsd" : {
+            "type" : "number"
+          },
+          "minUsd" : {
+            "type" : "number"
+          },
+          "sortOrder" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
         "type" : "object"
       },
       "CatalogItem" : {
@@ -534,6 +567,48 @@
         },
         "type" : "object"
       },
+      "ConsoleRequestIpDetails" : {
+        "properties" : {
+          "asName" : {
+            "type" : "string"
+          },
+          "city" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "countryCode" : {
+            "type" : "string"
+          },
+          "failure" : {
+            "type" : "string"
+          },
+          "isp" : {
+            "type" : "string"
+          },
+          "lookedUpAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "org" : {
+            "type" : "string"
+          },
+          "region" : {
+            "type" : "string"
+          },
+          "regionName" : {
+            "type" : "string"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "zip" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ConsoleRequestListItem" : {
         "properties" : {
           "completedSteps" : {
@@ -576,6 +651,11 @@
           "approximateLocation" : {
             "type" : "string"
           },
+          "capturedAt" : {
+            "description" : "Fecha y hora en que la app envió las señales por última vez",
+            "format" : "date-time",
+            "type" : "string"
+          },
           "device" : {
             "type" : "string"
           },
@@ -584,6 +664,19 @@
           },
           "ip" : {
             "type" : "string"
+          },
+          "ipDetails" : {
+            "$ref" : "#/components/schemas/ConsoleRequestIpDetails"
+          },
+          "latitude" : {
+            "type" : "number"
+          },
+          "locationStatus" : {
+            "enum" : [ "AVAILABLE", "UNAVAILABLE" ],
+            "type" : "string"
+          },
+          "longitude" : {
+            "type" : "number"
           },
           "nightTime" : {
             "type" : "boolean"
@@ -628,6 +721,9 @@
           "step" : {
             "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
             "type" : "string"
+          },
+          "typingSpeedCps" : {
+            "type" : "number"
           }
         },
         "type" : "object"
@@ -677,6 +773,75 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "CreateAlertTypeRequest" : {
+        "properties" : {
+          "code" : {
+            "description" : "Código único, en mayúsculas",
+            "example" : "RETIROS_FRACCIONADOS",
+            "minLength" : 1,
+            "pattern" : "[A-Z0-9_]{1,40}",
+            "type" : "string"
+          },
+          "defaultCriticality" : {
+            "description" : "Criticidad con la que se crean las alertas de este tipo",
+            "enum" : [ "CRITICAL", "HIGH", "MEDIUM", "LOW" ],
+            "example" : "HIGH",
+            "type" : "string"
+          },
+          "description" : {
+            "description" : "Descripción que ve el analista",
+            "example" : "Retiros fraccionados para no superar el umbral",
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "defaultCriticality", "description" ],
+        "type" : "object"
+      },
+      "CreateCatalogEntryRequest" : {
+        "properties" : {
+          "active" : {
+            "description" : "Si se muestra en la app; por defecto sí",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "code" : {
+            "description" : "Código único, en mayúsculas; no se puede cambiar después",
+            "example" : "MAS_5000",
+            "minLength" : 1,
+            "pattern" : "[A-Z0-9_]{1,30}",
+            "type" : "string"
+          },
+          "label" : {
+            "description" : "Texto que ve el cliente",
+            "example" : "Más de USD 5,000",
+            "maxLength" : 80,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "maxUsd" : {
+            "description" : "Último monto del rango (solo catálogos de rangos)",
+            "minimum" : 0,
+            "type" : "number"
+          },
+          "minUsd" : {
+            "description" : "Primer monto del rango (solo catálogos de rangos)",
+            "example" : 5000.01,
+            "minimum" : 0,
+            "type" : "number"
+          },
+          "sortOrder" : {
+            "description" : "Posición en la lista; sin valor va al final",
+            "example" : 5,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "code", "label" ],
         "type" : "object"
       },
       "CreateUserRequest" : {
@@ -912,6 +1077,29 @@
         "required" : [ "signalsAccepted" ],
         "type" : "object"
       },
+      "PrivacyNoticeResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "textHash" : {
+            "type" : "string"
+          },
+          "validFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "validTo" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ProblemDetail" : {
         "description" : "Error de la API (RFC 9457)",
         "properties" : {
@@ -936,6 +1124,51 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "PublishPrivacyNoticeRequest" : {
+        "properties" : {
+          "textHash" : {
+            "description" : "SHA-256 del texto que muestra la app, en hexadecimal",
+            "example" : "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+            "minLength" : 1,
+            "pattern" : "[0-9a-fA-F]{64}",
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "Versión, única",
+            "example" : "2026.2",
+            "maxLength" : 20,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "textHash", "version" ],
+        "type" : "object"
+      },
+      "PublishScoreRuleVersionRequest" : {
+        "properties" : {
+          "status" : {
+            "description" : "DRAFT, PROVISIONAL o CONFIRMED",
+            "enum" : [ "DRAFT", "PROVISIONAL", "CONFIRMED", "RETIRED" ],
+            "example" : "CONFIRMED",
+            "type" : "string"
+          },
+          "statusNote" : {
+            "description" : "Motivo del cambio",
+            "example" : "Umbral confirmado por Conozca a su Cliente",
+            "maxLength" : 250,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "threshold" : {
+            "description" : "Umbral mensual en USD",
+            "example" : 600,
+            "exclusiveMinimum" : 0,
+            "type" : "number"
+          }
+        },
+        "required" : [ "status", "threshold" ],
         "type" : "object"
       },
       "RaiseAlertRequest" : {
@@ -1047,11 +1280,70 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "validTo" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "version" : {
             "format" : "int32",
             "type" : "integer"
           }
         },
+        "type" : "object"
+      },
+      "UpdateAlertTypeRequest" : {
+        "properties" : {
+          "defaultCriticality" : {
+            "description" : "Criticidad con la que se crean las alertas nuevas de este tipo",
+            "enum" : [ "CRITICAL", "HIGH", "MEDIUM", "LOW" ],
+            "example" : "CRITICAL",
+            "type" : "string"
+          },
+          "description" : {
+            "description" : "Descripción que ve el analista",
+            "example" : "Movimientos por encima del perfil declarado",
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "defaultCriticality", "description" ],
+        "type" : "object"
+      },
+      "UpdateCatalogEntryRequest" : {
+        "properties" : {
+          "active" : {
+            "description" : "Si se muestra en la app",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "label" : {
+            "description" : "Texto que ve el cliente",
+            "example" : "Hasta USD 500",
+            "maxLength" : 80,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "maxUsd" : {
+            "description" : "Último monto del rango (solo catálogos de rangos)",
+            "example" : 500,
+            "minimum" : 0,
+            "type" : "number"
+          },
+          "minUsd" : {
+            "description" : "Primer monto del rango (solo catálogos de rangos)",
+            "minimum" : 0,
+            "type" : "number"
+          },
+          "sortOrder" : {
+            "description" : "Posición en la lista",
+            "example" : 1,
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "active", "label", "sortOrder" ],
         "type" : "object"
       },
       "UpdateUserRequest" : {
@@ -1318,6 +1610,681 @@
         } ],
         "summary" : "Bloquea, reactiva o cierra una cuenta",
         "tags" : [ "Consola · Cuentas" ]
+      }
+    },
+    "/api/console/admin/alert-types" : {
+      "post" : {
+        "operationId" : "alertTypeAdminCreate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateAlertTypeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertTypeResponse"
+                }
+              }
+            },
+            "description" : "Tipo de alerta creado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El código ya existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Crea un tipo de alerta",
+        "tags" : [ "Consola · Administración de alertas" ]
+      }
+    },
+    "/api/console/admin/alert-types/{code}" : {
+      "put" : {
+        "description" : "Las alertas ya levantadas conservan su propia criticidad.",
+        "operationId" : "alertTypeAdminUpdate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateAlertTypeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertTypeResponse"
+                }
+              }
+            },
+            "description" : "Tipo de alerta actualizado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El tipo de alerta no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Edita la descripción o la criticidad por defecto de un tipo de alerta",
+        "tags" : [ "Consola · Administración de alertas" ]
+      }
+    },
+    "/api/console/admin/catalogs/{catalog}" : {
+      "get" : {
+        "description" : "Catálogos: income-sources, income-ranges, monthly-amount-ranges o transaction-types.",
+        "operationId" : "catalogAdminList",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "catalog",
+          "required" : true,
+          "schema" : {
+            "enum" : [ "income-sources", "income-ranges", "monthly-amount-ranges", "transaction-types" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/CatalogEntryResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Entradas del catálogo, activas e inactivas, en orden"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El catálogo no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Entradas de un catálogo",
+        "tags" : [ "Consola · Administración de catálogos" ]
+      },
+      "post" : {
+        "description" : "Los rangos necesitan al menos un límite y no pueden solaparse con otro rango activo del mismo catálogo.",
+        "operationId" : "catalogAdminCreate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "catalog",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateCatalogEntryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CatalogEntryResponse"
+                }
+              }
+            },
+            "description" : "Entrada creada"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos o límites incoherentes"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El catálogo no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El código ya existe o el rango se solapa con otro"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Agrega una entrada a un catálogo",
+        "tags" : [ "Consola · Administración de catálogos" ]
+      }
+    },
+    "/api/console/admin/catalogs/{catalog}/{code}" : {
+      "put" : {
+        "description" : "Desactivarla la quita de la app sin tocar las solicitudes que ya la usan. Los límites de un rango que ya está en algún expediente no se pueden cambiar: cree un rango nuevo y desactive este.",
+        "operationId" : "catalogAdminUpdate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "catalog",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateCatalogEntryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CatalogEntryResponse"
+                }
+              }
+            },
+            "description" : "Entrada actualizada"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos o límites incoherentes"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El catálogo o la entrada no existen"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Rango en uso, solapado, o sería la última entrada activa"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Edita o desactiva una entrada de un catálogo",
+        "tags" : [ "Consola · Administración de catálogos" ]
+      }
+    },
+    "/api/console/admin/privacy-notices" : {
+      "get" : {
+        "description" : "La vigente es la que no tiene `validTo`.",
+        "operationId" : "catalogAdminPrivacyNotices",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/PrivacyNoticeResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Versiones, de la más reciente a la más antigua"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Versiones del aviso de privacidad",
+        "tags" : [ "Consola · Administración de catálogos" ]
+      },
+      "post" : {
+        "description" : "La versión anterior deja de estar vigente en el mismo instante. Los consentimientos ya dados siguen apuntando a la versión que se aceptó.",
+        "operationId" : "catalogAdminPublishPrivacyNotice",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PublishPrivacyNoticeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PrivacyNoticeResponse"
+                }
+              }
+            },
+            "description" : "Versión publicada y vigente desde ahora"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La versión ya existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Publica una versión nueva del aviso de privacidad",
+        "tags" : [ "Consola · Administración de catálogos" ]
+      }
+    },
+    "/api/console/admin/score-rules/{code}/versions" : {
+      "get" : {
+        "description" : "La vigente es la que no tiene `validTo` y no está en borrador.",
+        "operationId" : "scoreRuleAdminVersions",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ScoreRuleResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Versiones, de la más reciente a la más antigua"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La regla no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Historial de versiones de una regla",
+        "tags" : [ "Consola · Administración de reglas" ]
+      },
+      "post" : {
+        "description" : "Copia la lógica de la última versión con el umbral y el estado nuevos. PROVISIONAL o CONFIRMED la aplican desde ahora y retiran la vigente; DRAFT solo la guarda. Las evaluaciones ya hechas conservan la versión con la que se calcularon.",
+        "operationId" : "scoreRuleAdminPublish",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PublishScoreRuleVersionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ScoreRuleResponse"
+                }
+              }
+            },
+            "description" : "Versión publicada"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos o estado RETIRED"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La regla no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La versión vigente empieza en el futuro"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Publica una versión nueva de una regla (por ejemplo, otro umbral)",
+        "tags" : [ "Consola · Administración de reglas" ]
       }
     },
     "/api/console/alert-types" : {
@@ -2734,7 +3701,7 @@
     },
     "/api/onboarding/requests/{requestId}/basic-data" : {
       "put" : {
-        "description" : "DUI (00000000-0), nombres, apellidos y celular (7000-0000). Si el DUI ya existe se reutiliza el cliente.",
+        "description" : "DUI (00000000-0), nombres, apellidos y celular (7000-0000). Un DUI ya registrado con otros nombres o celular, o un celular de otro DUI, se rechaza con 409.",
         "operationId" : "onboardingRegisterBasicData",
         "parameters" : [ {
           "in" : "path",
@@ -2794,7 +3761,7 @@
                 }
               }
             },
-            "description" : "La solicitud ya no está en progreso"
+            "description" : "La solicitud ya no está en progreso, el DUI ya está registrado o el celular ya está en uso"
           }
         },
         "summary" : "Registra los datos básicos del cliente",
@@ -3162,23 +4129,11 @@
     "url" : "http://localhost:8080"
   } ],
   "tags" : [ {
-    "description" : "Cuentas abiertas a partir de solicitudes enviadas",
-    "name" : "Consola · Cuentas"
-  }, {
-    "description" : "Score de riesgo asignado a una solicitud",
-    "name" : "Riesgo"
-  }, {
     "description" : "Clientes identificados por su DUI",
     "name" : "Consola · Clientes"
   }, {
-    "description" : "Pasos de la solicitud de apertura de cuenta (app móvil)",
-    "name" : "Onboarding"
-  }, {
     "description" : "Inicio de sesión con correo y contraseña",
     "name" : "Consola · Acceso"
-  }, {
-    "description" : "Listado y detalle de solicitudes para la consola administrativa",
-    "name" : "Consola · Solicitudes"
   }, {
     "description" : "Listas de referencia que usa el flujo de onboarding",
     "name" : "Catálogos"
@@ -3188,6 +4143,27 @@
   }, {
     "description" : "Reglas de score vigentes (solo lectura)",
     "name" : "Consola · Reglas"
+  }, {
+    "description" : "Cuentas abiertas a partir de solicitudes enviadas",
+    "name" : "Consola · Cuentas"
+  }, {
+    "description" : "Catálogos de la app y aviso de privacidad (administradores)",
+    "name" : "Consola · Administración de catálogos"
+  }, {
+    "description" : "Score de riesgo asignado a una solicitud",
+    "name" : "Riesgo"
+  }, {
+    "description" : "Pasos de la solicitud de apertura de cuenta (app móvil)",
+    "name" : "Onboarding"
+  }, {
+    "description" : "Listado y detalle de solicitudes para la consola administrativa",
+    "name" : "Consola · Solicitudes"
+  }, {
+    "description" : "Tipos de alerta (administradores)",
+    "name" : "Consola · Administración de alertas"
+  }, {
+    "description" : "Versiones de las reglas de score (administradores)",
+    "name" : "Consola · Administración de reglas"
   }, {
     "description" : "Bandeja de trabajo del analista de fraude",
     "name" : "Consola · Alertas"

@@ -1,0 +1,144 @@
+name: ci
+
+# Un solo workflow para los tres componentes. Los checks obligatorios (test, lint-build, analyze-test) deben reportar
+# en todo PR, pero solo se ejecuta de verdad el job del componente que cambió: los demás se omiten con `if`,
+# GitHub los reporta como "skipped" (cuenta como éxito para los checks obligatorios) y no gastan minutos.
+on:
+  pull_request:
+    branches: [dev, QA, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  # Sonar necesita analizar main (su rama principal, no se puede cambiar en el plan gratis) para tener la línea base.
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Decide qué componentes cambiaron. Si el PR es borrador no corre nada (los borradores no se pueden mergear).
+  changes:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.diff.outputs.backend }}
+      webconsole: ${{ steps.diff.outputs.webconsole }}
+      onboarding: ${{ steps.diff.outputs.onboarding }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            files="$(git ls-files)"            # rama nueva: se asume que todo cambió
+          else
+            files="$(git diff --name-only "$BASE" "$GITHUB_SHA")"
+          fi
+          echo "$files"
+          files="$(echo "$files" | grep -vE '\.md$' || true)"   # documentación sola no requiere CI
+          has() { echo "$files" | grep -qE "$1" && echo true || echo false; }
+          ci=$(has '^\.github/workflows/ci\.yml$')   # si cambia este workflow, se prueba todo
+          for c in backend webconsole onboarding; do
+            r=$(has "^$c/")
+            [ "$ci" = true ] && r=true
+            echo "$c=$r" >> "$GITHUB_OUTPUT"
+          done
+
+  test:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Sonar usa el historial para atribuir código nuevo
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: ./mvnw -B verify
+
+      # Reutiliza target/ (clases y jacoco.xml) del verify anterior. Sin SONAR_TOKEN (forks) se omite.
+      # El Quality Gate de Sonar falla este paso: sonar.qualitygate.wait espera el resultado.
+      - name: SonarQube Cloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        if: env.SONAR_TOKEN != ''
+        run: ./mvnw -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.qualitygate.wait=true
+
+  lint-build:
+    needs: changes
+    if: needs.changes.outputs.webconsole == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: webconsole
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Sonar usa el historial para atribuir código nuevo
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: webconsole/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+      # Si el Quality Gate falla, falla este paso. Sin SONAR_TOKEN (forks) se omite.
+      - name: SonarQube Cloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v8
+        with:
+          projectBaseDir: webconsole
+          args: -Dsonar.qualitygate.wait=true
+
+  analyze-test:
+    needs: changes
+    if: needs.changes.outputs.onboarding == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: onboarding
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Sonar usa el historial para atribuir código nuevo
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test --coverage # genera coverage/lcov.info para Sonar
+
+      # Definition of Done: al menos 40 % de cobertura de líneas sobre el código fuente.
+      - name: Cobertura mínima
+        env:
+          COVERAGE_MIN: 40
+        run: |
+          awk -F: '/^LF:/{t+=$2} /^LH:/{h+=$2} END{p=100*h/t; printf "Cobertura de líneas: %.1f %% (mínimo %d %%)\n", p, ENVIRON["COVERAGE_MIN"]; if (p < ENVIRON["COVERAGE_MIN"]) exit 1}' coverage/lcov.info
+
+      # Si el Quality Gate falla, falla este paso. Sin SONAR_TOKEN (forks) se omite.
+      - name: SonarQube Cloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v8
+        with:
+          projectBaseDir: onboarding
+          args: -Dsonar.qualitygate.wait=true

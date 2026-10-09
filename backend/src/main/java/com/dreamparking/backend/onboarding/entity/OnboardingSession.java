@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -52,6 +53,9 @@ public class OnboardingSession {
 	@Column(name = "country_iso", length = 2)
 	private String countryIso;
 
+	@Embedded
+	private SessionGeolocation geolocation = new SessionGeolocation();
+
 	@Column(name = "user_agent", columnDefinition = "text")
 	private String userAgent;
 
@@ -72,6 +76,10 @@ public class OnboardingSession {
 
 	@Column(name = "ended_at")
 	private Instant endedAt;
+
+	/** Last time the app sent the signals; every signal of the session is replaced together. */
+	@Column(name = "captured_at", nullable = false)
+	private Instant capturedAt;
 
 	public UUID getId() {
 		return id;
@@ -117,6 +125,14 @@ public class OnboardingSession {
 		this.countryIso = countryIso;
 	}
 
+	public SessionGeolocation getGeolocation() {
+		return geolocation;
+	}
+
+	public void setGeolocation(SessionGeolocation geolocation) {
+		this.geolocation = geolocation;
+	}
+
 	public String getUserAgent() {
 		return userAgent;
 	}
@@ -159,6 +175,14 @@ public class OnboardingSession {
 
 	public void setEndedAt(Instant endedAt) {
 		this.endedAt = endedAt;
+	}
+
+	public Instant getCapturedAt() {
+		return capturedAt;
+	}
+
+	public void setCapturedAt(Instant capturedAt) {
+		this.capturedAt = capturedAt;
 	}
 
 }

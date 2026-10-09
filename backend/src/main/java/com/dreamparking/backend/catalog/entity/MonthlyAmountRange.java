@@ -10,7 +10,7 @@ import jakarta.persistence.Table;
 /** Catalog of expected monthly amount ranges in USD (step 3); a null bound means open-ended. */
 @Entity
 @Table(name = "monthly_amount_range")
-public class MonthlyAmountRange {
+public class MonthlyAmountRange implements RangeCatalogEntry {
 
 	@Id
 	@Column(name = "code", length = 30)

@@ -651,6 +651,11 @@
           "approximateLocation" : {
             "type" : "string"
           },
+          "capturedAt" : {
+            "description" : "Fecha y hora en que la app envió las señales por última vez",
+            "format" : "date-time",
+            "type" : "string"
+          },
           "device" : {
             "type" : "string"
           },

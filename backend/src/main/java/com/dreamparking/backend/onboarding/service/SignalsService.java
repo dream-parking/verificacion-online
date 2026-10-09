@@ -129,6 +129,7 @@ public class SignalsService {
 				: (body.countryIso() == null ? null : body.countryIso().toUpperCase()));
 		session.setTypingSpeedCpm(body.typingSpeedCpm());
 		session.setTypingPace(paceOf(body.typingSpeedCpm()));
+		session.setCapturedAt(now);
 		sessions.save(session);
 
 		if (body.steps() != null) {

@@ -310,6 +310,13 @@
           "step" : {
             "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
             "type" : "string"
+          },
+          "typingSpeedCps" : {
+            "description" : "Velocidad de escritura en la pantalla, en caracteres por segundo; se omite si no se escribió nada",
+            "example" : 3.25,
+            "maximum" : 50,
+            "minimum" : 0,
+            "type" : "number"
           }
         },
         "required" : [ "startedAt", "step" ],
@@ -709,6 +716,9 @@
           "step" : {
             "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
             "type" : "string"
+          },
+          "typingSpeedCps" : {
+            "type" : "number"
           }
         },
         "type" : "object"

@@ -32,6 +32,25 @@ public class ConsoleRequestService {
 
 	static final int MAX_PAGE_SIZE = 100;
 
+	/** Console filters; a null parameter disables its filter. Fixed SQL: the values only travel as bind parameters. */
+	private static final String LIST_FILTER = """
+			WHERE (CAST(:status AS text) IS NULL OR status = CAST(:status AS request_status))
+			  AND (CAST(:riskLevel AS text) IS NULL OR risk_level = CAST(:riskLevel AS risk_level))
+			  AND (CAST(:like AS text) IS NULL
+			       OR lower(name) LIKE CAST(:like AS text) ESCAPE '\\'
+			       OR lower(number) LIKE CAST(:like AS text) ESCAPE '\\')
+			""";
+
+	private static final String LIST_PAGE = """
+			SELECT v.*, p.total FROM (
+			  SELECT id, activity_date, count(*) OVER () AS total FROM v_request_list
+			""" + LIST_FILTER + """
+			  ORDER BY activity_date DESC, id OFFSET :offset LIMIT :limit
+			) p JOIN v_request_list v ON v.id = p.id
+			ORDER BY p.activity_date DESC, p.id""";
+
+	private static final String LIST_COUNT = "SELECT count(*) FROM v_request_list " + LIST_FILTER;
+
 	private final NamedParameterJdbcTemplate jdbc;
 
 	private final OnboardingRequestRepository requests;
@@ -74,30 +93,17 @@ public class ConsoleRequestService {
 			int page, int size) {
 		int pageNumber = Math.max(page, 0);
 		int pageSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-		StringBuilder where = new StringBuilder(" WHERE true");
+		String like = query == null || query.isBlank() ? null
+				: "%" + escapeLike(query.trim().toLowerCase()) + "%";
 		MapSqlParameterSource params = new MapSqlParameterSource()
+			.addValue("status", status == null ? null : status.name())
+			.addValue("riskLevel", riskLevel == null ? null : riskLevel.name())
+			.addValue("like", like)
 			.addValue("offset", (long) pageNumber * pageSize)
 			.addValue("limit", pageSize);
-		if (status != null) {
-			where.append(" AND status = CAST(:status AS request_status)");
-			params.addValue("status", status.name());
-		}
-		if (riskLevel != null) {
-			where.append(" AND risk_level = CAST(:riskLevel AS risk_level)");
-			params.addValue("riskLevel", riskLevel.name());
-		}
-		if (query != null && !query.isBlank()) {
-			where.append(" AND (lower(name) LIKE :like ESCAPE '\\' OR lower(number) LIKE :like ESCAPE '\\')");
-			params.addValue("like", "%" + escapeLike(query.trim().toLowerCase()) + "%");
-		}
 
 		long[] total = { -1 };
-		List<ConsoleRequestListItem> content = jdbc.query("""
-				SELECT v.*, p.total FROM (
-				  SELECT id, activity_date, count(*) OVER () AS total FROM v_request_list%s
-				  ORDER BY activity_date DESC, id OFFSET :offset LIMIT :limit
-				) p JOIN v_request_list v ON v.id = p.id
-				ORDER BY p.activity_date DESC, p.id""".formatted(where), params, (rs, row) -> {
+		List<ConsoleRequestListItem> content = jdbc.query(LIST_PAGE, params, (rs, row) -> {
 			total[0] = rs.getLong("total");
 			OffsetDateTime date = rs.getObject("activity_date", OffsetDateTime.class);
 			return new ConsoleRequestListItem(rs.getObject("id", UUID.class), rs.getString("number"),
@@ -107,7 +113,7 @@ public class ConsoleRequestService {
 		});
 		if (total[0] < 0) {
 			// Past the last page (or nothing matches): the window count came with no row.
-			total[0] = jdbc.queryForObject("SELECT count(*) FROM v_request_list" + where, params, Long.class);
+			total[0] = jdbc.queryForObject(LIST_COUNT, params, Long.class);
 		}
 		int totalPages = (int) ((total[0] + pageSize - 1) / pageSize);
 		return new PageResponse<>(content, pageNumber, pageSize, total[0], totalPages);

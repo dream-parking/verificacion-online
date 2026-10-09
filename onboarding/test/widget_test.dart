@@ -105,7 +105,10 @@ class FakeApi {
           http.Response? error(List<int> errors, void Function(List<int>) remaining) {
             if (errors.isEmpty) return null;
             remaining(errors.sublist(1));
-            return http.Response('{"status":${errors.first},"detail":"error"}', errors.first);
+            // A 400 comes like the real API: detail in English and the invalid fields in `errors`.
+            final fields = errors.first == 400 ? ',"errors":{"firstNames":"must match \\"\\\\p{L}+\\""}' : '';
+            return http.Response(
+                '{"status":${errors.first},"detail":"Some fields are invalid: firstNames"$fields}', errors.first);
           }
 
           if (req.url.path.endsWith('/privacy-consent')) {
@@ -340,6 +343,20 @@ void main() {
       await tapContinue(tester);
       expect(find.text('Paso 2 de 4'), findsOneWidget);
       expect(fake.basicData, hasLength(2));
+    });
+
+    testWidgets('if the API rejects a field, the message is in Spanish and names it', (tester) async {
+      final fake = FakeApi(basicDataErrors: [400]);
+      await tester.pumpWidget(app(fake));
+      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.byType(Checkbox));
+      await tapContinue(tester);
+      await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+
+      await tapContinue(tester);
+      expect(find.text('Revisa estos datos e inténtalo de nuevo: nombres.'), findsOneWidget);
+      expect(find.textContaining('Some fields'), findsNothing);
+      expect(find.textContaining('firstNames'), findsNothing);
     });
 
     testWidgets('if the submit response was lost, it shows the number the request already has', (tester) async {

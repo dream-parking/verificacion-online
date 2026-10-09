@@ -219,6 +219,22 @@ void main() {
 
     Future<void> tapContinue(WidgetTester tester) => tap(tester, find.text('CONTINUAR'));
 
+    /// Checks the privacy notice and the terms and conditions.
+    Future<void> acceptNotice(WidgetTester tester) async {
+      await tap(tester, find.byType(Checkbox).at(0));
+      await tap(tester, find.byType(Checkbox).at(1));
+    }
+
+    /// Types valid basic data in the four fields.
+    Future<void> fillBasicData(WidgetTester tester) async {
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'Marta Alejandra');
+      await tester.enterText(fields.at(1), 'Rivas Cruz');
+      await tester.enterText(fields.at(2), '048123775');
+      await tester.enterText(fields.at(3), '78452310');
+      await tester.pumpAndSettle();
+    }
+
     Widget app(FakeApi fake, {DeviceInfoSource? device, DateTime Function()? clock}) => OnboardingApp(
           home: OnboardingFlow(
             api: fake.api,
@@ -236,15 +252,18 @@ void main() {
 
       // Privacy: does not move on without accepting.
       await tapContinue(tester);
-      expect(find.text('Para continuar necesitamos que aceptes el aviso de privacidad.'), findsOneWidget);
-      await tap(tester, find.byType(Checkbox));
+      expect(
+        find.text('Para continuar necesitamos que aceptes el aviso de privacidad y los términos y condiciones.'),
+        findsOneWidget,
+      );
+      await acceptNotice(tester);
       await tapContinue(tester);
 
       // Basic data.
       expect(find.text('Paso 1 de 4'), findsOneWidget);
       await tapContinue(tester);
       expect(find.text('Escribe tus nombres.'), findsOneWidget);
-      await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+      await fillBasicData(tester);
       await tapContinue(tester);
 
       // Income.
@@ -295,7 +314,7 @@ void main() {
       final fake = FakeApi(privacyErrors: [503]);
       await tester.pumpWidget(app(fake));
       await tap(tester, find.text('EMPEZAR'));
-      await tap(tester, find.byType(Checkbox));
+      await acceptNotice(tester);
 
       await tapContinue(tester);
       expect(find.text('Paso 1 de 4'), findsNothing, reason: 'it does not move on without the notice recorded');
@@ -310,9 +329,9 @@ void main() {
       final fake = FakeApi(basicDataErrors: [503]);
       await tester.pumpWidget(app(fake));
       await tap(tester, find.text('EMPEZAR'));
-      await tap(tester, find.byType(Checkbox));
+      await acceptNotice(tester);
       await tapContinue(tester);
-      await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+      await fillBasicData(tester);
 
       await tapContinue(tester);
       expect(find.text('No pudimos guardar tus datos'), findsOneWidget);
@@ -328,9 +347,9 @@ void main() {
       final fake = FakeApi(submitErrors: [409], number: 'SOL-2026-00420')..submitted = true;
       await tester.pumpWidget(app(fake));
       await tap(tester, find.text('EMPEZAR'));
-      await tap(tester, find.byType(Checkbox));
+      await acceptNotice(tester);
       await tapContinue(tester);
-      await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+      await fillBasicData(tester);
       await tapContinue(tester);
       await tap(tester, find.text('Remesas'));
       await tap(tester, find.text('USD 500.01 a 1,000'));
@@ -357,29 +376,54 @@ void main() {
         final fake = FakeApi();
         await tester.pumpWidget(app(fake));
         await tap(tester, find.text('EMPEZAR'));
-        expect(find.text('Texto provisional · pendiente de revisión legal'), findsOneWidget);
+        expect(find.text('Texto provisional · pendiente de revisión legal'), findsNothing);
 
         await tapContinue(tester);
         expect(fake.starts, isEmpty);
 
-        await tap(tester, find.byType(Checkbox));
+        await acceptNotice(tester);
         await tapContinue(tester);
         expect(fake.starts, hasLength(1));
         expect(fake.starts.single.url.path, '/api/onboarding/requests');
         expect(find.text('Paso 1 de 4'), findsOneWidget);
       });
 
+      testWidgets('without the terms and conditions it does not move on', (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('He leído y acepto el aviso de privacidad.'));
+        await tapContinue(tester);
+
+        expect(find.text('Para continuar necesitamos que aceptes los términos y condiciones.'), findsOneWidget);
+        expect(find.text('Para continuar necesitamos que aceptes el aviso de privacidad.'), findsNothing);
+        expect(fake.starts, isEmpty);
+
+        await tap(tester, find.text('He leído y acepto los términos y condiciones.'));
+        await tapContinue(tester);
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+      });
+
+      testWidgets('there is no demo data link on the basic data screen', (tester) async {
+        await tester.pumpWidget(app(FakeApi()));
+        await tap(tester, find.text('EMPEZAR'));
+        await acceptNotice(tester);
+        await tapContinue(tester);
+        expect(find.textContaining('datos de ejemplo'), findsNothing);
+      });
+
       testWidgets('when coming back, the notice stays accepted and no other request is created', (tester) async {
         final fake = FakeApi();
         await tester.pumpWidget(app(fake));
         await tap(tester, find.text('EMPEZAR'));
-        await tap(tester, find.byType(Checkbox));
+        await acceptNotice(tester);
         await tapContinue(tester);
 
         await tap(tester, find.byTooltip('Volver al paso anterior'));
-        final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
-        expect(checkbox.value, isTrue);
-        expect(checkbox.onChanged, isNull, reason: 'a recorded consent cannot be withdrawn');
+        for (final checkbox in tester.widgetList<Checkbox>(find.byType(Checkbox))) {
+          expect(checkbox.value, isTrue);
+          expect(checkbox.onChanged, isNull, reason: 'a recorded consent cannot be withdrawn');
+        }
 
         await tapContinue(tester);
         expect(find.text('Paso 1 de 4'), findsOneWidget);
@@ -390,7 +434,7 @@ void main() {
         final fake = FakeApi(failStartTimes: 1);
         await tester.pumpWidget(app(fake));
         await tap(tester, find.text('EMPEZAR'));
-        await tap(tester, find.byType(Checkbox));
+        await acceptNotice(tester);
         await tapContinue(tester);
 
         expect(find.text('No pudimos iniciar tu solicitud'), findsOneWidget);
@@ -417,7 +461,7 @@ void main() {
         final fake = FakeApi();
         await tester.pumpWidget(app(fake));
         await tap(tester, find.text('EMPEZAR'));
-        await tap(tester, find.byType(Checkbox));
+        await acceptNotice(tester);
         await tapContinue(tester);
 
         expect(fake.signals, hasLength(1));
@@ -439,12 +483,12 @@ void main() {
         final fake = FakeApi(failSignalsTimes: 1);
         await tester.pumpWidget(app(fake));
         await tap(tester, find.text('EMPEZAR'));
-        await tap(tester, find.byType(Checkbox));
+        await acceptNotice(tester);
         await tapContinue(tester);
         expect(find.text('Paso 1 de 4'), findsOneWidget);
         expect(fake.signals, hasLength(1));
 
-        await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await fillBasicData(tester);
         await tapContinue(tester);
         expect(fake.signals, hasLength(2));
       });
@@ -459,7 +503,7 @@ void main() {
 
         await tap(tester, find.text('EMPEZAR'));
         advance(8000);
-        await tap(tester, find.byType(Checkbox));
+        await acceptNotice(tester);
         await tapContinue(tester);
 
         // Basic data: one failed attempt, then typed letter by letter (one keystroke every 200 ms).
@@ -522,9 +566,9 @@ void main() {
       Future<void> goToIncome(WidgetTester tester, FakeApi fake) async {
         await tester.pumpWidget(app(fake));
         await tap(tester, find.text('EMPEZAR'));
-        await tap(tester, find.byType(Checkbox));
+        await acceptNotice(tester);
         await tapContinue(tester);
-        await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await fillBasicData(tester);
         await tapContinue(tester);
         expect(find.text('Paso 2 de 4'), findsOneWidget);
       }
@@ -578,9 +622,9 @@ void main() {
       Future<void> goToIncome(WidgetTester tester, FakeApi fake) async {
         await tester.pumpWidget(app(fake));
         await tap(tester, find.text('EMPEZAR'));
-        await tap(tester, find.byType(Checkbox));
+        await acceptNotice(tester);
         await tapContinue(tester);
-        await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await fillBasicData(tester);
         await tapContinue(tester);
       }
 
@@ -642,9 +686,9 @@ void main() {
       Future<void> goToExpectedActivity(WidgetTester tester, FakeApi fake) async {
         await tester.pumpWidget(app(fake));
         await tap(tester, find.text('EMPEZAR'));
-        await tap(tester, find.byType(Checkbox));
+        await acceptNotice(tester);
         await tapContinue(tester);
-        await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+        await fillBasicData(tester);
         await tapContinue(tester);
         await tap(tester, find.text('Salario'));
         await tap(tester, find.text('Hasta USD 500'));

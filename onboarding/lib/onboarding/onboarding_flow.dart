@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 
 import '../api/catalogs.dart';
 import '../api/onboarding_api.dart';
-import '../env.dart';
 import '../signals/device_fingerprint.dart';
 import '../signals/signals.dart';
 import '../theme.dart';
@@ -394,22 +393,21 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   Widget _header(Screen? previous) {
     return SizedBox(
       height: 60,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 8, right: 12),
-        child: Row(
-          children: [
-            if (previous != null && !_busy)
-              IconButton(
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Logo(),
+          if (previous != null && !_busy)
+            Positioned(
+              left: 8,
+              child: IconButton(
                 tooltip: 'Volver al paso anterior',
                 onPressed: () => _goTo(previous),
                 icon: const Icon(Icons.arrow_back_ios_new, size: 22, color: AppColors.ink),
-              )
-            else
-              const SizedBox(width: 12),
-            const SizedBox(width: 4),
-            const Logo(),
-          ],
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -443,24 +441,19 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   // ---------------------------------------------------------------- 2. Privacy
 
   Widget _privacy() {
-    final error = _errorFor('accepted');
     final alreadyAccepted = _form.captureAllowed;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (PrivacyNotice.isProvisional) ...[
-            const _ProvisionalLabel(),
-            const SizedBox(height: 14),
-          ],
           const ScreenTitle(PrivacyNotice.title),
           const SizedBox(height: 12),
           const Text(PrivacyNotice.intro, style: AppText.body),
           const SizedBox(height: 20),
           for (final (icon, title, description) in PrivacyNotice.signals) ...[
             IconRow(
-              leading: Icon(icon, size: 32, color: AppColors.blue),
+              leading: Icon(icon, size: 32, color: AppColors.brandGreen),
               title: title,
               description: description,
             ),
@@ -470,26 +463,17 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           const Text(PrivacyNotice.closing, style: AppText.body),
           const SizedBox(height: 16),
           // Once the request exists, the consent is already recorded: it cannot be unchecked.
-          InkWell(
-            onTap: alreadyAccepted ? null : () => setState(() => _form.accepted = !_form.accepted),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 56),
-              child: Row(
-                children: [
-                  Transform.scale(
-                    scale: 1.3,
-                    child: Checkbox(
-                      value: _form.accepted,
-                      onChanged: alreadyAccepted ? null : (v) => setState(() => _form.accepted = v ?? false),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(child: Text(PrivacyNotice.acceptance, style: AppText.body)),
-                ],
-              ),
-            ),
+          _AcceptanceCheckbox(
+            text: PrivacyNotice.acceptance,
+            value: _form.accepted,
+            onChanged: alreadyAccepted ? null : (v) => setState(() => _form.accepted = v),
           ),
-          if (error.isNotEmpty) ErrorText(error),
+          _AcceptanceCheckbox(
+            text: PrivacyNotice.termsAcceptance,
+            value: _form.termsAccepted,
+            onChanged: alreadyAccepted ? null : (v) => setState(() => _form.termsAccepted = v),
+          ),
+          if (_errorFor('accepted').isNotEmpty) ErrorText(_errorFor('accepted')),
           if (_startError != null) ...[
             const SizedBox(height: 16),
             _ConnectionError(
@@ -566,10 +550,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 setState(() => _form.phone = v);
               },
             ),
-            if (appEnv != 'prod') ...[
-              const SizedBox(height: 12),
-              LinkButton(text: 'Rellenar con datos de ejemplo (demo)', onPressed: _fillDemoData),
-            ],
             if (_saveError != null) ...[
               const SizedBox(height: 16),
               _ConnectionError(
@@ -584,20 +564,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  void _fillDemoData() {
-    _firstNames.text = 'Marta Alejandra';
-    _lastNames.text = 'Rivas Cruz';
-    _dui.text = '04812377-5';
-    _phone.text = '7845-2310';
-    setState(() {
-      _form
-        ..firstNames = _firstNames.text
-        ..lastNames = _lastNames.text
-        ..dui = _dui.text
-        ..phone = _phone.text;
-    });
-  }
-
   // ---------------------------------------------------------------- 4. Income
 
   Widget _income() {
@@ -608,7 +574,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     return Column(
       children: [
         const ColorHeader(
-          color: AppColors.skyblue,
+          color: AppColors.brandSoft,
           eyebrow: 'Tus ingresos',
           title: '¿De dónde viene tu dinero?',
         ),
@@ -676,7 +642,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 32),
-      child: Center(child: CircularProgressIndicator(color: AppColors.blue)),
+      child: Center(child: CircularProgressIndicator(color: AppColors.brandGreen)),
     );
   }
 
@@ -704,7 +670,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     return Column(
       children: [
         const ColorHeader(
-          color: AppColors.pink,
+          color: AppColors.brandSoft,
           eyebrow: 'El dinero de tu cuenta',
           title: '¿Qué dinero pasará por esta cuenta?',
         ),
@@ -820,7 +786,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           Container(
             width: 72,
             height: 72,
-            decoration: const BoxDecoration(color: AppColors.yellow, shape: BoxShape.circle),
+            decoration: const BoxDecoration(color: AppColors.brand, shape: BoxShape.circle),
             child: const Icon(Icons.check_rounded, size: 40, color: AppColors.ink),
           ),
           const SizedBox(height: 20),
@@ -910,27 +876,30 @@ class _Welcome extends StatelessWidget {
         ),
         Container(
           width: double.infinity,
-          color: AppColors.orange,
+          color: AppColors.brandGreen,
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 36),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Abre tu cuenta en línea', style: AppText.heading(16).copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                'Abre tu cuenta en línea',
+                style: AppText.heading(16, color: AppColors.brand).copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
               Semantics(
                 header: true,
-                child: Text('Tu cuenta, desde tu teléfono.', style: AppText.heading(36, height: 1.1)),
+                child: Text('Tu cuenta, desde tu teléfono.', style: AppText.heading(36, color: Colors.white, height: 1.1)),
               ),
               const SizedBox(height: 16),
               const Text(
                 'Sin filas y sin ir a una agencia. Te toma unos 5 minutos.',
-                style: TextStyle(fontSize: 18, height: 26 / 18, color: AppColors.ink),
+                style: TextStyle(fontSize: 18, height: 26 / 18, color: Colors.white),
               ),
               const SizedBox(height: 20),
               Container(
                 constraints: const BoxConstraints(minHeight: 44),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: const ShapeDecoration(color: Colors.white, shape: StadiumBorder()),
+                decoration: const ShapeDecoration(color: AppColors.brand, shape: StadiumBorder()),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -962,19 +931,32 @@ class _Welcome extends StatelessWidget {
   }
 }
 
-class _ProvisionalLabel extends StatelessWidget {
-  const _ProvisionalLabel();
+/// Checkbox with its text; the whole row can be tapped. [onChanged] is `null` when it cannot change.
+class _AcceptanceCheckbox extends StatelessWidget {
+  const _AcceptanceCheckbox({required this.text, required this.value, required this.onChanged});
+
+  final String text;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    // Dashed box in the design; approximated with a solid gray border.
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.muted),
-        borderRadius: BorderRadius.circular(4),
+    final onChanged = this.onChanged;
+    return InkWell(
+      onTap: onChanged == null ? null : () => onChanged(!value),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Row(
+          children: [
+            Transform.scale(
+              scale: 1.3,
+              child: Checkbox(value: value, onChanged: onChanged == null ? null : (v) => onChanged(v ?? false)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(text, style: AppText.body)),
+          ],
+        ),
       ),
-      child: const Text('Texto provisional · pendiente de revisión legal', style: AppText.small),
     );
   }
 }
@@ -1078,7 +1060,7 @@ class _LoadingOverlay extends StatelessWidget {
                 height: 48,
                 child: CircularProgressIndicator(
                   strokeWidth: 5,
-                  color: AppColors.blue,
+                  color: AppColors.brandGreen,
                   backgroundColor: AppColors.border,
                   strokeCap: StrokeCap.round,
                 ),

@@ -11,7 +11,8 @@ const apiStepNames = {
   Screen.review: 'REVIEW',
 };
 
-/// Typing speed in characters per minute, measured only while the person is typing.
+/// Typing speed, measured only while the person is typing: in characters per minute for the whole
+/// request ([cpm]) and in characters per second for one screen ([cps]).
 ///
 /// - A pause longer than [pause] between keystrokes ends the "burst": thinking time does not count.
 /// - A change of more than 2 characters at once (paste, autofill, demo data) is not typing and also
@@ -54,6 +55,14 @@ class TypingRhythm {
     final value = (_keystrokes * 60000 / _typingTime.inMilliseconds).round();
     return value.clamp(0, 2000);
   }
+
+  /// Characters per second with 2 decimals (0-50, the API range of `steps[].typingSpeedCps`) or
+  /// `null` while there is not enough data.
+  double? get cps {
+    if (_keystrokes < minKeystrokes || _typingTime <= Duration.zero) return null;
+    final value = _keystrokes * 1000 / _typingTime.inMilliseconds;
+    return (value.clamp(0, 50) * 100).round() / 100;
+  }
 }
 
 /// Start, end and attempts of each form step.
@@ -72,13 +81,15 @@ class StepTimings {
   /// The step was completed; if it is completed again after editing it, the last time is kept.
   void complete(Screen s, DateTime now) => _steps[s]?.completedAt = now;
 
-  List<Map<String, Object?>> toJson() => [
+  /// [typingSpeeds]: characters per second typed on each screen; screens without typing omit it.
+  List<Map<String, Object?>> toJson({Map<Screen, double> typingSpeeds = const {}}) => [
         for (final MapEntry(key: s, value: t) in _steps.entries)
           {
             'step': apiStepNames[s],
             'startedAt': t.startedAt.toUtc().toIso8601String(),
             if (t.completedAt != null) 'completedAt': t.completedAt!.toUtc().toIso8601String(),
             'attempts': t.attempts < 1 ? 1 : t.attempts,
+            'typingSpeedCps': ?typingSpeeds[s],
           },
       ];
 }

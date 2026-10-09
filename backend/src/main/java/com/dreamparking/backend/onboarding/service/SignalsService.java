@@ -1,5 +1,6 @@
 package com.dreamparking.backend.onboarding.service;
 
+import java.math.RoundingMode;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -128,6 +129,7 @@ public class SignalsService {
 				: (body.countryIso() == null ? null : body.countryIso().toUpperCase()));
 		session.setTypingSpeedCpm(body.typingSpeedCpm());
 		session.setTypingPace(paceOf(body.typingSpeedCpm()));
+		session.setCapturedAt(now);
 		sessions.save(session);
 
 		if (body.steps() != null) {
@@ -168,6 +170,9 @@ public class SignalsService {
 		step.setCompletedAt(timing.completedAt());
 		if (timing.attempts() != null) {
 			step.setAttempts(timing.attempts());
+		}
+		if (timing.typingSpeedCps() != null) {
+			step.setTypingSpeedCps(timing.typingSpeedCps().setScale(2, RoundingMode.HALF_UP));
 		}
 		steps.save(step);
 	}

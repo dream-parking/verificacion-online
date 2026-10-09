@@ -42,12 +42,16 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			String monthlyAmountRangeCode, String monthlyAmountRangeLabel, Instant registeredAt, Instant updatedAt) {
 	}
 
-	/** Device and behavior signals (VDI-12). */
+	/**
+	 * Device and behavior signals (VDI-12). The app sends them all in one call, so {@code capturedAt} is the capture
+	 * time of each of them; the location has its own {@code ipDetails.lookedUpAt} and each screen its own times.
+	 */
 	@Schema(name = "ConsoleRequestSignals")
 	public record Signals(String ip, String approximateLocation, String deviceFingerprint, String device,
 			Short typingSpeedCpm, TypingPace typingPace, Boolean nightTime, Long totalDurationSeconds,
 			Long requestsFromSameDevice, LocationStatus locationStatus, BigDecimal latitude, BigDecimal longitude,
-			IpDetails ipDetails) {
+			IpDetails ipDetails,
+			@Schema(description = "Fecha y hora en que la app envió las señales por última vez") Instant capturedAt) {
 	}
 
 	/**
@@ -61,7 +65,7 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 
 	@Schema(name = "ConsoleRequestStepTime")
 	public record StepTime(OnboardingStep step, Instant startedAt, Instant completedAt, Integer durationSeconds,
-			Short attempts) {
+			Short attempts, BigDecimal typingSpeedCps) {
 	}
 
 	@Schema(name = "ConsoleRequestTimelineEntry")

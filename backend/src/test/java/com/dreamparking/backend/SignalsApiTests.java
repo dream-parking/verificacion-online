@@ -1,5 +1,6 @@
 package com.dreamparking.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -63,7 +64,7 @@ class SignalsApiTests {
 					 "appVersion": "1.0.0+1", "approximateLocation": "San Salvador, El Salvador", "countryIso": "sv",
 					 "typingSpeedCpm": 185,
 					 "steps": [{"step": "PRIVACY_NOTICE", "startedAt": "%s", "completedAt": "%s"},
-					           {"step": "INCOME", "startedAt": "%s", "attempts": 2}]}
+					           {"step": "INCOME", "startedAt": "%s", "attempts": 2, "typingSpeedCps": 3.257}]}
 					""".formatted(shown, done, done)))
 			.andExpect(status().isNoContent());
 
@@ -80,7 +81,25 @@ class SignalsApiTests {
 			.andExpect(jsonPath("$.steps.length()").value(2))
 			.andExpect(jsonPath("$.steps[0].step").value("PRIVACY_NOTICE"))
 			.andExpect(jsonPath("$.steps[0].durationSeconds").value(68))
-			.andExpect(jsonPath("$.steps[1].attempts").value(2));
+			.andExpect(jsonPath("$.steps[1].attempts").value(2))
+			.andExpect(jsonPath("$.steps[1].typingSpeedCps").value(3.26));
+	}
+
+	@Test
+	void showsWhenTheSignalsWereCapturedAndMovesItWhenTheyAreSentAgain() throws Exception {
+		String id = startRequest();
+		Instant before = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+
+		capture(id, "{\"deviceFingerprint\": \"fp-captura\"}", 204);
+		flushAndClear();
+		Instant first = capturedAt(id);
+		assertThat(first).isBetween(before, Instant.now());
+
+		em.createNativeQuery("update onboarding_session set captured_at = captured_at - interval '1 hour'"
+				+ " where request_id = cast(:id as uuid)").setParameter("id", id).executeUpdate();
+		capture(id, "{\"deviceFingerprint\": \"fp-captura\"}", 204);
+		flushAndClear();
+		assertThat(capturedAt(id)).isAfterOrEqualTo(first);
 	}
 
 	@Test
@@ -135,6 +154,11 @@ class SignalsApiTests {
 	private void capture(String id, String body, int expectedStatus) throws Exception {
 		mvc.perform(put("/api/onboarding/requests/{id}/signals", id).contentType(MediaType.APPLICATION_JSON)
 			.content(body)).andExpect(status().is(expectedStatus));
+	}
+
+	private Instant capturedAt(String id) throws Exception {
+		String body = mvc.perform(get("/api/console/requests/{id}", id)).andReturn().getResponse().getContentAsString();
+		return Instant.parse(JsonPath.read(body, "$.signals.capturedAt"));
 	}
 
 	private String startRequest() throws Exception {

@@ -14,6 +14,7 @@ function titleFor(pathname: string) {
   if (pathname.startsWith("/requests/")) return "Solicitudes · Detalle";
   if (pathname.startsWith("/requests")) return "Solicitudes";
   if (pathname.startsWith("/alerts")) return "Bandeja de alertas";
+  if (pathname.startsWith("/map")) return "Mapa de ubicaciones";
   if (pathname.startsWith("/score-rule")) return "Regla de score";
   if (pathname.startsWith("/users")) return "Usuarios";
   return "";
@@ -47,6 +48,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const nav = [
     { href: "/requests", label: "Solicitudes", badge: 0 },
     { href: "/alerts", label: "Bandeja de alertas", badge: unassigned },
+    { href: "/map", label: "Mapa de ubicaciones", badge: 0 },
     { href: "/score-rule", label: "Regla de score", badge: 0 },
     // Only an administrator manages users.
     ...(user.role === "ADMIN" ? [{ href: "/users", label: "Usuarios", badge: 0 }] : []),

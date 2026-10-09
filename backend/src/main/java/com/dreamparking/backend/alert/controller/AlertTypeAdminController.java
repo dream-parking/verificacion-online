@@ -1,6 +1,7 @@
 package com.dreamparking.backend.alert.controller;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,6 +24,7 @@ import com.dreamparking.backend.alert.dto.AlertTypeResponse;
 import com.dreamparking.backend.alert.dto.CreateAlertTypeRequest;
 import com.dreamparking.backend.alert.dto.UpdateAlertTypeRequest;
 import com.dreamparking.backend.alert.service.AlertTypeService;
+import com.dreamparking.backend.common.validation.Code;
 import com.dreamparking.backend.security.AuthenticatedUser;
 
 /** Maintenance of the alert types. Administrators only; any console user reads them in GET /api/console/alert-types. */
@@ -57,7 +59,8 @@ public class AlertTypeAdminController {
 	@ApiResponse(responseCode = "403", description = "Solo administradores", content = @Content)
 	@ApiResponse(responseCode = "404", description = "El tipo de alerta no existe", content = @Content)
 	@PutMapping("/{code}")
-	public AlertTypeResponse update(@PathVariable String code, @Valid @RequestBody UpdateAlertTypeRequest body,
+	public AlertTypeResponse update(@PathVariable @Size(max = 40) @Code String code,
+			@Valid @RequestBody UpdateAlertTypeRequest body,
 			@Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser admin) {
 		return alertTypeService.update(code, body, admin.id());
 	}

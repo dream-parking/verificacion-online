@@ -11,12 +11,14 @@ import jakarta.validation.constraints.Size;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import com.dreamparking.backend.common.validation.FreeText;
+
 /**
  * Edits a catalog entry. Bounds of a range already used by a request cannot change (they are part of its KYC
  * file): create a new range and deactivate this one instead.
  */
 public record UpdateCatalogEntryRequest(
-		@Schema(description = "Texto que ve el cliente", example = "Hasta USD 500") @NotBlank @Size(max = 80) String label,
+		@Schema(description = "Texto que ve el cliente", example = "Hasta USD 500") @NotBlank @Size(max = 80) @FreeText String label,
 		@Schema(description = "Posición en la lista", example = "1") @NotNull @Min(0) Short sortOrder,
 		@Schema(description = "Si se muestra en la app", example = "true") @NotNull Boolean active,
 		@Schema(description = "Primer monto del rango (solo catálogos de rangos)") @DecimalMin("0") @Digits(integer = 12, fraction = 2) BigDecimal minUsd,

@@ -20,6 +20,7 @@ jobs:
   changes:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       backend: ${{ steps.diff.outputs.backend }}
       webconsole: ${{ steps.diff.outputs.webconsole }}
@@ -38,6 +39,7 @@ jobs:
             files="$(git diff --name-only "$BASE" "$GITHUB_SHA")"
           fi
           echo "$files"
+          files="$(echo "$files" | grep -vE '\.md$' || true)"   # documentación sola no requiere CI
           has() { echo "$files" | grep -qE "$1" && echo true || echo false; }
           ci=$(has '^\.github/workflows/ci\.yml$')   # si cambia este workflow, se prueba todo
           for c in backend webconsole onboarding; do
@@ -50,6 +52,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -76,6 +79,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.webconsole == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: webconsole
@@ -106,6 +110,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.onboarding == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: onboarding

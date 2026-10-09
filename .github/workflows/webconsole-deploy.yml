@@ -5,7 +5,10 @@ name: webconsole-deploy
 on:
   push:
     branches: [dev, QA]
-    paths: ["webconsole/**", ".github/workflows/webconsole-deploy.yml"]
+    paths:
+      - "webconsole/**"
+      - "!webconsole/**/*.md"
+      - ".github/workflows/webconsole-deploy.yml"
   workflow_dispatch:
 
 concurrency:
@@ -15,6 +18,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
     steps:
       - uses: actions/checkout@v4

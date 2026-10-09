@@ -63,7 +63,7 @@ class SignalsApiTests {
 					 "appVersion": "1.0.0+1", "approximateLocation": "San Salvador, El Salvador", "countryIso": "sv",
 					 "typingSpeedCpm": 185,
 					 "steps": [{"step": "PRIVACY_NOTICE", "startedAt": "%s", "completedAt": "%s"},
-					           {"step": "INCOME", "startedAt": "%s", "attempts": 2}]}
+					           {"step": "INCOME", "startedAt": "%s", "attempts": 2, "typingSpeedCps": 3.257}]}
 					""".formatted(shown, done, done)))
 			.andExpect(status().isNoContent());
 
@@ -80,7 +80,8 @@ class SignalsApiTests {
 			.andExpect(jsonPath("$.steps.length()").value(2))
 			.andExpect(jsonPath("$.steps[0].step").value("PRIVACY_NOTICE"))
 			.andExpect(jsonPath("$.steps[0].durationSeconds").value(68))
-			.andExpect(jsonPath("$.steps[1].attempts").value(2));
+			.andExpect(jsonPath("$.steps[1].attempts").value(2))
+			.andExpect(jsonPath("$.steps[1].typingSpeedCps").value(3.26));
 	}
 
 	@Test

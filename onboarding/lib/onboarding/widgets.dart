@@ -23,8 +23,8 @@ class PrimaryButton extends StatelessWidget {
           elevation: const WidgetStatePropertyAll(0),
           backgroundColor: WidgetStateProperty.resolveWith((s) {
             if (s.contains(WidgetState.disabled)) return AppColors.disabled;
-            if (s.contains(WidgetState.pressed) || s.contains(WidgetState.hovered)) return AppColors.yellowHover;
-            return AppColors.yellow;
+            if (s.contains(WidgetState.pressed) || s.contains(WidgetState.hovered)) return AppColors.brandHover;
+            return AppColors.brand;
           }),
           foregroundColor: WidgetStateProperty.resolveWith(
             (s) => s.contains(WidgetState.disabled) ? AppColors.muted : AppColors.ink,
@@ -204,11 +204,11 @@ class OptionCard extends StatelessWidget {
       inMutuallyExclusiveGroup: true,
       checked: selected,
       child: Material(
-        color: selected ? AppColors.blueSoft : Colors.white,
+        color: selected ? AppColors.brandSoft : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: selected
-              ? const BorderSide(color: AppColors.blue, width: 2)
+              ? const BorderSide(color: AppColors.brandGreen, width: 2)
               : const BorderSide(color: AppColors.borderStrong),
         ),
         child: InkWell(
@@ -228,7 +228,7 @@ class OptionCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: Colors.white,
                       border: Border.all(
-                        color: selected ? AppColors.blue : AppColors.muted,
+                        color: selected ? AppColors.brandGreen : AppColors.muted,
                         width: selected ? 7 : 2,
                       ),
                     ),
@@ -284,7 +284,7 @@ class StepProgress extends StatelessWidget {
                       duration: const Duration(milliseconds: 250),
                       height: 6,
                       decoration: BoxDecoration(
-                        color: i <= step ? AppColors.blue : AppColors.border,
+                        color: i <= step ? AppColors.brandGreen : AppColors.border,
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -312,16 +312,8 @@ class Logo extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.yellow, width: 2),
-            ),
-            child: ClipOval(child: Image.asset('assets/brand/emblem.png', fit: BoxFit.cover)),
-          ),
+          // The emblem already has its own round frame: no extra ring, so it does not look like two circles.
+          ClipOval(child: Image.asset('assets/brand/emblem.png', width: 40, height: 40, fit: BoxFit.cover)),
           const SizedBox(width: 10),
           Column(
             mainAxisSize: MainAxisSize.min,
@@ -339,7 +331,7 @@ class Logo extends StatelessWidget {
 
 /// Full logo with the tagline, for the welcome screen (same file as the console login).
 class FullLogo extends StatelessWidget {
-  const FullLogo({super.key, this.width = 220});
+  const FullLogo({super.key, this.width = 150});
 
   final double width;
 

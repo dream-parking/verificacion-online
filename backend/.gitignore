@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Secretos locales (copias de .env.example con valores reales); nunca al repo, que es público.
+.env
+.env.*
+!.env.example

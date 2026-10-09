@@ -1,5 +1,7 @@
 package com.dreamparking.backend.common.exception;
 
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 
 /**
@@ -17,6 +19,11 @@ public abstract class ApiException extends RuntimeException {
 
 	public HttpStatus getStatus() {
 		return status;
+	}
+
+	/** Extra members of the Problem Details body, for errors the client handles by code (none by default). */
+	public Map<String, Object> getProperties() {
+		return Map.of();
 	}
 
 }

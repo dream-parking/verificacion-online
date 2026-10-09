@@ -75,11 +75,11 @@ class StepTimingApiTests {
 		send(put("/api/onboarding/requests/{id}/privacy-consent", id), "{\"signalsAccepted\": true}");
 		send(put("/api/onboarding/requests/{id}/basic-data", id), """
 				{"dui": "01234567-8", "firstNames": "Ana", "lastNames": "Pérez", "mobilePhone": "7123-4567"}
-				""").andExpect(jsonPath("$.completedSteps").value(2));
+				""").andExpect(jsonPath("$.completedSteps").value(3)); // skips the optional DUI step
 
 		flushAndClear();
 		mvc.perform(get("/api/console/requests/{id}", id))
-			.andExpect(jsonPath("$.completedSteps").value(2))
+			.andExpect(jsonPath("$.completedSteps").value(3))
 			.andExpect(jsonPath("$.steps.length()").value(0));
 	}
 

@@ -43,6 +43,7 @@ export const puedeTomarAlertas = (rol: Rol) => rol === "FRAUD_ANALYST" || rol ==
 
 export const PASOS: { paso: Paso; nombre: string }[] = [
   { paso: "PRIVACY_NOTICE", nombre: "Aviso de privacidad" },
+  { paso: "IDENTITY_DOCUMENT", nombre: "DUI" },
   { paso: "BASIC_DATA", nombre: "Datos básicos" },
   { paso: "INCOME", nombre: "Ingresos" },
   { paso: "EXPECTED_ACTIVITY", nombre: "Movimiento esperado" },

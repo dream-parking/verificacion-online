@@ -1,5 +1,7 @@
 package com.dreamparking.backend.console.service;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.UUID;
 
 import org.springframework.data.domain.PageRequest;
@@ -12,6 +14,10 @@ import com.dreamparking.backend.common.dto.PageResponse;
 import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.console.dto.ConsoleRequestDetail;
 import com.dreamparking.backend.console.dto.ConsoleRequestListItem;
+import com.dreamparking.backend.identity.entity.IdentityDocument;
+import com.dreamparking.backend.identity.repository.IdentityDocumentImageRepository;
+import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
+import com.dreamparking.backend.identity.service.DuiValidator;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestListItem;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
@@ -33,6 +39,9 @@ public class ConsoleRequestService {
 
 	static final int MAX_PAGE_SIZE = 100;
 
+	/** Dates printed on the DUI are Salvadoran dates. */
+	static final ZoneId EL_SALVADOR = ZoneId.of("America/El_Salvador");
+
 	private final RequestListItemRepository listItems;
 
 	private final OnboardingRequestRepository requests;
@@ -49,10 +58,15 @@ public class ConsoleRequestService {
 
 	private final RiskAssessmentService riskAssessments;
 
+	private final IdentityDocumentRepository identityDocuments;
+
+	private final IdentityDocumentImageRepository identityDocumentImages;
+
 	public ConsoleRequestService(RequestListItemRepository listItems, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
-			RiskAssessmentService riskAssessments) {
+			RiskAssessmentService riskAssessments, IdentityDocumentRepository identityDocuments,
+			IdentityDocumentImageRepository identityDocumentImages) {
 		this.listItems = listItems;
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
@@ -61,6 +75,8 @@ public class ConsoleRequestService {
 		this.steps = steps;
 		this.events = events;
 		this.riskAssessments = riskAssessments;
+		this.identityDocuments = identityDocuments;
+		this.identityDocumentImages = identityDocumentImages;
 	}
 
 	/** Newest first; {@code query} matches the applicant's name or the request number. */
@@ -89,6 +105,7 @@ public class ConsoleRequestService {
 
 		var applicant = new ConsoleRequestDetail.Applicant(request.getFirstNames(), request.getLastNames(),
 				request.getDui(), request.getMobilePhone());
+		var identityDocument = identityDocuments.findById(requestId).map(this::toIdentityDocument).orElse(null);
 		var income = incomeDeclarations.findById(requestId)
 			.map(d -> new ConsoleRequestDetail.Income(d.getSource().getCode(), d.getSource().getLabel(),
 					d.getSourceDetail(), d.getRange().getCode(), d.getRange().getLabel(), d.getRegisteredAt(),
@@ -117,8 +134,18 @@ public class ConsoleRequestService {
 
 		return new ConsoleRequestDetail(request.getId(), request.getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
-				request.getSubmittedAt(), applicant, income, expectedActivity, risk, signalsView, stepTimes,
+				request.getSubmittedAt(), applicant, identityDocument, income, expectedActivity, risk, signalsView, stepTimes,
 				timeline);
+	}
+
+	private ConsoleRequestDetail.IdentityDocument toIdentityDocument(IdentityDocument d) {
+		return new ConsoleRequestDetail.IdentityDocument(d.getStatus(), d.getModel(), d.getAttempts(),
+				d.getUnreadableReason(), d.getFailure(), d.getDui(), d.getFirstNames(), d.getLastNames(),
+				d.getBirthDate(), d.getIssueDate(), d.getExpiryDate(), d.getGender(),
+				d.getDui() == null ? null : DuiValidator.hasValidCheckDigit(d.getDui()),
+				d.getExpiryDate() == null ? null : d.isExpired(LocalDate.now(EL_SALVADOR)), d.getLooksAuthentic(),
+				d.getConfidence(), d.getDuiMatchesDeclared(), d.getCorrectedFields(),
+				identityDocumentImages.findSidesByRequestId(d.getRequestId()), d.getProcessedAt());
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {

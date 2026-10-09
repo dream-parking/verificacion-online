@@ -1,6 +1,8 @@
 package com.dreamparking.backend.console.service;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,6 +15,11 @@ import com.dreamparking.backend.common.dto.PageResponse;
 import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.console.dto.ConsoleRequestDetail;
 import com.dreamparking.backend.console.dto.ConsoleRequestListItem;
+import com.dreamparking.backend.identity.entity.IdentityDocument;
+import com.dreamparking.backend.identity.entity.enums.OcrStatus;
+import com.dreamparking.backend.identity.repository.IdentityDocumentImageRepository;
+import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
+import com.dreamparking.backend.identity.service.DuiValidator;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
@@ -31,6 +38,9 @@ import com.dreamparking.backend.risk.service.RiskAssessmentService;
 public class ConsoleRequestService {
 
 	static final int MAX_PAGE_SIZE = 100;
+
+	/** Dates printed on the DUI are Salvadoran dates. */
+	static final ZoneId EL_SALVADOR = ZoneId.of("America/El_Salvador");
 
 	/** Console filters; a null parameter disables its filter. Fixed SQL: the values only travel as bind parameters. */
 	private static final String LIST_FILTER = """
@@ -67,10 +77,15 @@ public class ConsoleRequestService {
 
 	private final RiskAssessmentService riskAssessments;
 
+	private final IdentityDocumentRepository identityDocuments;
+
+	private final IdentityDocumentImageRepository identityDocumentImages;
+
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
-			RiskAssessmentService riskAssessments) {
+			RiskAssessmentService riskAssessments, IdentityDocumentRepository identityDocuments,
+			IdentityDocumentImageRepository identityDocumentImages) {
 		this.jdbc = jdbc;
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
@@ -79,6 +94,8 @@ public class ConsoleRequestService {
 		this.steps = steps;
 		this.events = events;
 		this.riskAssessments = riskAssessments;
+		this.identityDocuments = identityDocuments;
+		this.identityDocumentImages = identityDocumentImages;
 	}
 
 	/**
@@ -125,6 +142,7 @@ public class ConsoleRequestService {
 
 		var applicant = new ConsoleRequestDetail.Applicant(request.getFirstNames(), request.getLastNames(),
 				request.getDui(), request.getMobilePhone());
+		var identityDocument = identityDocuments.findById(requestId).map(this::toIdentityDocument).orElse(null);
 		var income = incomeDeclarations.findById(requestId)
 			.map(d -> new ConsoleRequestDetail.Income(d.getSource().getCode(), d.getSource().getLabel(),
 					d.getSourceDetail(), d.getRange().getCode(), d.getRange().getLabel(), d.getRegisteredAt(),
@@ -153,8 +171,23 @@ public class ConsoleRequestService {
 
 		return new ConsoleRequestDetail(request.getId(), request.getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
-				request.getSubmittedAt(), applicant, income, expectedActivity, risk, signalsView, stepTimes,
+				request.getSubmittedAt(), applicant, identityDocument, income, expectedActivity, risk, signalsView, stepTimes,
 				timeline);
+	}
+
+	private ConsoleRequestDetail.IdentityDocument toIdentityDocument(IdentityDocument d) {
+		var read = d.getStatus() == OcrStatus.READ ? new ConsoleRequestDetail.DuiData(d.getDui(), d.getFirstNames(),
+				d.getLastNames(), d.getBirthDate(), d.getIssueDate(), d.getExpiryDate(), d.getGender()) : null;
+		var confirmed = d.isConfirmed() ? new ConsoleRequestDetail.DuiData(d.getConfirmedDui(),
+				d.getConfirmedFirstNames(), d.getConfirmedLastNames(), d.getConfirmedBirthDate(), null,
+				d.getConfirmedExpiryDate(), null) : null;
+		String dui = d.isConfirmed() ? d.getConfirmedDui() : d.getDui();
+		return new ConsoleRequestDetail.IdentityDocument(d.getStatus(), d.getModel(), d.getAttempts(),
+				d.getUnreadableReason(), d.getUnreadableSide(), d.getFailure(), read, confirmed, d.getConfirmedAt(),
+				d.getCorrectedFields(), d.getDuiMatchesDeclared(), d.getNamesMatchDeclared(),
+				dui == null ? null : DuiValidator.hasValidCheckDigit(dui),
+				d.effectiveExpiryDate() == null ? null : d.isExpired(LocalDate.now(EL_SALVADOR)), d.getLooksAuthentic(),
+				d.getConfidence(), identityDocumentImages.findSidesByRequestId(d.getRequestId()), d.getProcessedAt());
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {

@@ -61,7 +61,7 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 
 	@Schema(name = "ConsoleRequestStepTime")
 	public record StepTime(OnboardingStep step, Instant startedAt, Instant completedAt, Integer durationSeconds,
-			Short attempts) {
+			Short attempts, BigDecimal typingSpeedCps) {
 	}
 
 	@Schema(name = "ConsoleRequestTimelineEntry")

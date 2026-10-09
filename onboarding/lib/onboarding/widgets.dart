@@ -119,11 +119,19 @@ class ErrorText extends StatelessWidget {
   }
 }
 
-/// Formatter that replaces the text with `format(text)` and puts the cursor at the end.
+/// Formatter that replaces the text with `format(text)` (a mask of digits such as DUI or phone).
+/// The cursor stays after the same digit it was after, so a digit can be fixed in the middle
+/// without the cursor jumping to the end.
 TextInputFormatter maskFormatter(String Function(String) format) {
   return TextInputFormatter.withFunction((_, newValue) {
     final t = format(newValue.text);
-    return TextEditingValue(text: t, selection: TextSelection.collapsed(offset: t.length));
+    final cursor = newValue.selection.isValid ? newValue.selection.extentOffset : newValue.text.length;
+    final digitsBefore = newValue.text.substring(0, cursor.clamp(0, newValue.text.length)).replaceAll(RegExp(r'\D'), '').length;
+    var offset = 0;
+    for (var seen = 0; offset < t.length && seen < digitsBefore; offset++) {
+      if (RegExp(r'\d').hasMatch(t[offset])) seen++;
+    }
+    return TextEditingValue(text: t, selection: TextSelection.collapsed(offset: offset));
   });
 }
 

@@ -349,9 +349,9 @@ void main() {
       final fake = FakeApi(basicDataErrors: [400]);
       await tester.pumpWidget(app(fake));
       await tap(tester, find.text('EMPEZAR'));
-      await tap(tester, find.byType(Checkbox));
+      await acceptNotice(tester);
       await tapContinue(tester);
-      await tap(tester, find.text('Rellenar con datos de ejemplo (demo)'));
+      await fillBasicData(tester);
 
       await tapContinue(tester);
       expect(find.text('Revisa estos datos e inténtalo de nuevo: nombres.'), findsOneWidget);

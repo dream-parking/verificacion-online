@@ -30,3 +30,4 @@ Lienzo original (editable): https://claude.ai/artifact/35dGM4tBJHR9FGu3TTCTRL
 - RNPN, prueba de vida y listas internas aparecen como «Llega en otro sprint»: no suman ni restan al score.
 - La versión del aviso queda como `[X.Y]` hasta que Legal apruebe el texto.
 - Las fotos del DUI son dibujos de relleno, no imágenes reales.
+- El número SOL-… solo existe cuando la solicitud se envía; antes se muestra "Sin número aún" (consola) o la fecha de inicio (app).

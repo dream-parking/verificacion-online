@@ -7,6 +7,7 @@ Definition of Done del equipo (Los Alan-bres Ágiles) y cómo se hace cumplir. "
 | Sin errores de sintaxis ni incongruencias de variables (no declaradas, sin usar) | Compilación/`flutter analyze`/`eslint`/`next build` en el CI + Quality Gate de Sonar: *Sonar way*: reliability **A** y maintainability **A** sobre el código nuevo (las variables sin usar son *code smells*) | Automático |
 | Convención de nombres acordada | Reglas de nombres de Sonar (maintainability **A**) + lints (`eslint`, `flutter analyze`) | Automático |
 | Pruebas unitarias con **≥ 40 %** de cobertura sobre el código fuente | Backend: JaCoCo `check` en `verify` (mínimo **70 %**, más estricto que la DoD). Onboarding: paso "Cobertura mínima" del CI (**40 %**). Sonar (gate *Sonar way*): cobertura del código **nuevo** ≥ 80 % | Automático |
+| Toda entrada de texto de la API declara su formato (nombres, texto libre, códigos…) | Backend: `InputFormatRulesTests` falla si un `String` de un cuerpo, parámetro de búsqueda o variable de ruta no tiene una anotación de `common.validation` (o `@Pattern`) y su `@Size` | Automático |
 | Revisado por Scrum Master y QA antes de integrar a la rama principal | Revisión de PR | Manual (ver "Pendiente") |
 | Cada cambio en su propia rama; se unifica al main solo tras la revisión | Los `required checks` impiden el push directo a `dev`, `QA` y `main`; todo entra por PR | Automático |
 | Desplegado en un ambiente accesible por internet en la nube | Despliegue automático de `dev` (Dev) y `QA` (QA) a Azure; ver `docs/cicd.md` | Automático |

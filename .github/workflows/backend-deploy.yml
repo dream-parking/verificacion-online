@@ -72,7 +72,8 @@ jobs:
           inlineScript: |
             APP=ca-verificaciononline-api-${APP_ENV}
             az containerapp ingress update -n "$APP" -g "$RESOURCE_GROUP" --target-port 8080 -o none
-            az containerapp update -n "$APP" -g "$RESOURCE_GROUP" \
+            # 0.25 vCPU / 0.5 GiB doubles the free grant (~200 replica-hours/month shared by dev+qa).
+            az containerapp update -n "$APP" -g "$RESOURCE_GROUP" --cpu 0.25 --memory 0.5Gi \
               --image "$IMAGE:${{ github.sha }}" --set-env-vars APP_ENV="$APP_ENV" SPRING_PROFILES_ACTIVE=dev -o none
             FQDN=$(az containerapp show -n "$APP" -g "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)
             echo "FQDN=$FQDN" >> "$GITHUB_ENV"

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import com.dreamparking.backend.identity.entity.enums.DocumentSide;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.entity.enums.UnreadableReason;
+import com.dreamparking.backend.identity.entity.enums.UnreadableSide;
 import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
@@ -34,16 +35,23 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 	}
 
 	/**
-	 * What was read from the DUI (VDI-79) and how it compares with what the customer confirmed. The photos are
-	 * downloaded one by one from {@code /identity-document/{side}}; {@code photos} lists the sides on file.
-	 * {@code checkDigitValid} is about the number read; {@code expired} compares the expiry date with today.
+	 * The DUI (VDI-79, VDI-81): what was read from the photos next to what the customer confirmed, the fields the
+	 * customer corrected, and how the confirmed data compares with the basic data. The photos are downloaded one by
+	 * one from {@code /identity-document/{side}}; {@code photos} lists the sides on file. {@code confirmed} is null
+	 * until the customer confirms. {@code checkDigitValid} and {@code expired} use the confirmed data, else the read one.
 	 */
 	@Schema(name = "ConsoleRequestIdentityDocument")
 	public record IdentityDocument(OcrStatus ocrStatus, String ocrModel, short attempts,
-			UnreadableReason unreadableReason, String failure, String dui, String firstNames, String lastNames,
-			LocalDate birthDate, LocalDate issueDate, LocalDate expiryDate, String gender, Boolean checkDigitValid,
-			Boolean expired, Boolean looksAuthentic, BigDecimal confidence, Boolean duiMatchesDeclared,
-			List<String> correctedFields, List<DocumentSide> photos, Instant processedAt) {
+			UnreadableReason unreadableReason, UnreadableSide unreadableSide, String failure, DuiData read,
+			DuiData confirmed, Instant confirmedAt, List<String> correctedFields, Boolean duiMatchesDeclared,
+			Boolean namesMatchDeclared, Boolean checkDigitValid, Boolean expired, Boolean looksAuthentic,
+			BigDecimal confidence, List<DocumentSide> photos, Instant processedAt) {
+	}
+
+	/** Data of a DUI, as read or as confirmed. Fields not read are null. */
+	@Schema(name = "ConsoleRequestDuiData")
+	public record DuiData(String dui, String firstNames, String lastNames, LocalDate birthDate, LocalDate issueDate,
+			LocalDate expiryDate, String gender) {
 	}
 
 	/** Declared income (VDI-23). {@code registeredAt} is the original declaration time and never changes. */

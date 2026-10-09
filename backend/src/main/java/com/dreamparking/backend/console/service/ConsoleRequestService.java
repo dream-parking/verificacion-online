@@ -16,6 +16,7 @@ import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.console.dto.ConsoleRequestDetail;
 import com.dreamparking.backend.console.dto.ConsoleRequestListItem;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
+import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.repository.IdentityDocumentImageRepository;
 import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
 import com.dreamparking.backend.identity.service.DuiValidator;
@@ -175,13 +176,18 @@ public class ConsoleRequestService {
 	}
 
 	private ConsoleRequestDetail.IdentityDocument toIdentityDocument(IdentityDocument d) {
+		var read = d.getStatus() == OcrStatus.READ ? new ConsoleRequestDetail.DuiData(d.getDui(), d.getFirstNames(),
+				d.getLastNames(), d.getBirthDate(), d.getIssueDate(), d.getExpiryDate(), d.getGender()) : null;
+		var confirmed = d.isConfirmed() ? new ConsoleRequestDetail.DuiData(d.getConfirmedDui(),
+				d.getConfirmedFirstNames(), d.getConfirmedLastNames(), d.getConfirmedBirthDate(), null,
+				d.getConfirmedExpiryDate(), null) : null;
+		String dui = d.isConfirmed() ? d.getConfirmedDui() : d.getDui();
 		return new ConsoleRequestDetail.IdentityDocument(d.getStatus(), d.getModel(), d.getAttempts(),
-				d.getUnreadableReason(), d.getFailure(), d.getDui(), d.getFirstNames(), d.getLastNames(),
-				d.getBirthDate(), d.getIssueDate(), d.getExpiryDate(), d.getGender(),
-				d.getDui() == null ? null : DuiValidator.hasValidCheckDigit(d.getDui()),
-				d.getExpiryDate() == null ? null : d.isExpired(LocalDate.now(EL_SALVADOR)), d.getLooksAuthentic(),
-				d.getConfidence(), d.getDuiMatchesDeclared(), d.getCorrectedFields(),
-				identityDocumentImages.findSidesByRequestId(d.getRequestId()), d.getProcessedAt());
+				d.getUnreadableReason(), d.getUnreadableSide(), d.getFailure(), read, confirmed, d.getConfirmedAt(),
+				d.getCorrectedFields(), d.getDuiMatchesDeclared(), d.getNamesMatchDeclared(),
+				dui == null ? null : DuiValidator.hasValidCheckDigit(dui),
+				d.effectiveExpiryDate() == null ? null : d.isExpired(LocalDate.now(EL_SALVADOR)), d.getLooksAuthentic(),
+				d.getConfidence(), identityDocumentImages.findSidesByRequestId(d.getRequestId()), d.getProcessedAt());
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {

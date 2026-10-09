@@ -37,7 +37,7 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 | `QA` | QA | `ca-verificaciononline-api-qa` | `verificacion_qa` (rol `app_qa`) |
 
 - Región: South Central US (Central US no tenía capacidad para Container Apps al crear el entorno).
-- Hosting: Azure Container Apps (consumo), escala a cero, máx. 1 réplica, 0.5 vCPU / 1 GiB, sin Log Analytics. La franja gratis es por suscripción: 180 000 vCPU-s, 360 000 GiB-s y 2 M de requests al mes. Primera petición tras inactividad = arranque en frío (~30-60 s).
+- Hosting: Azure Container Apps (consumo), escala a cero, máx. 1 réplica, 0.25 vCPU / 0.5 GiB (fijado en `backend-deploy.yml`), sin Log Analytics. La franja gratis es por suscripción: 180 000 vCPU-s, 360 000 GiB-s y 2 M de requests al mes, unas 200 horas de réplica encendida entre dev y qa (con 0.5 vCPU / 1 GiB eran 100 h y nos pasábamos). Cada request mantiene la réplica viva ~5 min. Primera petición tras inactividad = arranque en frío (~30 s; Spring arranca en ~11 s).
 - Base de datos: **un** servidor `psql-verificaciononline` (PostgreSQL 17, Burstable B1ms, 32 GiB) con **dos** bases. Cada rol solo accede a la suya. Firewall: solo "servicios de Azure".
 - Conexión: la app lee `DB_URL`, `DB_USER` y `DB_PASSWORD` (esta última es un secret de la Container App). Flyway aplica las migraciones de `backend/src/main/resources/db/migration` al arrancar.
 - Imagen: `ghcr.io/dream-parking/verificacion-online-backend` (tags `<sha>`, `dev`, `qa`). Es **pública** para que Azure la descargue sin credenciales sin necesitar un Container Registry (de pago).

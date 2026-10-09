@@ -134,7 +134,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   /// VDI-43: typing speed in the text fields (only after the notice is accepted).
   void _onTyped(String field, String text) {
-    if (_form.captureAllowed) _signals.typing.record(field, text, widget.clock());
+    if (_form.captureAllowed) _signals.recordTyping(_screen, field, text, widget.clock());
   }
 
   void _continue() {

@@ -40,6 +40,21 @@ String _nameMessage(String raw, String missing) {
   return '';
 }
 
+/// Longest income detail the API accepts (`IncomeDeclarationRequest.sourceDetail`).
+const maxIncomeDetailLength = 150;
+
+/// Income detail: letters, numbers, spaces and basic punctuation; no emojis or other symbols.
+final _detailPattern = RegExp(r'^[\p{L}\p{N} .,\-/()]+$', unicode: true);
+
+String _incomeDetailMessage(String raw) {
+  final detail = normalizeName(raw);
+  if (detail.length < 3) return 'Cuéntanos de dónde vienen tus ingresos.';
+  if (!_detailPattern.hasMatch(detail)) {
+    return 'Usa solo letras, números y los signos . , - / ( ), sin emojis ni otros símbolos.';
+  }
+  return '';
+}
+
 String labelOf(List<Option> options, String value) {
   for (final o in options) {
     if (o.value == value) return o.label;
@@ -85,9 +100,7 @@ class ApplicationForm {
           ? ''
           : 'Escribe un celular de 8 dígitos que empiece con 6 o 7, por ejemplo 7845-2310.',
       'incomeSource': incomeSource.isNotEmpty ? '' : 'Elige de dónde vienen tus ingresos.',
-      'incomeSourceDetail': incomeSource == otherIncomeSource && incomeSourceDetail.trim().isEmpty
-          ? 'Cuéntanos de dónde vienen tus ingresos.'
-          : '',
+      'incomeSourceDetail': incomeSource == otherIncomeSource ? _incomeDetailMessage(incomeSourceDetail) : '',
       'incomeRange': incomeRange.isNotEmpty ? '' : 'Elige tu nivel de ingresos mensuales.',
       'transactionType': transactionType.isNotEmpty ? '' : 'Elige qué tipo de dinero manejarás.',
       'amountRange': amountRange.isNotEmpty ? '' : 'Elige cuánto dinero moverás al mes.',

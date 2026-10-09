@@ -77,6 +77,10 @@ public class OnboardingSession {
 	@Column(name = "ended_at")
 	private Instant endedAt;
 
+	/** Last time the app sent the signals; every signal of the session is replaced together. */
+	@Column(name = "captured_at", nullable = false)
+	private Instant capturedAt;
+
 	public UUID getId() {
 		return id;
 	}
@@ -171,6 +175,14 @@ public class OnboardingSession {
 
 	public void setEndedAt(Instant endedAt) {
 		this.endedAt = endedAt;
+	}
+
+	public Instant getCapturedAt() {
+		return capturedAt;
+	}
+
+	public void setCapturedAt(Instant capturedAt) {
+		this.capturedAt = capturedAt;
 	}
 
 }

@@ -134,7 +134,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   /// VDI-43: typing speed in the text fields (only after the notice is accepted).
   void _onTyped(String field, String text) {
-    if (_form.captureAllowed) _signals.typing.record(field, text, widget.clock());
+    if (_form.captureAllowed) _signals.recordTyping(_screen, field, text, widget.clock());
   }
 
   void _continue() {
@@ -181,7 +181,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _form.id!,
         source: _form.incomeSource,
         range: _form.incomeRange,
-        detail: _form.incomeSource == otherIncomeSource ? _form.incomeSourceDetail.trim() : null,
+        detail: _form.incomeSource == otherIncomeSource ? normalizeName(_form.incomeSourceDetail) : null,
       );
 
   /// VDI-51: saves the transaction type and the monthly amount range in the API.
@@ -601,12 +601,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const InfoBox(
-                highlight: '¿Por qué lo preguntamos?',
-                text: 'La ley exige que el banco conozca el origen de tus ingresos. '
-                    'Se llama «Conozca a su Cliente».',
-              ),
-              const SizedBox(height: 24),
               if (catalogs == null)
                 _optionsPlaceholder()
               else ...[
@@ -620,7 +614,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     controller: _incomeSourceDetail,
                     label: '¿De dónde vienen tus ingresos?',
                     placeholder: 'Por ejemplo, venta de artesanías',
-                    formatters: [LengthLimitingTextInputFormatter(150)],
+                    formatters: [LengthLimitingTextInputFormatter(maxIncomeDetailLength)],
                     error: detailError,
                     onChanged: (v) {
                       _onTyped('incomeSourceDetail', v);

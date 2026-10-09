@@ -69,6 +69,28 @@ class ApiErrorTests {
 	}
 
 	@Test
+	void aRegisteredDuiOrPhoneCannotBeTakenOver() throws Exception {
+		// Demo customer: 04812377-5, Marta Alejandra Rivas Cruz, 7845-2310.
+		String id = startRequest();
+		mvc.perform(put("/api/onboarding/requests/{id}/basic-data", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{"dui": "04812377-5", "firstNames": "Otra", "lastNames": "Persona", "mobilePhone": "7123-4567"}
+				"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.detail").value("El DUI ya se encuentra registrado"));
+
+		mvc.perform(put("/api/onboarding/requests/{id}/basic-data", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{"dui": "01234567-8", "firstNames": "Ana", "lastNames": "Pérez", "mobilePhone": "7845-2310"}
+				"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.detail").value("El número de celular ya está en uso"));
+
+		mvc.perform(put("/api/onboarding/requests/{id}/basic-data", id).contentType(MediaType.APPLICATION_JSON).content("""
+				{"dui": "04812377-5", "firstNames": "Marta Alejandra", "lastNames": "Rivas Cruz", "mobilePhone": "7845-2310"}
+				"""))
+			.andExpect(status().isOk());
+	}
+
+	@Test
 	void malformedBodiesAndPathsAreBadRequests() throws Exception {
 		String id = startRequest();
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", id).contentType(MediaType.APPLICATION_JSON)

@@ -1,8 +1,22 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// APP_ENV comes from `--dart-define=APP_ENV=dev|qa`; Flutter hands dart-defines to Gradle
+// base64-encoded. Dev and QA get their own application id so both fit on one phone.
+val appEnv: String = (findProperty("dart-defines") as String?)
+    ?.split(",")
+    ?.map { String(Base64.getDecoder().decode(it)) }
+    ?.firstOrNull { it.startsWith("APP_ENV=") }
+    ?.substringAfter("=")
+    ?: "local"
+
+// CI decodes the release keystore into this path; local builds fall back to the debug key.
+val releaseKeystore: String? = System.getenv("ANDROID_KEYSTORE_PATH")
 
 android {
     namespace = "com.dreamparking.onboarding"
@@ -15,8 +29,18 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.dreamparking.onboarding"
+        when (appEnv) {
+            "dev" -> {
+                applicationIdSuffix = ".dev"
+                manifestPlaceholders["appLabel"] = "Tangamandapio Dev"
+            }
+            "qa" -> {
+                applicationIdSuffix = ".qa"
+                manifestPlaceholders["appLabel"] = "Tangamandapio QA"
+            }
+            else -> manifestPlaceholders["appLabel"] = "Tangamandapio"
+        }
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -29,11 +53,21 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Without the CI keystore, sign with the debug key so `flutter run --release` works.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 }

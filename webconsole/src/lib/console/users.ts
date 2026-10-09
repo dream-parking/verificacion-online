@@ -42,3 +42,26 @@ export function resetPasswordMessage(e: unknown): string {
 export function resetPassword(token: string, userId: string, newPassword: string) {
   return apiFetch<void>(`/api/console/users/${userId}/password`, { token, method: "POST", body: { newPassword } });
 }
+
+/** Changes the password of the signed-in person (POST /auth/change-password). */
+export function changePassword(token: string, currentPassword: string, newPassword: string) {
+  return apiFetch<void>("/api/console/auth/change-password", {
+    token,
+    method: "POST",
+    body: { currentPassword, newPassword },
+  });
+}
+
+/** Message to show when the API rejects the password change. */
+export function changePasswordMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 400) {
+      return e.detail
+        ? `El servidor no aceptó el cambio: ${e.detail}`
+        : "La contraseña actual no es correcta o la nueva no cumple la política. Revisa los dos campos.";
+    }
+    if (e.status === 401) return "Tu sesión terminó. Inicia sesión de nuevo.";
+    if (e.status === 0) return "No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.";
+  }
+  return "No pudimos cambiar la contraseña. Intenta de nuevo.";
+}

@@ -310,6 +310,13 @@
           "step" : {
             "enum" : [ "PRIVACY_NOTICE", "IDENTITY_DOCUMENT", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
             "type" : "string"
+          },
+          "typingSpeedCps" : {
+            "description" : "Velocidad de escritura en la pantalla, en caracteres por segundo; se omite si no se escribió nada",
+            "example" : 3.25,
+            "maximum" : 50,
+            "minimum" : 0,
+            "type" : "number"
           }
         },
         "required" : [ "startedAt", "step" ],
@@ -726,6 +733,11 @@
           "approximateLocation" : {
             "type" : "string"
           },
+          "capturedAt" : {
+            "description" : "Fecha y hora en que la app envió las señales por última vez",
+            "format" : "date-time",
+            "type" : "string"
+          },
           "device" : {
             "type" : "string"
           },
@@ -791,6 +803,9 @@
           "step" : {
             "enum" : [ "PRIVACY_NOTICE", "IDENTITY_DOCUMENT", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
             "type" : "string"
+          },
+          "typingSpeedCps" : {
+            "type" : "number"
           }
         },
         "type" : "object"
@@ -3879,7 +3894,7 @@
     },
     "/api/onboarding/requests/{requestId}/basic-data" : {
       "put" : {
-        "description" : "DUI (00000000-0), nombres, apellidos y celular (7000-0000). Si el DUI ya existe se reutiliza el cliente.",
+        "description" : "DUI (00000000-0), nombres, apellidos y celular (7000-0000). Un DUI ya registrado con otros nombres o celular, o un celular de otro DUI, se rechaza con 409.",
         "operationId" : "onboardingRegisterBasicData",
         "parameters" : [ {
           "in" : "path",
@@ -3939,7 +3954,7 @@
                 }
               }
             },
-            "description" : "La solicitud ya no está en progreso"
+            "description" : "La solicitud ya no está en progreso, el DUI ya está registrado o el celular ya está en uso"
           }
         },
         "summary" : "Registra los datos básicos del cliente",

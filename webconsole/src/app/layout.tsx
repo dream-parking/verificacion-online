@@ -14,7 +14,7 @@ const openSans = Open_Sans({
   weight: ["400", "600", "700"],
 });
 
-// Letra con serifas del nombre del banco, parecida a la del logo.
+// Serif font of the bank name, similar to the logo's.
 const cinzel = Cinzel({
   variable: "--font-cinzel",
   subsets: ["latin"],

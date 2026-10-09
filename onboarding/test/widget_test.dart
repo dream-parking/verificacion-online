@@ -609,6 +609,7 @@ void main() {
         await tap(tester, find.text('Otro'));
         await tap(tester, find.text('Hasta USD 500'));
         await tapContinue(tester);
+        expect(find.text('¿Por qué lo preguntamos?', findRichText: true), findsNothing);
         expect(find.text('Cuéntanos de dónde vienen tus ingresos.'), findsOneWidget);
         expect(find.text('Paso 2 de 4'), findsOneWidget);
 

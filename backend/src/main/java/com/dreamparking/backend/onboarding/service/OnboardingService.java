@@ -147,7 +147,7 @@ public class OnboardingService {
 		}
 
 		Customer customer = customerService.register(body.dui(), body.firstNames().trim(), body.lastNames().trim(),
-				body.mobilePhone());
+				body.mobilePhone(), request.getCustomer());
 		request.setCustomer(customer);
 		request.setDui(customer.getDui());
 		request.setFirstNames(customer.getFirstNames());

@@ -73,7 +73,7 @@ export function AlertsView() {
   const list = alerts.data ?? [];
   const unassigned = list.filter((x) => x.status === "UNASSIGNED").length;
   const mine = list.filter((x) => x.assigneeId === user.id).length;
-  const assignees = [...new Set(list.flatMap((x) => (x.assigneeName ? [x.assigneeName] : [])))].sort();
+  const assignees = [...new Set(list.flatMap((x) => (x.assigneeName ? [x.assigneeName] : [])))].sort((a, b) => a.localeCompare(b, "es"));
   const digits = f.account.replace(/\D/g, "");
   const reason = f.reason.trim().toLowerCase();
 

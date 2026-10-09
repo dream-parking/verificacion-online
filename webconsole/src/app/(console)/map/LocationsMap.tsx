@@ -62,7 +62,7 @@ export function LocationsMap({
   // Create the map once. Leaflet needs the browser, so it is loaded here and not on the server.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       const leafletModule = await import("leaflet");
       const L = (leafletModule as unknown as { default?: typeof import("leaflet") }).default ?? leafletModule;
       if (cancelled || !container.current) return;

@@ -115,10 +115,10 @@ public class OnboardingController {
 
 	@ApiResponse(responseCode = "200", description = "Resumen de la solicitud con el paso completado")
 	@Operation(summary = "Registra los datos básicos del cliente",
-			description = "DUI (00000000-0), nombres, apellidos y celular (7000-0000). Si el DUI ya existe se reutiliza el cliente.")
+			description = "DUI (00000000-0), nombres, apellidos y celular (7000-0000). Un DUI ya registrado con otros nombres o celular, o un celular de otro DUI, se rechaza con 409.")
 	@ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content)
 	@ApiResponse(responseCode = "404", description = "La solicitud no existe", content = @Content)
-	@ApiResponse(responseCode = "409", description = "La solicitud ya no está en progreso", content = @Content)
+	@ApiResponse(responseCode = "409", description = "La solicitud ya no está en progreso, el DUI ya está registrado o el celular ya está en uso", content = @Content)
 	@PutMapping("/{requestId}/basic-data")
 	public OnboardingRequestResponse registerBasicData(@PathVariable UUID requestId,
 			@Valid @RequestBody BasicDataRequest body) {

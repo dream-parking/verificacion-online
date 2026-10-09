@@ -41,11 +41,11 @@ import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 import com.dreamparking.backend.risk.service.RiskAssessmentService;
 
 /**
- * Steps of the mobile onboarding flow: privacy notice → identity document (DUI) → basic data → income → expected
+ * Steps of the mobile onboarding flow: privacy notice → basic data → identity document (DUI) → income → expected
  * activity → submit. Steps can be saved again while the request is in progress; {@code completedSteps} only advances
- * in order, and the request can only be submitted once the five steps are done. The DUI step is captured by
- * {@code IdentityDocumentService}; until the app has that screen it can be made optional
- * ({@code app.onboarding.identity-document-required=false}), and then the basic data step skips it. The time spent on each step is measured by
+ * in order, and the request can only be submitted once the five steps are done. The DUI step is captured and
+ * confirmed through {@code IdentityDocumentService}; until the app has those screens it can be made optional
+ * ({@code app.onboarding.identity-document-required=false}), and then the income step skips it. The time spent on each step is measured by
  * the app and stored by {@link SignalsService}: this service only tracks the progress.
  */
 @Service
@@ -123,28 +123,10 @@ public class OnboardingService {
 		return OnboardingRequestResponse.of(request);
 	}
 
-	/**
-	 * Step 2: the DUI photos were stored and read (or the reader failed and the customer will type the data). Called
-	 * by {@code IdentityDocumentService} only when the step can advance: unreadable photos do not complete it.
-	 */
-	@Transactional
-	public void completeIdentityDocument(OnboardingRequest request, OcrStatus ocrStatus) {
-		completeStep(request, OnboardingStep.IDENTITY_DOCUMENT);
-		recordEvent(request, RequestEventType.IDENTITY_DOCUMENT_CAPTURED,
-				ocrStatus == OcrStatus.READ ? "DUI capturado y leído" : "DUI capturado; datos para escribir a mano",
-				Map.of("ocrStatus", ocrStatus.name()));
-	}
-
-	/**
-	 * Step 3: identifies the customer with the data confirmed or corrected from the DUI reading. The request keeps a
-	 * snapshot of the data as declared, and the reading records what the customer changed.
-	 */
+	/** Step 2: identifies the customer. The request keeps a snapshot of the data as declared. */
 	@Transactional
 	public OnboardingRequestResponse registerBasicData(UUID requestId, BasicDataRequest body) {
 		OnboardingRequest request = findInProgress(requestId);
-		if (!identityDocumentRequired && request.getCompletedSteps() == OnboardingStep.IDENTITY_DOCUMENT.ordinal()) {
-			request.setCompletedSteps((short) (OnboardingStep.IDENTITY_DOCUMENT.ordinal() + 1));
-		}
 
 		Customer customer = customerService.register(body.dui(), body.firstNames().trim(), body.lastNames().trim(),
 				body.mobilePhone(), request.getCustomer());
@@ -153,18 +135,45 @@ public class OnboardingService {
 		request.setFirstNames(customer.getFirstNames());
 		request.setLastNames(customer.getLastNames());
 		request.setMobilePhone(customer.getMobilePhone());
+		// Corrected after confirming the DUI: compare again with what the customer confirmed.
 		identityDocuments.findById(requestId)
-			.ifPresent(document -> document.confirm(customer.getDui(), request.getFirstNames(), request.getLastNames()));
+			.ifPresent(document -> document.compareWithDeclared(request.getDui(), request.getFirstNames(),
+					request.getLastNames()));
 
 		completeStep(request, OnboardingStep.BASIC_DATA);
 		recordEvent(request, RequestEventType.BASIC_DATA_COMPLETED, "Datos básicos completados");
 		return OnboardingRequestResponse.of(request);
 	}
 
-	/** Step 4: saves (or replaces) the declared income source and range. */
+	/** The DUI photos of the request were stored and read (or could not be read); the step does not advance yet. */
+	@Transactional
+	public void recordIdentityDocumentCaptured(OnboardingRequest request, OcrStatus ocrStatus) {
+		String description = switch (ocrStatus) {
+			case READ -> "Fotos del DUI capturadas y leídas";
+			case UNREADABLE -> "Fotos del DUI ilegibles";
+			case FAILED -> "Fotos del DUI capturadas; el lector no estuvo disponible";
+		};
+		recordEvent(request, RequestEventType.IDENTITY_DOCUMENT_CAPTURED, description,
+				Map.of("ocrStatus", ocrStatus.name()));
+	}
+
+	/** Step 3: the customer confirmed or corrected the data read from the DUI. */
+	@Transactional
+	public void completeIdentityDocument(OnboardingRequest request) {
+		completeStep(request, OnboardingStep.IDENTITY_DOCUMENT);
+		recordEvent(request, RequestEventType.IDENTITY_DOCUMENT_CONFIRMED, "Datos del DUI confirmados");
+	}
+
+	/**
+	 * Step 4: saves (or replaces) the declared income source and range. While the DUI step is optional, a request
+	 * right after the basic data skips it.
+	 */
 	@Transactional
 	public void declareIncome(UUID requestId, IncomeDeclarationRequest body) {
 		OnboardingRequest request = findInProgress(requestId);
+		if (!identityDocumentRequired && request.getCompletedSteps() == OnboardingStep.IDENTITY_DOCUMENT.ordinal()) {
+			request.setCompletedSteps((short) (OnboardingStep.IDENTITY_DOCUMENT.ordinal() + 1));
+		}
 		IncomeSource source = catalogService.activeIncomeSource(body.sourceCode());
 		if (OTHER_INCOME_SOURCE.equals(source.getCode())
 				&& (body.sourceDetail() == null || body.sourceDetail().isBlank())) {
@@ -206,6 +215,10 @@ public class OnboardingService {
 		int stepsBeforeReview = OnboardingStep.REVIEW.ordinal();
 		if (request.getCompletedSteps() < stepsBeforeReview) {
 			throw new InvalidStateException("Complete the " + stepsBeforeReview + " previous steps before submitting");
+		}
+		if (identityDocuments.findById(requestId).filter(document -> !document.isConfirmed()).isPresent()) {
+			// New DUI photos after confirming: the customer has to confirm their data again.
+			throw new InvalidStateException("Confirm the data of the identity document before submitting");
 		}
 
 		Instant now = Instant.now();

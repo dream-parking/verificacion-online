@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.dreamparking.backend.common.exception.InvalidInputException;
+import com.dreamparking.backend.common.exception.InvalidStateException;
 import com.dreamparking.backend.common.exception.NotFoundException;
+import com.dreamparking.backend.identity.dto.ConfirmIdentityDocumentRequest;
 import com.dreamparking.backend.identity.dto.IdentityDocumentResponse;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
 import com.dreamparking.backend.identity.entity.IdentityDocumentImage;
@@ -25,14 +27,16 @@ import com.dreamparking.backend.identity.ocr.DuiOcrException;
 import com.dreamparking.backend.identity.ocr.DuiReading;
 import com.dreamparking.backend.identity.repository.IdentityDocumentImageRepository;
 import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
+import com.dreamparking.backend.onboarding.dto.OnboardingRequestResponse;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.service.OnboardingService;
 
 /**
- * Identity document step (VDI-79, VDI-80): stores the DUI photos encrypted and reads their data. Unreadable photos
- * are kept (the last attempt) but do not complete the step; a provider failure does, so an outage never blocks the
- * request and the customer types the data instead. The provider call runs outside the database transaction so a slow
- * answer does not hold a connection of the small pool.
+ * Identity document step (VDI-79, VDI-80), after the basic data: stores the DUI photos encrypted, reads their data,
+ * and records what the customer confirms or corrects, which completes the step. Unreadable photos are kept (the last
+ * attempt) and answered with an error so the customer takes them again; a provider failure is not an error, so an
+ * outage never blocks the request and the customer types the data on the confirmation screen. The provider call runs
+ * outside the database transaction so a slow answer does not hold a connection of the small pool.
  */
 @Service
 public class IdentityDocumentService {
@@ -78,7 +82,7 @@ public class IdentityDocumentService {
 	public IdentityDocumentResponse capture(UUID requestId, byte[] front, byte[] back) {
 		DocumentPhoto frontPhoto = photo("front", front);
 		DocumentPhoto backPhoto = photo("back", back);
-		transactions.executeWithoutResult(status -> onboardingService.findInProgress(requestId));
+		transactions.executeWithoutResult(status -> withBasicData(requestId));
 
 		DuiReading reading = null;
 		String failure = null;
@@ -94,9 +98,37 @@ public class IdentityDocumentService {
 		String failed = failure;
 		IdentityDocument document = transactions.execute(tx -> save(requestId, frontPhoto, backPhoto, status, read, failed));
 		if (document.getStatus() == OcrStatus.UNREADABLE) {
-			throw new UnreadableDocumentException(document.getUnreadableReason());
+			throw new UnreadableDocumentException(document.getUnreadableReason(), document.getUnreadableSide());
 		}
 		return IdentityDocumentResponse.of(document);
+	}
+
+	/**
+	 * The customer confirmed or corrected the data read from the DUI: completes the step. The confirmed data is
+	 * compared with the basic data; a difference is a risk signal, not an error.
+	 */
+	@Transactional
+	public OnboardingRequestResponse confirm(UUID requestId, ConfirmIdentityDocumentRequest body) {
+		OnboardingRequest request = withBasicData(requestId);
+		IdentityDocument document = documents.findById(requestId)
+			.filter(d -> d.getStatus() != OcrStatus.UNREADABLE)
+			.orElseThrow(() -> new InvalidStateException("Capture readable photos of the identity document first"));
+		Instant now = Instant.now();
+		document.confirm(body.dui(), body.firstNames().trim().replaceAll("\\s+", " "),
+				body.lastNames().trim().replaceAll("\\s+", " "), body.birthDate(), body.expiryDate(), now);
+		document.compareWithDeclared(request.getDui(), request.getFirstNames(), request.getLastNames());
+		onboardingService.completeIdentityDocument(request);
+		request.setLastActivityAt(now);
+		return OnboardingRequestResponse.of(request);
+	}
+
+	/** The DUI step comes after the basic data, which it is compared with. */
+	private OnboardingRequest withBasicData(UUID requestId) {
+		OnboardingRequest request = onboardingService.findInProgress(requestId);
+		if (request.getDui() == null) {
+			throw new InvalidStateException("Register the basic data before the identity document");
+		}
+		return request;
 	}
 
 	private static OcrStatus statusOf(DuiReading reading) {
@@ -108,7 +140,7 @@ public class IdentityDocumentService {
 
 	private IdentityDocument save(UUID requestId, DocumentPhoto front, DocumentPhoto back, OcrStatus status,
 			DuiReading reading, String failure) {
-		OnboardingRequest request = onboardingService.findInProgress(requestId);
+		OnboardingRequest request = withBasicData(requestId);
 		Instant now = Instant.now();
 
 		store(request, DocumentSide.FRONT, front, now);
@@ -116,15 +148,9 @@ public class IdentityDocumentService {
 
 		IdentityDocument document = documents.findById(requestId).orElseGet(() -> new IdentityDocument(request));
 		document.recordReading(status, reading, failure, ocr.model(), now);
-		if (request.getDui() != null) {
-			// Captured again after the basic data: compare with what the customer already confirmed.
-			document.confirm(request.getDui(), request.getFirstNames(), request.getLastNames());
-		}
 		documents.save(document);
 
-		if (status != OcrStatus.UNREADABLE) {
-			onboardingService.completeIdentityDocument(request, status);
-		}
+		onboardingService.recordIdentityDocumentCaptured(request, status);
 		request.setLastActivityAt(now);
 		return document;
 	}

@@ -45,14 +45,16 @@ import org.springframework.web.context.WebApplicationContext;
 import com.dreamparking.backend.console.entity.ConsoleUser;
 import com.dreamparking.backend.console.entity.enums.ConsoleRole;
 import com.dreamparking.backend.identity.entity.enums.UnreadableReason;
+import com.dreamparking.backend.identity.entity.enums.UnreadableSide;
 import com.dreamparking.backend.identity.ocr.DuiOcrClient;
 import com.dreamparking.backend.identity.ocr.DuiOcrException;
 import com.dreamparking.backend.identity.ocr.DuiReading;
 import com.jayway.jsonpath.JsonPath;
 
 /**
- * VDI-79 / VDI-80: DUI photos read by the OCR provider, the data confirmed in the basic data step, and the photos kept
- * encrypted in the file. The provider is mocked; its client has its own tests.
+ * VDI-79 / VDI-80, flow of the Sprint 2 prototype: basic data → DUI photos (read by the OCR provider) → the customer
+ * confirms or corrects the data read → income. The photos are kept encrypted in the file. The provider is mocked; its
+ * client has its own tests.
  */
 @Import({ TestcontainersConfiguration.class, TestAuth.class })
 @SpringBootTest
@@ -65,6 +67,16 @@ class IdentityDocumentApiTests {
 	static final byte[] FRONT = { (byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe0, 1, 2, 3, 4, 5 };
 
 	static final byte[] BACK = { (byte) 0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 9, 8, 7 };
+
+	static final String BASIC_DATA = """
+			{"dui": "04567891-2", "firstNames": "Marta Alejandra", "lastNames": "Rivas Cruz", "mobilePhone": "7123-4567"}
+			""";
+
+	/** What the customer confirms: accents kept (not a correction) and the birth date corrected. */
+	static final String CONFIRMATION = """
+			{"dui": "04567891-2", "firstNames": "Marta Alejandra", "lastNames": "Rivas Cruz",
+			 "birthDate": "1991-03-14", "expiryDate": "2031-07-22"}
+			""";
 
 	@Autowired
 	WebApplicationContext context;
@@ -92,55 +104,84 @@ class IdentityDocumentApiTests {
 		when(ocr.model()).thenReturn("gpt-6-astra");
 	}
 
-	static DuiReading anaSofia() {
-		return new DuiReading(true, null, "01234567-8", "Ana Sofia", "Pérez López", LocalDate.of(1994, 3, 2),
-				LocalDate.of(2021, 5, 10), LocalDate.of(2029, 5, 10), "F", true, new BigDecimal("0.97"));
+	static DuiReading marta() {
+		return new DuiReading(true, null, null, "04567891-2", "Marta Alejandra", "Rivas Cruz", LocalDate.of(1991, 8, 14),
+				LocalDate.of(2021, 7, 22), LocalDate.of(2031, 7, 22), "F", true, new BigDecimal("0.97"));
 	}
 
 	@Test
-	void readsTheDuiAndTheConsoleSeesWhatTheCustomerCorrected() throws Exception {
-		when(ocr.read(any(), any())).thenReturn(anaSofia());
-		String id = startAndAccept();
+	void readsTheDuiAndTheConsoleSeesWhatTheCustomerConfirmedAndCorrected() throws Exception {
+		when(ocr.read(any(), any())).thenReturn(marta());
+		String id = withBasicData();
 
 		upload(id, FRONT, BACK).andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("READ"))
 			.andExpect(jsonPath("$.attempts").value(1))
-			.andExpect(jsonPath("$.dui").value("01234567-8"))
-			.andExpect(jsonPath("$.firstNames").value("Ana Sofia"))
-			.andExpect(jsonPath("$.lastNames").value("Pérez López"))
-			.andExpect(jsonPath("$.birthDate").value("1994-03-02"))
-			.andExpect(jsonPath("$.expiryDate").value("2029-05-10"))
+			.andExpect(jsonPath("$.dui").value("04567891-2"))
+			.andExpect(jsonPath("$.firstNames").value("Marta Alejandra"))
+			.andExpect(jsonPath("$.lastNames").value("Rivas Cruz"))
+			.andExpect(jsonPath("$.birthDate").value("1991-08-14"))
+			.andExpect(jsonPath("$.expiryDate").value("2031-07-22"))
 			.andExpect(jsonPath("$.gender").value("F"))
 			// fraud signals stay in the console
 			.andExpect(jsonPath("$.looksAuthentic").doesNotExist())
 			.andExpect(jsonPath("$.confidence").doesNotExist());
+		// The photos alone do not complete the step: the customer confirms first.
 		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.completedSteps").value(2));
 
-		// The customer keeps the accent the OCR dropped (not a correction) and fixes the last names.
-		perform(put("/api/onboarding/requests/{id}/basic-data", id).content("""
-				{"dui": "01234567-8", "firstNames": "Ana Sofía", "lastNames": "Pérez Gómez", "mobilePhone": "7123-4567"}
-				""")).andExpect(jsonPath("$.completedSteps").value(3));
+		confirm(id, CONFIRMATION).andExpect(status().isOk()).andExpect(jsonPath("$.completedSteps").value(3));
 
 		flushAndClear();
 		mvc.perform(get("/api/console/requests/{id}", id))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.identityDocument.ocrStatus").value("READ"))
 			.andExpect(jsonPath("$.identityDocument.ocrModel").value("gpt-6-astra"))
-			.andExpect(jsonPath("$.identityDocument.dui").value("01234567-8"))
-			.andExpect(jsonPath("$.identityDocument.checkDigitValid").value(true))
+			.andExpect(jsonPath("$.identityDocument.read.birthDate").value("1991-08-14"))
+			.andExpect(jsonPath("$.identityDocument.confirmed.birthDate").value("1991-03-14"))
+			.andExpect(jsonPath("$.identityDocument.confirmed.firstNames").value("Marta Alejandra"))
+			.andExpect(jsonPath("$.identityDocument.confirmedAt").exists())
+			.andExpect(jsonPath("$.identityDocument.correctedFields").value(contains("birthDate")))
+			.andExpect(jsonPath("$.identityDocument.duiMatchesDeclared").value(true))
+			.andExpect(jsonPath("$.identityDocument.namesMatchDeclared").value(true))
+			.andExpect(jsonPath("$.identityDocument.checkDigitValid").value(false))
 			.andExpect(jsonPath("$.identityDocument.expired").value(false))
 			.andExpect(jsonPath("$.identityDocument.looksAuthentic").value(true))
 			.andExpect(jsonPath("$.identityDocument.confidence").value(0.97))
-			.andExpect(jsonPath("$.identityDocument.duiMatchesDeclared").value(true))
-			.andExpect(jsonPath("$.identityDocument.correctedFields").value(contains("lastNames")))
 			.andExpect(jsonPath("$.identityDocument.photos").value(contains("BACK", "FRONT")))
-			.andExpect(jsonPath("$.timeline[*].type").value(hasItem("IDENTITY_DOCUMENT_CAPTURED")));
+			.andExpect(jsonPath("$.timeline[*].type").value(hasItem("IDENTITY_DOCUMENT_CAPTURED")))
+			.andExpect(jsonPath("$.timeline[*].type").value(hasItem("IDENTITY_DOCUMENT_CONFIRMED")));
+	}
+
+	@Test
+	void aDuiDifferentFromTheBasicDataIsASignalNotAnError() throws Exception {
+		when(ocr.read(any(), any())).thenReturn(marta());
+		String id = withBasicData();
+		upload(id, FRONT, BACK).andExpect(status().isOk());
+
+		confirm(id, """
+				{"dui": "04567891-3", "firstNames": "Marta", "lastNames": "Rivas Cruz",
+				 "birthDate": "1991-08-14", "expiryDate": "2031-07-22"}
+				""").andExpect(status().isOk());
+		flushAndClear();
+		mvc.perform(get("/api/console/requests/{id}", id))
+			.andExpect(jsonPath("$.identityDocument.correctedFields").value(contains("dui", "firstNames")))
+			.andExpect(jsonPath("$.identityDocument.duiMatchesDeclared").value(false))
+			.andExpect(jsonPath("$.identityDocument.namesMatchDeclared").value(false));
+
+		// Fixing the basic data afterwards compares again.
+		perform(put("/api/onboarding/requests/{id}/basic-data", id).content("""
+				{"dui": "04567891-3", "firstNames": "Marta", "lastNames": "Rivas Cruz", "mobilePhone": "7123-4568"}
+				""")).andExpect(status().isOk());
+		flushAndClear();
+		mvc.perform(get("/api/console/requests/{id}", id))
+			.andExpect(jsonPath("$.identityDocument.duiMatchesDeclared").value(true))
+			.andExpect(jsonPath("$.identityDocument.namesMatchDeclared").value(true));
 	}
 
 	@Test
 	void theConsoleDownloadsTheDecryptedPhotoAndTheAccessIsAudited() throws Exception {
-		when(ocr.read(any(), any())).thenReturn(anaSofia());
-		String id = startAndAccept();
+		when(ocr.read(any(), any())).thenReturn(marta());
+		String id = withBasicData();
 		upload(id, FRONT, BACK).andExpect(status().isOk());
 		flushAndClear();
 
@@ -152,6 +193,8 @@ class IdentityDocumentApiTests {
 		mvc.perform(get("/api/console/requests/{id}/identity-document/BACK", id))
 			.andExpect(content().contentType(MediaType.IMAGE_PNG))
 			.andExpect(content().bytes(BACK));
+		mvc.perform(get("/api/console/requests/{id}/identity-document/FRONT", UUID.randomUUID()))
+			.andExpect(status().isNotFound());
 
 		Integer audits = jdbc.queryForObject(
 				"select count(*) from access_audit where user_id = ? and action = 'VIEW_IDENTITY_DOCUMENT' and entity_id = ?",
@@ -161,8 +204,8 @@ class IdentityDocumentApiTests {
 
 	@Test
 	void thePhotosAreStoredEncrypted() throws Exception {
-		when(ocr.read(any(), any())).thenReturn(anaSofia());
-		String id = startAndAccept();
+		when(ocr.read(any(), any())).thenReturn(marta());
+		String id = withBasicData();
 		upload(id, FRONT, BACK).andExpect(status().isOk());
 		flushAndClear();
 
@@ -177,60 +220,104 @@ class IdentityDocumentApiTests {
 	}
 
 	@Test
-	void unreadablePhotosDoNotAdvanceAndCanBeTakenAgain() throws Exception {
-		when(ocr.read(any(), any())).thenReturn(
-				new DuiReading(false, UnreadableReason.GLARE, null, null, null, null, null, null, null, true, null));
-		String id = startAndAccept();
+	void unreadablePhotosSayWhichSideToTakeAgain() throws Exception {
+		when(ocr.read(any(), any())).thenReturn(new DuiReading(false, UnreadableReason.GLARE, UnreadableSide.FRONT, null,
+				null, null, null, null, null, null, true, null));
+		String id = withBasicData();
 
 		upload(id, FRONT, BACK).andExpect(status().isUnprocessableContent())
 			.andExpect(jsonPath("$.reason").value("GLARE"))
+			.andExpect(jsonPath("$.side").value("FRONT"))
 			.andExpect(jsonPath("$.detail").value("The identity document photos cannot be read: GLARE"));
-		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.completedSteps").value(1));
+		// Nothing to confirm yet.
+		confirm(id, CONFIRMATION).andExpect(status().isConflict())
+			.andExpect(jsonPath("$.detail").value("Capture readable photos of the identity document first"));
 
 		// The attempt is on file for the console even though the request answered an error.
 		flushAndClear();
 		mvc.perform(get("/api/console/requests/{id}", id))
 			.andExpect(jsonPath("$.identityDocument.ocrStatus").value("UNREADABLE"))
-			.andExpect(jsonPath("$.identityDocument.unreadableReason").value("GLARE"));
+			.andExpect(jsonPath("$.identityDocument.unreadableReason").value("GLARE"))
+			.andExpect(jsonPath("$.identityDocument.unreadableSide").value("FRONT"))
+			.andExpect(jsonPath("$.identityDocument.read").doesNotExist());
 
-		when(ocr.read(any(), any())).thenReturn(anaSofia());
+		when(ocr.read(any(), any())).thenReturn(marta());
 		upload(id, FRONT, BACK).andExpect(status().isOk()).andExpect(jsonPath("$.attempts").value(2));
-		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.completedSteps").value(2));
+		confirm(id, CONFIRMATION).andExpect(jsonPath("$.completedSteps").value(3));
 	}
 
 	@Test
 	void aReadingWithoutTheDuiNumberIsUnreadable() throws Exception {
 		when(ocr.read(any(), any())).thenReturn(
-				new DuiReading(true, null, null, "Ana", "Pérez", null, null, null, null, true, null));
-		String id = startAndAccept();
+				new DuiReading(true, null, null, null, "Marta", "Rivas", null, null, null, null, true, null));
+		String id = withBasicData();
 
-		upload(id, FRONT, BACK).andExpect(status().isUnprocessableContent()).andExpect(jsonPath("$.reason").value("OTHER"));
+		upload(id, FRONT, BACK).andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.reason").value("OTHER"))
+			.andExpect(jsonPath("$.side").doesNotExist());
 	}
 
 	@Test
 	void aProviderFailureLetsTheCustomerTypeTheData() throws Exception {
 		when(ocr.read(any(), any())).thenThrow(new DuiOcrException("provider error: ResourceAccessException"));
-		String id = startAndAccept();
+		String id = withBasicData();
 
 		upload(id, FRONT, BACK).andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("FAILED"))
 			.andExpect(jsonPath("$.dui").doesNotExist());
-		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.completedSteps").value(2));
+		confirm(id, CONFIRMATION).andExpect(jsonPath("$.completedSteps").value(3));
 
-		perform(put("/api/onboarding/requests/{id}/basic-data", id).content("""
-				{"dui": "01234567-8", "firstNames": "Ana", "lastNames": "Pérez", "mobilePhone": "7123-4567"}
-				""")).andExpect(jsonPath("$.completedSteps").value(3));
 		flushAndClear();
 		mvc.perform(get("/api/console/requests/{id}", id))
 			.andExpect(jsonPath("$.identityDocument.ocrStatus").value("FAILED"))
 			.andExpect(jsonPath("$.identityDocument.failure").value("provider error: ResourceAccessException"))
-			.andExpect(jsonPath("$.identityDocument.duiMatchesDeclared").doesNotExist())
+			.andExpect(jsonPath("$.identityDocument.read").doesNotExist())
+			.andExpect(jsonPath("$.identityDocument.confirmed.dui").value("04567891-2"))
+			// typed by hand: nothing was read, so nothing counts as corrected
+			.andExpect(jsonPath("$.identityDocument.correctedFields").isEmpty())
+			.andExpect(jsonPath("$.identityDocument.duiMatchesDeclared").value(true))
 			.andExpect(jsonPath("$.identityDocument.photos").value(contains("BACK", "FRONT")));
 	}
 
 	@Test
-	void rejectsFilesThatAreNotJpegOrPngWithoutCallingTheProvider() throws Exception {
+	void theDuiStepComesAfterTheBasicData() throws Exception {
 		String id = startAndAccept();
+
+		upload(id, FRONT, BACK).andExpect(status().isConflict())
+			.andExpect(jsonPath("$.detail").value("Register the basic data before the identity document"));
+		confirm(id, CONFIRMATION).andExpect(status().isConflict());
+		verify(ocr, never()).read(any(), any());
+	}
+
+	@Test
+	void incomeDoesNotSkipTheRequiredDuiStep() throws Exception {
+		String id = withBasicData();
+
+		perform(put("/api/onboarding/requests/{id}/income", id).content("""
+				{"sourceCode": "SALARIO", "rangeCode": "HASTA_500"}
+				""")).andExpect(status().isNoContent());
+		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.completedSteps").value(2));
+	}
+
+	@Test
+	void rejectsInvalidConfirmations() throws Exception {
+		when(ocr.read(any(), any())).thenReturn(marta());
+		String id = withBasicData();
+		upload(id, FRONT, BACK).andExpect(status().isOk());
+
+		confirm(id, """
+				{"dui": "045678912", "firstNames": "Marta 2", "lastNames": "", "birthDate": "2999-01-01"}
+				""").andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors.dui").exists())
+			.andExpect(jsonPath("$.errors.firstNames").exists())
+			.andExpect(jsonPath("$.errors.lastNames").exists())
+			.andExpect(jsonPath("$.errors.birthDate").exists())
+			.andExpect(jsonPath("$.errors.expiryDate").exists());
+	}
+
+	@Test
+	void rejectsFilesThatAreNotJpegOrPngWithoutCallingTheProvider() throws Exception {
+		String id = withBasicData();
 
 		upload(id, "%PDF-1.7".getBytes(), BACK).andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.detail").value("The front photo must be a JPEG or PNG image"));
@@ -248,12 +335,20 @@ class IdentityDocumentApiTests {
 	}
 
 	@Test
-	void withoutTheDuiTheBasicDataDoNotAdvanceTheRequest() throws Exception {
-		String id = startAndAccept();
+	void newPhotosAfterConfirmingHaveToBeConfirmedAgain() throws Exception {
+		when(ocr.read(any(), any())).thenReturn(marta());
+		String id = withBasicData();
+		upload(id, FRONT, BACK).andExpect(status().isOk());
+		confirm(id, CONFIRMATION).andExpect(status().isOk());
+		declareIncomeAndActivity(id);
 
-		perform(put("/api/onboarding/requests/{id}/basic-data", id).content("""
-				{"dui": "01234567-8", "firstNames": "Ana", "lastNames": "Pérez", "mobilePhone": "7123-4567"}
-				""")).andExpect(status().isOk()).andExpect(jsonPath("$.completedSteps").value(1));
+		upload(id, FRONT, BACK).andExpect(status().isOk());
+		perform(post("/api/onboarding/requests/{id}/submit", id)).andExpect(status().isConflict())
+			.andExpect(jsonPath("$.detail").value("Confirm the data of the identity document before submitting"));
+
+		confirm(id, CONFIRMATION).andExpect(status().isOk());
+		perform(post("/api/onboarding/requests/{id}/submit", id)).andExpect(status().isOk())
+			.andExpect(jsonPath("$.completedSteps").value(6));
 	}
 
 	@Test
@@ -275,22 +370,24 @@ class IdentityDocumentApiTests {
 	}
 
 	private String submittedWithDui() throws Exception {
-		when(ocr.read(any(), any())).thenReturn(anaSofia());
-		String id = startAndAccept();
+		when(ocr.read(any(), any())).thenReturn(marta());
+		String id = withBasicData();
 		upload(id, FRONT, BACK).andExpect(status().isOk());
-		perform(put("/api/onboarding/requests/{id}/basic-data", id).content("""
-				{"dui": "01234567-8", "firstNames": "Ana Sofia", "lastNames": "Pérez López", "mobilePhone": "7123-4567"}
-				"""));
-		perform(put("/api/onboarding/requests/{id}/income", id).content("""
-				{"sourceCode": "SALARIO", "rangeCode": "HASTA_500"}
-				"""));
-		perform(put("/api/onboarding/requests/{id}/expected-activity", id).content("""
-				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "200_500"}
-				"""));
+		confirm(id, CONFIRMATION).andExpect(status().isOk());
+		declareIncomeAndActivity(id);
 		perform(post("/api/onboarding/requests/{id}/submit", id)).andExpect(status().isOk())
 			.andExpect(jsonPath("$.completedSteps").value(6));
 		flushAndClear();
 		return id;
+	}
+
+	private void declareIncomeAndActivity(String id) throws Exception {
+		perform(put("/api/onboarding/requests/{id}/income", id).content("""
+				{"sourceCode": "SALARIO", "rangeCode": "HASTA_500"}
+				""")).andExpect(status().isNoContent());
+		perform(put("/api/onboarding/requests/{id}/expected-activity", id).content("""
+				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "200_500"}
+				""")).andExpect(status().isOk());
 	}
 
 	private String startAndAccept() throws Exception {
@@ -303,10 +400,21 @@ class IdentityDocumentApiTests {
 		return id;
 	}
 
+	private String withBasicData() throws Exception {
+		String id = startAndAccept();
+		perform(put("/api/onboarding/requests/{id}/basic-data", id).content(BASIC_DATA))
+			.andExpect(jsonPath("$.completedSteps").value(2));
+		return id;
+	}
+
 	private ResultActions upload(String id, byte[] front, byte[] back) throws Exception {
 		return mvc.perform(multipart(HttpMethod.PUT, "/api/onboarding/requests/{id}/identity-document", id)
 			.file(new MockMultipartFile("front", "front.jpg", "image/jpeg", front))
 			.file(new MockMultipartFile("back", "back.png", "image/png", back)));
+	}
+
+	private ResultActions confirm(String id, String body) throws Exception {
+		return perform(put("/api/onboarding/requests/{id}/identity-document/confirmation", id).content(body));
 	}
 
 	private ResultActions perform(MockHttpServletRequestBuilder request) throws Exception {

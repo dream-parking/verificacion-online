@@ -19,6 +19,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import com.dreamparking.backend.identity.entity.enums.UnreadableReason;
+import com.dreamparking.backend.identity.entity.enums.UnreadableSide;
 
 /** VDI-79: the OpenAI Responses API client, against a local server that answers like the provider does. */
 class OpenAiDuiOcrClientTests {
@@ -128,13 +129,13 @@ class OpenAiDuiOcrClientTests {
 		assertThat(format.get("type").asString()).isEqualTo("json_schema");
 		assertThat(format.get("strict").asBoolean()).isTrue();
 		assertThat(format.get("schema").get("additionalProperties").asBoolean()).isFalse();
-		assertThat(format.get("schema").get("required")).hasSize(11);
+		assertThat(format.get("schema").get("required")).hasSize(12);
 	}
 
 	@Test
 	void anUnreadablePhotoIsAResultNotAnError() throws Exception {
 		body = completed("""
-				{"readable":false,"unreadableReason":"BLURRY","dui":null,"firstNames":null,"lastNames":null,
+				{"readable":false,"unreadableReason":"BLURRY","unreadableSide":"FRONT","dui":null,"firstNames":null,"lastNames":null,
 				 "birthDate":null,"issueDate":null,"expiryDate":null,"gender":null,"looksAuthentic":true,"confidence":0.2}
 				""");
 
@@ -143,12 +144,13 @@ class OpenAiDuiOcrClientTests {
 		assertThat(reading.readable()).isFalse();
 		assertThat(reading.isComplete()).isFalse();
 		assertThat(reading.unreadableReason()).isEqualTo(UnreadableReason.BLURRY);
+		assertThat(reading.unreadableSide()).isEqualTo(UnreadableSide.FRONT);
 	}
 
 	@Test
 	void doesNotTrustValuesOutsideTheSchema() throws Exception {
 		body = completed("""
-				{"readable":false,"unreadableReason":"SOMETHING_ELSE","dui":"012345678","firstNames":"  Ana   Sofía ",
+				{"readable":false,"unreadableReason":"SOMETHING_ELSE","unreadableSide":"LEFT","dui":"012345678","firstNames":"  Ana   Sofía ",
 				 "lastNames":"","birthDate":"02/03/1994","issueDate":null,"expiryDate":"2029-13-40","gender":"female",
 				 "looksAuthentic":null,"confidence":1.7}
 				""");
@@ -156,6 +158,7 @@ class OpenAiDuiOcrClientTests {
 		DuiReading reading = client(true, "sk-test").read(FRONT, BACK);
 
 		assertThat(reading.unreadableReason()).isEqualTo(UnreadableReason.OTHER);
+		assertThat(reading.unreadableSide()).isNull();
 		assertThat(reading.dui()).isEqualTo("01234567-8");
 		assertThat(reading.firstNames()).isEqualTo("Ana Sofía");
 		assertThat(reading.lastNames()).isNull();

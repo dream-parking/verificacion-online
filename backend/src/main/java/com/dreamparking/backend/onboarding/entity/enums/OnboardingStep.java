@@ -4,8 +4,8 @@ package com.dreamparking.backend.onboarding.entity.enums;
 public enum OnboardingStep {
 
 	PRIVACY_NOTICE,
-	IDENTITY_DOCUMENT,
 	BASIC_DATA,
+	IDENTITY_DOCUMENT,
 	INCOME,
 	EXPECTED_ACTIVITY,
 	REVIEW

@@ -76,7 +76,7 @@ class FullFlowApiTests {
 		perform(app, put("/api/onboarding/requests/{id}/basic-data", requestId).content("""
 				{"dui": "01234567-8", "firstNames": "Ana Sofía", "lastNames": "Pérez López", "mobilePhone": "7123-4567"}
 				"""))
-			.andExpect(jsonPath("$.completedSteps").value(3)); // the DUI step is optional in this configuration
+			.andExpect(jsonPath("$.completedSteps").value(2));
 		perform(app, put("/api/onboarding/requests/{id}/income", requestId).content("""
 				{"sourceCode": "SALARIO", "rangeCode": "HASTA_500"}
 				"""))

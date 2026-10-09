@@ -81,7 +81,7 @@ class DemoDataTests {
 		assertThat(jdbc.queryForObject("select count(*) from expected_activity where request_id = '00000000-0000-0000-0000-000000000414'::uuid", Integer.class))
 			.isZero();
 		assertThat(jdbc.queryForObject("select completed_steps from onboarding_request where id = '00000000-0000-0000-0000-000000000408'::uuid", Integer.class))
-			.isEqualTo(3);
+			.isEqualTo(2);
 		assertThat(jdbc.queryForObject("select count(*) from income_declaration where request_id = '00000000-0000-0000-0000-000000000408'::uuid", Integer.class))
 			.isZero();
 	}

@@ -26,6 +26,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import com.dreamparking.backend.identity.entity.enums.UnreadableReason;
+import com.dreamparking.backend.identity.entity.enums.UnreadableSide;
 import com.dreamparking.backend.identity.service.DuiValidator;
 
 /**
@@ -46,7 +47,8 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 			- Set readable to false when the DUI number or the names cannot be read with certainty, and give the main
 			  reason: BLURRY (out of focus or moved), GLARE (reflections hide text), CROPPED (part of the card is
 			  outside the photo), TOO_DARK, NOT_A_DUI (not a Salvadoran DUI), WRONG_SIDES (both photos show the same
-			  side, or the sides belong to different cards) or OTHER. When readable is true, unreadableReason is null.
+			  side, or the sides belong to different cards) or OTHER. Also say which photo has to be taken again in
+			  unreadableSide: FRONT, BACK or BOTH. When readable is true, unreadableReason and unreadableSide are null.
 			- dui: the DUI number as 8 digits, a hyphen and the check digit, for example 01234567-8.
 			- firstNames and lastNames: as printed, in title case, keeping accents and ñ ("MARÍA JOSÉ" becomes
 			  "María José"). Do not include the "conocido por" name.
@@ -175,6 +177,9 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 		properties.put("unreadableReason", Map.of("anyOf",
 				List.of(Map.of("type", "string", "enum", Arrays.stream(UnreadableReason.values()).map(Enum::name).toList()),
 						Map.of("type", "null"))));
+		properties.put("unreadableSide", Map.of("anyOf",
+				List.of(Map.of("type", "string", "enum", Arrays.stream(UnreadableSide.values()).map(Enum::name).toList()),
+						Map.of("type", "null"))));
 		properties.put("dui", nullableString);
 		properties.put("firstNames", nullableString);
 		properties.put("lastNames", nullableString);
@@ -208,16 +213,17 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 
 	/** The answer as the schema defines it; values are checked again here, since a model can still be wrong. */
 	@JsonIgnoreProperties(ignoreUnknown = true)
-	record ModelOutput(boolean readable, String unreadableReason, String dui, String firstNames, String lastNames,
-			String birthDate, String issueDate, String expiryDate, String gender, Boolean looksAuthentic,
-			BigDecimal confidence) {
+	record ModelOutput(boolean readable, String unreadableReason, String unreadableSide, String dui,
+			String firstNames, String lastNames, String birthDate, String issueDate, String expiryDate, String gender,
+			Boolean looksAuthentic, BigDecimal confidence) {
 
 		DuiReading toReading() {
 			UnreadableReason reason = readable ? null : reasonOf(unreadableReason);
+			UnreadableSide side = readable ? null : sideOf(unreadableSide);
 			String g = "M".equals(gender) || "F".equals(gender) ? gender : null;
 			BigDecimal c = confidence == null ? null
 					: confidence.max(BigDecimal.ZERO).min(BigDecimal.ONE).setScale(2, RoundingMode.HALF_UP);
-			return new DuiReading(readable, reason, DuiValidator.normalize(dui), name(firstNames), name(lastNames),
+			return new DuiReading(readable, reason, side, DuiValidator.normalize(dui), name(firstNames), name(lastNames),
 					date(birthDate), date(issueDate), date(expiryDate), g, looksAuthentic, c);
 		}
 
@@ -228,6 +234,15 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 				}
 			}
 			return UnreadableReason.OTHER;
+		}
+
+		private static UnreadableSide sideOf(String value) {
+			for (UnreadableSide side : UnreadableSide.values()) {
+				if (side.name().equals(value)) {
+					return side;
+				}
+			}
+			return null;
 		}
 
 		private static String name(String value) {

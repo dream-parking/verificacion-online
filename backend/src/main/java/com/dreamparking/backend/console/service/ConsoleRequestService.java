@@ -143,7 +143,7 @@ public class ConsoleRequestService {
 		var stepTimes = steps.findByRequestIdOrderByStartedAt(requestId)
 			.stream()
 			.map(s -> new ConsoleRequestDetail.StepTime(s.getStep(), s.getStartedAt(), s.getCompletedAt(),
-					s.getDurationSeconds(), s.getAttempts()))
+					s.getDurationSeconds(), s.getAttempts(), s.getTypingSpeedCps()))
 			.toList();
 		var timeline = events.findByRequestIdOrderByOccurredAt(requestId)
 			.stream()

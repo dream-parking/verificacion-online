@@ -50,7 +50,32 @@ public class DocumentCipher {
 	}
 
 	/** Ciphertext (with the GCM tag at the end) and the IV it was encrypted with. */
-	public record Sealed(byte[] iv, byte[] ciphertext, short keyVersion) {
+	public static final class Sealed {
+
+		private final byte[] iv;
+
+		private final byte[] ciphertext;
+
+		private final short keyVersion;
+
+		Sealed(byte[] iv, byte[] ciphertext, short keyVersion) {
+			this.iv = iv.clone();
+			this.ciphertext = ciphertext.clone();
+			this.keyVersion = keyVersion;
+		}
+
+		public byte[] iv() {
+			return iv.clone();
+		}
+
+		public byte[] ciphertext() {
+			return ciphertext.clone();
+		}
+
+		public short keyVersion() {
+			return keyVersion;
+		}
+
 	}
 
 	public Sealed encrypt(byte[] plain, String associatedData) {

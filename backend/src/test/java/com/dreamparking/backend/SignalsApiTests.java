@@ -1,5 +1,6 @@
 package com.dreamparking.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -85,6 +86,23 @@ class SignalsApiTests {
 	}
 
 	@Test
+	void showsWhenTheSignalsWereCapturedAndMovesItWhenTheyAreSentAgain() throws Exception {
+		String id = startRequest();
+		Instant before = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+
+		capture(id, "{\"deviceFingerprint\": \"fp-captura\"}", 204);
+		flushAndClear();
+		Instant first = capturedAt(id);
+		assertThat(first).isBetween(before, Instant.now());
+
+		em.createNativeQuery("update onboarding_session set captured_at = captured_at - interval '1 hour'"
+				+ " where request_id = cast(:id as uuid)").setParameter("id", id).executeUpdate();
+		capture(id, "{\"deviceFingerprint\": \"fp-captura\"}", 204);
+		flushAndClear();
+		assertThat(capturedAt(id)).isAfterOrEqualTo(first);
+	}
+
+	@Test
 	void classifiesTheTypingPace() throws Exception {
 		String id = startRequest();
 		String[][] cases = { { "95", "SLOW" }, { "150", "NORMAL" }, { "310", "FAST" } };
@@ -136,6 +154,11 @@ class SignalsApiTests {
 	private void capture(String id, String body, int expectedStatus) throws Exception {
 		mvc.perform(put("/api/onboarding/requests/{id}/signals", id).contentType(MediaType.APPLICATION_JSON)
 			.content(body)).andExpect(status().is(expectedStatus));
+	}
+
+	private Instant capturedAt(String id) throws Exception {
+		String body = mvc.perform(get("/api/console/requests/{id}", id)).andReturn().getResponse().getContentAsString();
+		return Instant.parse(JsonPath.read(body, "$.signals.capturedAt"));
 	}
 
 	private String startRequest() throws Exception {

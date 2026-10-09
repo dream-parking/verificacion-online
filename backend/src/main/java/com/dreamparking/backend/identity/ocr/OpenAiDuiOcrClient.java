@@ -17,6 +17,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -66,6 +68,8 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 	/** Includes the reasoning tokens, so it leaves room for them. */
 	static final int MAX_OUTPUT_TOKENS = 8000;
 
+	private static final Logger log = LoggerFactory.getLogger(OpenAiDuiOcrClient.class);
+
 	private static final JsonMapper JSON = JsonMapper.builder()
 		.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
 		.build();
@@ -109,6 +113,7 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 			throw new DuiOcrException("OCR API key is not configured");
 		}
 		ResponsesApiResponse response;
+		long started = System.nanoTime();
 		try {
 			response = http.post()
 				.uri("/responses")
@@ -122,6 +127,7 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 			// Includes timeouts, connection errors and HTTP 4xx/5xx (401 = wrong key, 429 = rate or budget limit).
 			throw new DuiOcrException("provider error: " + ex.getClass().getSimpleName(), ex);
 		}
+		logUsage(response, Duration.ofNanos(System.nanoTime() - started));
 		String text = outputText(response);
 		try {
 			return JSON.readValue(text, ModelOutput.class).toReading();
@@ -146,6 +152,16 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 		body.put("text", Map.of("format",
 				Map.of("type", "json_schema", "name", "dui_reading", "strict", true, "schema", SCHEMA)));
 		return body;
+	}
+
+	/** Model, time and tokens of each reading, to follow the cost; nothing about the customer. */
+	private void logUsage(ResponsesApiResponse response, Duration elapsed) {
+		if (response == null || response.usage() == null) {
+			return;
+		}
+		Usage usage = response.usage();
+		log.info("DUI read by {} in {} ms: {} input tokens, {} output tokens ({} reasoning)", model, elapsed.toMillis(),
+				usage.inputTokens(), usage.outputTokens(), usage.reasoningTokens());
 	}
 
 	/** The JSON text of the answer; a refusal or an incomplete answer is a provider error. */
@@ -196,7 +212,21 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	record ResponsesApiResponse(String status, List<OutputItem> output,
-			@JsonProperty("incomplete_details") IncompleteDetails incompleteDetails) {
+			@JsonProperty("incomplete_details") IncompleteDetails incompleteDetails, Usage usage) {
+	}
+
+	@JsonIgnoreProperties(ignoreUnknown = true)
+	record Usage(@JsonProperty("input_tokens") long inputTokens, @JsonProperty("output_tokens") long outputTokens,
+			@JsonProperty("output_tokens_details") OutputTokensDetails outputTokensDetails) {
+
+		long reasoningTokens() {
+			return outputTokensDetails == null ? 0 : outputTokensDetails.reasoningTokens();
+		}
+
+	}
+
+	@JsonIgnoreProperties(ignoreUnknown = true)
+	record OutputTokensDetails(@JsonProperty("reasoning_tokens") long reasoningTokens) {
 	}
 
 	@JsonIgnoreProperties(ignoreUnknown = true)

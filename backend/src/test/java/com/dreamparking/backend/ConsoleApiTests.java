@@ -1,5 +1,6 @@
 package com.dreamparking.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -8,6 +9,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -73,6 +78,32 @@ class ConsoleApiTests {
 			.andExpect(jsonPath("$.page").value(0));
 
 		mvc.perform(get("/api/console/requests").param("status", "NO_EXISTE")).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void pagesWalkTheWholeListNewestFirstWithoutRepeats() throws Exception {
+		String all = mvc.perform(get("/api/console/requests").param("size", "100"))
+			.andReturn().getResponse().getContentAsString();
+		List<String> ids = JsonPath.read(all, "$.content[*].id");
+		List<String> dates = JsonPath.read(all, "$.content[*].date");
+		int total = JsonPath.read(all, "$.totalElements");
+		assertThat(ids).hasSize(total).doesNotHaveDuplicates();
+		assertThat(dates.stream().map(Instant::parse).toList()).isSortedAccordingTo(Comparator.reverseOrder());
+
+		List<String> paged = new ArrayList<>();
+		for (int page = 0; page * 3 < total; page++) {
+			String body = mvc.perform(get("/api/console/requests").param("size", "3").param("page", String.valueOf(page)))
+				.andExpect(jsonPath("$.totalElements").value(total))
+				.andExpect(jsonPath("$.totalPages").value((total + 2) / 3))
+				.andReturn().getResponse().getContentAsString();
+			paged.addAll(JsonPath.read(body, "$.content[*].id"));
+		}
+		assertThat(paged).isEqualTo(ids);
+
+		mvc.perform(get("/api/console/requests").param("size", "3").param("page", "999"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content", hasSize(0)))
+			.andExpect(jsonPath("$.totalElements").value(total));
 	}
 
 	@Test

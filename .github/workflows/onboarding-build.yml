@@ -2,10 +2,17 @@ name: onboarding-build
 
 # dev -> Dev build, QA -> QA build, each sent to its Firebase App Distribution testers. Runs on Linux (Android only) to stay inside the
 # free GitHub Actions minutes; macOS runners are billed at 10x.
+# No analyze/test here: the required `analyze-test` check (ci.yml) already ran them in the PR.
+# Docs, tests and iOS-only changes don't affect the APK, so they don't trigger a build.
 on:
   push:
     branches: [dev, QA]
-    paths: ["onboarding/**", ".github/workflows/onboarding-build.yml"]
+    paths:
+      - "onboarding/**"
+      - "!onboarding/**/*.md"
+      - "!onboarding/test/**"
+      - "!onboarding/ios/**"
+      - ".github/workflows/onboarding-build.yml"
   workflow_dispatch:
 
 concurrency:
@@ -15,6 +22,7 @@ concurrency:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       id-token: write # keyless login to Google Cloud (Workload Identity Federation)
@@ -30,13 +38,15 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            onboarding/android/*.gradle*
+            onboarding/android/**/gradle-wrapper.properties
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
       - name: Decode release keystore
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"

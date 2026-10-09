@@ -40,7 +40,7 @@ class ApiErrorTests {
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.status").value(409))
 			.andExpect(jsonPath("$.title").value("Conflict"))
-			.andExpect(jsonPath("$.detail").value("Complete the 4 previous steps before submitting"))
+			.andExpect(jsonPath("$.detail").value("Complete the 5 previous steps before submitting"))
 			.andExpect(jsonPath("$.instance").value("/api/onboarding/requests/" + id + "/submit"));
 
 		UUID missing = UUID.randomUUID();

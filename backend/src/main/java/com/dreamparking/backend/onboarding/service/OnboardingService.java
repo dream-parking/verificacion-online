@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,8 @@ import com.dreamparking.backend.common.exception.InvalidStateException;
 import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.customer.entity.Customer;
 import com.dreamparking.backend.customer.service.CustomerService;
+import com.dreamparking.backend.identity.entity.enums.OcrStatus;
+import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
 import com.dreamparking.backend.onboarding.dto.BasicDataRequest;
 import com.dreamparking.backend.onboarding.dto.ExpectedActivityRequest;
 import com.dreamparking.backend.onboarding.dto.IncomeDeclarationRequest;
@@ -38,9 +41,11 @@ import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 import com.dreamparking.backend.risk.service.RiskAssessmentService;
 
 /**
- * Steps of the mobile onboarding flow: privacy notice → basic data → income → expected activity → submit.
- * Steps can be saved again while the request is in progress; {@code completedSteps} only advances in order,
- * and the request can only be submitted once the four steps are done. The time spent on each step is measured by
+ * Steps of the mobile onboarding flow: privacy notice → identity document (DUI) → basic data → income → expected
+ * activity → submit. Steps can be saved again while the request is in progress; {@code completedSteps} only advances
+ * in order, and the request can only be submitted once the five steps are done. The DUI step is captured by
+ * {@code IdentityDocumentService}; until the app has that screen it can be made optional
+ * ({@code app.onboarding.identity-document-required=false}), and then the basic data step skips it. The time spent on each step is measured by
  * the app and stored by {@link SignalsService}: this service only tracks the progress.
  */
 @Service
@@ -66,11 +71,16 @@ public class OnboardingService {
 
 	private final RiskAssessmentService riskAssessmentService;
 
+	private final IdentityDocumentRepository identityDocuments;
+
+	private final boolean identityDocumentRequired;
+
 	public OnboardingService(OnboardingRequestRepository requests, PrivacyConsentRepository consents,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestEventRepository events, CatalogService catalogService,
 			PrivacyNoticeService privacyNoticeService, CustomerService customerService,
-			RiskAssessmentService riskAssessmentService) {
+			RiskAssessmentService riskAssessmentService, IdentityDocumentRepository identityDocuments,
+			@Value("${app.onboarding.identity-document-required:true}") boolean identityDocumentRequired) {
 		this.requests = requests;
 		this.consents = consents;
 		this.incomeDeclarations = incomeDeclarations;
@@ -80,6 +90,8 @@ public class OnboardingService {
 		this.privacyNoticeService = privacyNoticeService;
 		this.customerService = customerService;
 		this.riskAssessmentService = riskAssessmentService;
+		this.identityDocuments = identityDocuments;
+		this.identityDocumentRequired = identityDocumentRequired;
 	}
 
 	@Transactional
@@ -111,10 +123,28 @@ public class OnboardingService {
 		return OnboardingRequestResponse.of(request);
 	}
 
-	/** Step 2: identifies the customer. The request keeps a snapshot of the data as declared. */
+	/**
+	 * Step 2: the DUI photos were stored and read (or the reader failed and the customer will type the data). Called
+	 * by {@code IdentityDocumentService} only when the step can advance: unreadable photos do not complete it.
+	 */
+	@Transactional
+	public void completeIdentityDocument(OnboardingRequest request, OcrStatus ocrStatus) {
+		completeStep(request, OnboardingStep.IDENTITY_DOCUMENT);
+		recordEvent(request, RequestEventType.IDENTITY_DOCUMENT_CAPTURED,
+				ocrStatus == OcrStatus.READ ? "DUI capturado y leído" : "DUI capturado; datos para escribir a mano",
+				Map.of("ocrStatus", ocrStatus.name()));
+	}
+
+	/**
+	 * Step 3: identifies the customer with the data confirmed or corrected from the DUI reading. The request keeps a
+	 * snapshot of the data as declared, and the reading records what the customer changed.
+	 */
 	@Transactional
 	public OnboardingRequestResponse registerBasicData(UUID requestId, BasicDataRequest body) {
 		OnboardingRequest request = findInProgress(requestId);
+		if (!identityDocumentRequired && request.getCompletedSteps() == OnboardingStep.IDENTITY_DOCUMENT.ordinal()) {
+			request.setCompletedSteps((short) (OnboardingStep.IDENTITY_DOCUMENT.ordinal() + 1));
+		}
 
 		Customer customer = customerService.register(body.dui(), body.firstNames().trim(), body.lastNames().trim(),
 				body.mobilePhone());
@@ -123,13 +153,15 @@ public class OnboardingService {
 		request.setFirstNames(customer.getFirstNames());
 		request.setLastNames(customer.getLastNames());
 		request.setMobilePhone(customer.getMobilePhone());
+		identityDocuments.findById(requestId)
+			.ifPresent(document -> document.confirm(customer.getDui(), request.getFirstNames(), request.getLastNames()));
 
 		completeStep(request, OnboardingStep.BASIC_DATA);
 		recordEvent(request, RequestEventType.BASIC_DATA_COMPLETED, "Datos básicos completados");
 		return OnboardingRequestResponse.of(request);
 	}
 
-	/** Step 3: saves (or replaces) the declared income source and range. */
+	/** Step 4: saves (or replaces) the declared income source and range. */
 	@Transactional
 	public void declareIncome(UUID requestId, IncomeDeclarationRequest body) {
 		OnboardingRequest request = findInProgress(requestId);
@@ -150,7 +182,7 @@ public class OnboardingService {
 		recordEvent(request, RequestEventType.INCOME_REGISTERED, "Ingresos registrados");
 	}
 
-	/** Step 4: saves (or replaces) the expected activity and scores the request's risk from the monthly amount range. */
+	/** Step 5: saves (or replaces) the expected activity and scores the request's risk from the monthly amount range. */
 	@Transactional
 	public RiskAssessmentResponse registerExpectedActivity(UUID requestId, ExpectedActivityRequest body) {
 		OnboardingRequest request = findInProgress(requestId);

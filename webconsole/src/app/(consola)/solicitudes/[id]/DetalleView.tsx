@@ -200,7 +200,7 @@ export function DetalleView({ id }: { id: string }) {
         </div>
         <div className="flex flex-wrap gap-2.5">
           <span className={`badge ${estado.cls}`}>
-            {r.status === "IN_PROGRESS" ? `${estado.label} (${r.completedSteps} de 5 etapas)` : estado.label}
+            {r.status === "IN_PROGRESS" ? `${estado.label} (${r.completedSteps} de ${PASOS.length} etapas)` : estado.label}
           </span>
           <span className={`badge ${riesgo.cls}`}>{riesgo.label}</span>
         </div>

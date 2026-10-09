@@ -19,7 +19,7 @@ export type NivelRiesgo = "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" 
 export type EstadoSolicitud = "IN_PROGRESS" | "COMPLETED" | "ABANDONED";
 export type Criticidad = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type EstadoAlerta = "UNASSIGNED" | "ASSIGNED" | "IN_REVIEW" | "CLOSED";
-export type Paso = "PRIVACY_NOTICE" | "BASIC_DATA" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
+export type Paso = "PRIVACY_NOTICE" | "IDENTITY_DOCUMENT" | "BASIC_DATA" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
 
 export type UsuarioConsola = {
   id: string;

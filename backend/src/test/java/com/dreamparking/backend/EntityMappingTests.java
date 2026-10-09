@@ -63,6 +63,7 @@ class EntityMappingTests {
 			.getSingleResult();
 		assertThat(session.getIp()).isEqualTo(InetAddress.getByName("190.5.142.77"));
 		assertThat(session.getTypingPace()).isEqualTo(TypingPace.NORMAL);
+		assertThat(session.getCapturedAt()).isEqualTo(session.getStartedAt());
 
 		RiskAssessment assessment = em.createQuery(
 				"from RiskAssessment a where a.request.id = :id and a.current", RiskAssessment.class)
@@ -83,6 +84,7 @@ class EntityMappingTests {
 		RequestSignals signals = em.find(RequestSignals.class, DEMO_REQUEST);
 		assertThat(signals.getTotalDurationSeconds()).isEqualTo(292L);
 		assertThat(signals.getTypingPace()).isEqualTo(TypingPace.NORMAL);
+		assertThat(signals.getCapturedAt()).isNotNull();
 
 		AlertInboxItem item = em.createQuery("from AlertInboxItem where lastFour = '4821'", AlertInboxItem.class).getSingleResult();
 		assertThat(item.getCriticality()).isEqualTo(AlertCriticality.CRITICAL);

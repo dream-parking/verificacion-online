@@ -1,5 +1,6 @@
 package com.dreamparking.backend.onboarding.entity;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 import jakarta.persistence.Column;
@@ -42,6 +43,10 @@ public class RequestStep {
 
 	@Column(name = "attempts", nullable = false)
 	private Short attempts = (short) 1;
+
+	/** Typing speed on this screen, in characters per second; null when nothing was typed. */
+	@Column(name = "typing_speed_cps", precision = 4, scale = 2)
+	private BigDecimal typingSpeedCps;
 
 	protected RequestStep() {
 	}
@@ -90,6 +95,14 @@ public class RequestStep {
 
 	public void setAttempts(Short attempts) {
 		this.attempts = attempts;
+	}
+
+	public BigDecimal getTypingSpeedCps() {
+		return typingSpeedCps;
+	}
+
+	public void setTypingSpeedCps(BigDecimal typingSpeedCps) {
+		this.typingSpeedCps = typingSpeedCps;
 	}
 
 }

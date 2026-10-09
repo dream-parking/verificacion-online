@@ -1,29 +1,32 @@
 import 'package:flutter/material.dart';
 
-/// Color tokens from the style guide (docs/styles.md) used in the
-/// "App móvil · Onboarding" design.
+/// Color tokens shared with the web console (`webconsole/src/app/globals.css`), so the app and the
+/// console look like the same bank.
 abstract final class AppColors {
   static const ink = Color(0xFF1A1B1A);
   static const muted = Color(0xFF5B5B5B);
   static const placeholder = Color(0xFF6B6B6B);
   static const dark = Color(0xFF2C2A29);
-  static const yellow = Color(0xFFFDDA24);
-  static const yellowHover = Color(0xFFF2CE12);
+  /// Main action (`--color-brand` in the console): one per screen, always with [ink] text.
+  static const brand = Color(0xFF9DDFA6);
+  static const brandHover = Color(0xFF84D291);
+
+  /// Very light tint of [brand] for section headers.
+  static const brandSoft = Color(0xFFE7F6E9);
   static const blue = Color(0xFF00448C);
   static const blueSoft = Color(0xFFE3EDF8);
-  static const orange = Color(0xFFFF7F41);
-  static const skyblue = Color(0xFF59CBE8);
-  static const pink = Color(0xFFF5B6CD);
   static const neutral100 = Color(0xFFF5F7F9);
   static const neutral200 = Color(0xFFF4F4F4);
   static const border = Color(0xFFCCCCCC);
   static const borderStrong = Color(0xFF989696);
   static const disabled = Color(0xFFE8E8E8);
-  static const error = Color(0xFFB3261E);
+  /// Errors, as in the console (`--color-danger` and the error notice).
+  static const error = Color(0xFF8C1D18);
   static const errorDark = Color(0xFF8C1D18);
-  static const errorBg = Color(0xFFFDECEA);
+  static const errorBg = Color(0xFFFBEAEA);
 
-  /// Colors of the Banco Tangamandapio logo (webconsole/public/brand).
+  /// Colors of the Banco Tangamandapio logo (webconsole/public/brand). [brandGreen] also backs the
+  /// welcome banner and the progress bar: white text on it has a contrast of 11:1.
   static const brandNavy = Color(0xFF081B39);
   static const brandGreen = Color(0xFF0A402B);
 }
@@ -68,7 +71,7 @@ ThemeData buildTheme() {
     textSelectionTheme: const TextSelectionThemeData(cursorColor: AppColors.blue),
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected) ? AppColors.blue : Colors.white,
+        (states) => states.contains(WidgetState.selected) ? AppColors.brandGreen : Colors.white,
       ),
       side: const BorderSide(color: AppColors.muted, width: 2),
     ),

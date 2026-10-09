@@ -231,6 +231,10 @@
     grid-template-columns: 120px 105px minmax(200px, 1fr) 130px 140px 130px 100px;
     min-width: 1030px;
   }
+  .g-locations {
+    grid-template-columns: minmax(170px, 1.2fr) 150px 140px minmax(200px, 1.4fr) 190px 110px;
+    min-width: 1060px;
+  }
   .g-users {
     grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1.5fr) minmax(170px, 1fr) 190px 110px 110px;
     min-width: 1060px;
@@ -273,6 +277,48 @@
     height: 14px;
     border-radius: 7px;
     background: var(--color-line-soft);
+  }
+
+  /* Map of locations (Leaflet): same fonts as the console; popups with the console look */
+  .leaflet-container {
+    font-family: var(--font-sans);
+  }
+  .locations-popup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--color-ink);
+  }
+  .locations-popup ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .locations-popup li {
+    display: flex;
+    flex-direction: column;
+  }
+  .locations-popup li span,
+  .locations-popup p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+  .locations-link {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    font-weight: 700;
+    color: var(--color-blue);
+    text-align: left;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   /* Badges */

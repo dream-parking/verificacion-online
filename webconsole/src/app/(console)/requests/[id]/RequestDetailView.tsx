@@ -180,6 +180,7 @@ export function RequestDetailView({ id }: { id: string }) {
             ? [{ k: "Coordenadas aproximadas", v: `${s.latitude!.toFixed(4)}, ${s.longitude!.toFixed(4)}` }]
             : []),
           ...(geo?.timezone ? [{ k: "Zona horaria", v: geo.timezone }] : []),
+          ...(geo?.lookedUpAt ? [{ k: "Ubicación consultada", v: formatDateTime(geo.lookedUpAt) }] : []),
           ...(geo?.isp ? [{ k: "Proveedor de internet", v: geo.isp }] : []),
         ];
 
@@ -212,7 +213,9 @@ export function RequestDetailView({ id }: { id: string }) {
   const steps = STEPS.map(({ step, name }) => {
     const p = r.steps?.find((x) => x.step === step);
     const attempts = p?.attempts && p.attempts > 1 ? ` · ${p.attempts} intentos` : "";
-    return { t: name, d: p?.durationSeconds != null ? minSec(p.durationSeconds) + attempts : "Sin completar" };
+    const speed =
+      p?.typingSpeedCps != null ? ` · ${p.typingSpeedCps.toLocaleString("es", { maximumFractionDigits: 1 })} car./s` : "";
+    return { t: name, d: p?.durationSeconds != null ? minSec(p.durationSeconds) + attempts + speed : "Sin completar" };
   });
 
   const timeline = [...(r.timeline ?? [])].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
@@ -281,9 +284,12 @@ export function RequestDetailView({ id }: { id: string }) {
           {s ? (
             <KeyValue items={signalList} className="min-w-0 flex-[1_1_380px]" />
           ) : (
-            <p className="m-0 min-w-0 flex-[1_1_380px] text-[15px] text-muted">
-              La app todavía no ha enviado señales de esta solicitud.
-            </p>
+            <div className="min-w-0 flex-[1_1_380px]">
+              <p className="m-0 text-[15px] font-semibold">Sin señales capturadas</p>
+              <p className="mt-1 mb-0 text-sm leading-5 text-muted">
+                La app todavía no las ha enviado, o la persona no aceptó el aviso de privacidad.
+              </p>
+            </div>
           )}
           <div className="min-w-0 flex-[1_1_300px]">
             <div className="k mb-1.5">Tiempo por paso</div>

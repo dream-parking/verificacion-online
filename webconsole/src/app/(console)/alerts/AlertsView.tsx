@@ -114,7 +114,7 @@ export function AlertsView() {
   const onlyTab = (Object.keys(INITIAL_FILTERS) as (keyof typeof INITIAL_FILTERS)[]).every(
     (k) => k === "tab" || f[k] === INITIAL_FILTERS[k],
   );
-  let emptyTitle = "No hay alertas con esos filtros";
+  let emptyTitle = "No hay alertas con estos filtros";
   let emptyText = "Cambia o quita los filtros para ver más alertas.";
   if (f.tab === "mine" && onlyTab) {
     emptyTitle = "No tienes alertas asignadas";
@@ -362,7 +362,7 @@ function TakeButton({
       disabled={taking}
       aria-label={`Tomar la alerta de la cuenta ${a.account}`}
     >
-      {taking ? "Tomando…" : "Tomarla"}
+      {taking ? "Tomando…" : "Tomar"}
     </button>
   );
 }

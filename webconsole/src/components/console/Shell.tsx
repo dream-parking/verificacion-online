@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ROLE_LABEL } from "@/lib/console/format";
 import { signOut } from "@/lib/console/session";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { useConsole } from "./ConsoleProvider";
 import { Logo } from "./Logo";
 
@@ -22,15 +23,18 @@ function titleFor(pathname: string) {
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { user, alerts } = useConsole();
+  const { user, token, alerts } = useConsole();
   // menuOpen: dropdown menu on mobile and tablet. collapsed: sidebar hidden on desktop.
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const closeChangePassword = useCallback(() => setChangingPassword(false), []);
   const unassigned = (alerts.data ?? []).filter((x) => x.status === "UNASSIGNED").length;
   const initials =
     user.initials ||
     user.fullName
-      .split(/s+/)
+      .split(/\s+/)
+      .filter(Boolean)
       .slice(0, 2)
       .map((p) => p[0])
       .join("")
@@ -174,6 +178,13 @@ export function Shell({ children }: { children: ReactNode }) {
               </div>
               <span className="sr-only sm:hidden">{user.fullName}</span>
             </div>
+            <button type="button" className="btn2 min-h-10 gap-2 px-3 text-[13px] md:px-4" onClick={() => setChangingPassword(true)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="8" cy="15" r="4" />
+                <path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2" />
+              </svg>
+              <span className="max-md:sr-only">Cambiar contraseña</span>
+            </button>
             <button type="button" className="btn2 min-h-10 gap-2 px-3 text-[13px] md:px-4" onClick={signOut}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" />
@@ -190,6 +201,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
+      {changingPassword && <ChangePasswordDialog email={user.email} token={token} onClose={closeChangePassword} />}
     </div>
   );
 }

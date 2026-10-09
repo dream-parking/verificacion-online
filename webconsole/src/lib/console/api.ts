@@ -127,7 +127,17 @@ export type RequestDetail = {
     totalDurationSeconds: number | null;
     requestsFromSameDevice: number | null;
   } | null;
-  steps: { step: Step; startedAt: string | null; completedAt: string | null; durationSeconds: number | null; attempts: number | null }[] | null;
+  steps:
+    | {
+        step: Step;
+        startedAt: string | null;
+        completedAt: string | null;
+        durationSeconds: number | null;
+        attempts: number | null;
+        /** Typing speed on that screen, in characters per second (omitted when nothing was typed). */
+        typingSpeedCps?: number | null;
+      }[]
+    | null;
   timeline: { type: string; description: string | null; actor: string | null; occurredAt: string }[] | null;
 };
 

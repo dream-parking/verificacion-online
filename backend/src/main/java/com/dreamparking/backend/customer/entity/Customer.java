@@ -20,15 +20,6 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "customer")
 public class Customer {
 
-	/**
-	 * Letters (accents and ñ included) in words separated by single spaces; no digits or special characters.
-	 * Checked on the way in ({@code BasicDataRequest}), not on the entity: a rule on the entity would also
-	 * reject saving any customer already stored with other data.
-	 */
-	public static final String NAME_PATTERN = "\\p{L}+( \\p{L}+)*";
-
-	public static final String NAME_MESSAGE = "Solo se permiten letras y espacios";
-
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
 	@Column(name = "id")

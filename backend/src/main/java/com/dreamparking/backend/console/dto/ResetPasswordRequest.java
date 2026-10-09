@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Size;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import com.dreamparking.backend.common.validation.Password;
+
 public record ResetPasswordRequest(
-		@Schema(description = "Contraseña nueva, de 10 a 72 caracteres") @NotBlank @Size(max = 200) String newPassword) {
+		@Schema(description = "Contraseña nueva, de 10 a 72 caracteres") @NotBlank @Size(max = 200) @Password String newPassword) {
 }

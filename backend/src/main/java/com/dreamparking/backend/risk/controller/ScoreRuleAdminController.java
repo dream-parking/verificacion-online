@@ -3,6 +3,7 @@ package com.dreamparking.backend.risk.controller;
 import java.util.List;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.dreamparking.backend.common.validation.Code;
 import com.dreamparking.backend.risk.dto.PublishScoreRuleVersionRequest;
 import com.dreamparking.backend.risk.dto.ScoreRuleResponse;
 import com.dreamparking.backend.risk.service.ScoreRuleService;
@@ -44,7 +46,7 @@ public class ScoreRuleAdminController {
 	@ApiResponse(responseCode = "403", description = "Solo administradores", content = @Content)
 	@ApiResponse(responseCode = "404", description = "La regla no existe", content = @Content)
 	@GetMapping("/{code}/versions")
-	public List<ScoreRuleResponse> versions(@PathVariable String code) {
+	public List<ScoreRuleResponse> versions(@PathVariable @Size(max = 40) @Code String code) {
 		return scoreRuleService.versions(code);
 	}
 
@@ -59,7 +61,8 @@ public class ScoreRuleAdminController {
 	@ApiResponse(responseCode = "409", description = "La versión vigente empieza en el futuro", content = @Content)
 	@PostMapping("/{code}/versions")
 	@ResponseStatus(HttpStatus.CREATED)
-	public ScoreRuleResponse publish(@PathVariable String code, @Valid @RequestBody PublishScoreRuleVersionRequest body,
+	public ScoreRuleResponse publish(@PathVariable @Size(max = 40) @Code String code,
+			@Valid @RequestBody PublishScoreRuleVersionRequest body,
 			@Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser admin) {
 		return scoreRuleService.publish(code, body, admin.id());
 	}

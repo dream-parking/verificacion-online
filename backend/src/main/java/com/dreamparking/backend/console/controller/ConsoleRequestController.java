@@ -2,6 +2,8 @@ package com.dreamparking.backend.console.controller;
 
 import java.util.UUID;
 
+import jakarta.validation.constraints.Size;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.dreamparking.backend.common.dto.PageResponse;
+import com.dreamparking.backend.common.validation.FreeText;
 import com.dreamparking.backend.console.dto.ConsoleRequestDetail;
 import com.dreamparking.backend.console.dto.ConsoleRequestListItem;
 import com.dreamparking.backend.console.service.ConsoleRequestService;
@@ -37,7 +40,8 @@ public class ConsoleRequestController {
 			description = "Filtra por estado, nivel de riesgo y texto (nombre o número). `page` empieza en 0; `size` máximo 100.")
 	@GetMapping
 	public PageResponse<ConsoleRequestListItem> list(@RequestParam(required = false) RequestStatus status,
-			@RequestParam(required = false) RiskLevel riskLevel, @RequestParam(required = false) String q,
+			@RequestParam(required = false) RiskLevel riskLevel,
+			@RequestParam(required = false) @Size(max = 100) @FreeText String q,
 			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
 		return service.list(status, riskLevel, q, page, size);
 	}

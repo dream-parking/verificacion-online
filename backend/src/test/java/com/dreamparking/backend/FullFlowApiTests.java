@@ -88,7 +88,7 @@ class FullFlowApiTests {
 		perform(app, post("/api/onboarding/requests/{id}/submit", requestId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("COMPLETED"))
-			.andExpect(jsonPath("$.completedSteps").value(5))
+			.andExpect(jsonPath("$.completedSteps").value(6))
 			.andExpect(jsonPath("$.number").value(matchesPattern("SOL-\\d{4}-\\d{5}")));
 
 		// ---- console: the detail has the whole file

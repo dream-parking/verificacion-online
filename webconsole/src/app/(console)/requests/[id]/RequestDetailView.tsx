@@ -235,7 +235,7 @@ export function RequestDetailView({ id }: { id: string }) {
         </div>
         <div className="flex flex-wrap gap-2.5">
           <span className={`badge ${status.cls}`}>
-            {r.status === "IN_PROGRESS" ? `${status.label} (${r.completedSteps} de 5 etapas)` : status.label}
+            {r.status === "IN_PROGRESS" ? `${status.label} (${r.completedSteps} de ${STEPS.length} etapas)` : status.label}
           </span>
           <span className={`badge ${risk.cls}`}>{risk.label}</span>
         </div>

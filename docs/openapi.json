@@ -276,7 +276,7 @@
             "items" : {
               "$ref" : "#/components/schemas/CaptureSignalsStepTiming"
             },
-            "maxItems" : 5,
+            "maxItems" : 6,
             "minItems" : 0,
             "type" : "array"
           },
@@ -308,7 +308,7 @@
             "type" : "string"
           },
           "step" : {
-            "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
+            "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "IDENTITY_DOCUMENT", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
             "type" : "string"
           },
           "typingSpeedCps" : {
@@ -438,6 +438,47 @@
         "required" : [ "resolution" ],
         "type" : "object"
       },
+      "ConfirmIdentityDocumentRequest" : {
+        "properties" : {
+          "birthDate" : {
+            "description" : "Fecha de nacimiento",
+            "example" : "1991-03-14",
+            "format" : "date",
+            "type" : "string"
+          },
+          "dui" : {
+            "description" : "Número de DUI",
+            "example" : "04567891-2",
+            "minLength" : 1,
+            "pattern" : "[0-9]{8}-[0-9]",
+            "type" : "string"
+          },
+          "expiryDate" : {
+            "description" : "Fecha de vencimiento del DUI",
+            "example" : "2031-07-22",
+            "format" : "date",
+            "type" : "string"
+          },
+          "firstNames" : {
+            "description" : "Nombres",
+            "example" : "Marta Alejandra",
+            "maxLength" : 100,
+            "minLength" : 0,
+            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
+            "type" : "string"
+          },
+          "lastNames" : {
+            "description" : "Apellidos",
+            "example" : "Rivas Cruz",
+            "maxLength" : 100,
+            "minLength" : 0,
+            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "birthDate", "dui", "expiryDate", "firstNames", "lastNames" ],
+        "type" : "object"
+      },
       "ConsoleRequestApplicant" : {
         "properties" : {
           "dui" : {
@@ -470,6 +511,9 @@
           "id" : {
             "format" : "uuid",
             "type" : "string"
+          },
+          "identityDocument" : {
+            "$ref" : "#/components/schemas/ConsoleRequestIdentityDocument"
           },
           "income" : {
             "$ref" : "#/components/schemas/ConsoleRequestIncome"
@@ -514,6 +558,35 @@
         },
         "type" : "object"
       },
+      "ConsoleRequestDuiData" : {
+        "properties" : {
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "dui" : {
+            "type" : "string"
+          },
+          "expiryDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "firstNames" : {
+            "type" : "string"
+          },
+          "gender" : {
+            "type" : "string"
+          },
+          "issueDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "lastNames" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ConsoleRequestExpectedActivity" : {
         "properties" : {
           "monthlyAmountRangeCode" : {
@@ -534,6 +607,78 @@
           },
           "updatedAt" : {
             "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestIdentityDocument" : {
+        "properties" : {
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "checkDigitValid" : {
+            "type" : "boolean"
+          },
+          "confidence" : {
+            "type" : "number"
+          },
+          "confirmed" : {
+            "$ref" : "#/components/schemas/ConsoleRequestDuiData"
+          },
+          "confirmedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "correctedFields" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "duiMatchesDeclared" : {
+            "type" : "boolean"
+          },
+          "expired" : {
+            "type" : "boolean"
+          },
+          "failure" : {
+            "type" : "string"
+          },
+          "looksAuthentic" : {
+            "type" : "boolean"
+          },
+          "namesMatchDeclared" : {
+            "type" : "boolean"
+          },
+          "ocrModel" : {
+            "type" : "string"
+          },
+          "ocrStatus" : {
+            "enum" : [ "READ", "UNREADABLE", "FAILED" ],
+            "type" : "string"
+          },
+          "photos" : {
+            "items" : {
+              "enum" : [ "FRONT", "BACK" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "processedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "read" : {
+            "$ref" : "#/components/schemas/ConsoleRequestDuiData"
+          },
+          "unreadableReason" : {
+            "enum" : [ "BLURRY", "GLARE", "CROPPED", "TOO_DARK", "NOT_A_DUI", "WRONG_SIDES", "OTHER" ],
+            "type" : "string"
+          },
+          "unreadableSide" : {
+            "enum" : [ "FRONT", "BACK", "BOTH" ],
             "type" : "string"
           }
         },
@@ -719,7 +864,7 @@
             "type" : "string"
           },
           "step" : {
-            "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
+            "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "IDENTITY_DOCUMENT", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
             "type" : "string"
           },
           "typingSpeedCps" : {
@@ -741,7 +886,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },
@@ -921,6 +1066,60 @@
           }
         },
         "required" : [ "monthlyAmountRangeCode", "transactionTypeCode" ],
+        "type" : "object"
+      },
+      "IdentityDocumentResponse" : {
+        "properties" : {
+          "attempts" : {
+            "description" : "Capturas hechas en esta solicitud",
+            "example" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "birthDate" : {
+            "description" : "Fecha de nacimiento",
+            "example" : "1990-04-12",
+            "format" : "date",
+            "type" : "string"
+          },
+          "dui" : {
+            "description" : "Número de DUI leído",
+            "example" : "01234567-8",
+            "type" : "string"
+          },
+          "expiryDate" : {
+            "description" : "Fecha de vencimiento",
+            "example" : "2029-06-01",
+            "format" : "date",
+            "type" : "string"
+          },
+          "firstNames" : {
+            "description" : "Nombres leídos",
+            "example" : "María José",
+            "type" : "string"
+          },
+          "gender" : {
+            "description" : "Sexo: M o F",
+            "example" : "F",
+            "type" : "string"
+          },
+          "issueDate" : {
+            "description" : "Fecha de expedición",
+            "example" : "2021-06-01",
+            "format" : "date",
+            "type" : "string"
+          },
+          "lastNames" : {
+            "description" : "Apellidos leídos",
+            "example" : "Pérez López",
+            "type" : "string"
+          },
+          "status" : {
+            "description" : "`READ`: datos leídos. `FAILED`: el lector no está disponible y la persona escribe sus datos a mano",
+            "enum" : [ "READ", "UNREADABLE", "FAILED" ],
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "IncomeDeclarationRequest" : {
@@ -3220,6 +3419,63 @@
         "tags" : [ "Consola · Solicitudes" ]
       }
     },
+    "/api/console/requests/{requestId}/identity-document/{side}" : {
+      "get" : {
+        "description" : "Descifra la foto guardada en el expediente. Cada consulta queda en la auditoría de accesos del usuario y la respuesta no se guarda en caché.",
+        "operationId" : "consoleIdentityDocumentPhoto",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "side",
+          "required" : true,
+          "schema" : {
+            "enum" : [ "FRONT", "BACK" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "image/jpeg" : { },
+              "image/png" : { }
+            },
+            "description" : "La foto (JPEG o PNG)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no tiene esa foto"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Foto del DUI de una solicitud (frente o reverso)",
+        "tags" : [ "Consola · Solicitudes" ]
+      }
+    },
     "/api/console/score-rules" : {
       "get" : {
         "description" : "Hoy solo R-01 (monto mensual bajo → riesgo bajo). Los umbrales no se editan en este sprint.",
@@ -3834,6 +4090,174 @@
           }
         },
         "summary" : "Paso 3: registra el movimiento esperado y asigna el score de riesgo",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}/identity-document" : {
+      "put" : {
+        "description" : "Va después de los datos básicos. Multipart con `front` y `back`, JPEG o PNG de hasta 5 MB cada una. Guarda las fotos cifradas en el expediente y lee sus datos para la pantalla de confirmación; un dato que no se leyó con claridad viene `null`. Si el lector no está disponible responde `status: FAILED` y la persona escribe sus datos al confirmar. El paso se completa al confirmar. Se puede repetir mientras la solicitud está en progreso; las fotos nuevas piden confirmar otra vez.",
+        "operationId" : "identityDocumentCapture",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "back" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  },
+                  "front" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "back", "front" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IdentityDocumentResponse"
+                }
+              }
+            },
+            "description" : "Datos leídos del DUI, para que la persona los confirme o corrija en los datos básicos"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta una foto, está vacía o no es JPEG ni PNG"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Faltan los datos básicos o la solicitud ya no está en progreso"
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Una foto pasa de 5 MB"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Las fotos no se pueden leer: `reason` dice por qué (BLURRY, GLARE, CROPPED, TOO_DARK, NOT_A_DUI, WRONG_SIDES, OTHER) y `side` qué foto repetir (FRONT, BACK, BOTH; puede faltar)"
+          }
+        },
+        "summary" : "Paso 3: fotos del DUI (frente y reverso) y lectura de sus datos",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}/identity-document/confirmation" : {
+      "put" : {
+        "description" : "Lo que la persona confirma en la pantalla «¿Leímos bien tus datos?». Se guarda junto a lo leído (la consola ve qué se corrigió) y se compara con los datos básicos. Completa el paso del DUI.",
+        "operationId" : "identityDocumentConfirm",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfirmIdentityDocumentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingRequestResponse"
+                }
+              }
+            },
+            "description" : "Resumen de la solicitud con el paso completado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Datos inválidos"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Faltan los datos básicos o las fotos legibles del DUI, o la solicitud ya no está en progreso"
+          }
+        },
+        "summary" : "Paso 3: confirma o corrige los datos leídos del DUI",
         "tags" : [ "Onboarding" ]
       }
     },

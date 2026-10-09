@@ -30,7 +30,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(ApiException.class)
 	public ProblemDetail businessError(ApiException ex) {
-		return ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage());
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage());
+		ex.getProperties().forEach(problem::setProperty);
+		return problem;
 	}
 
 	/** Same as any business error, plus the {@code Retry-After} header. */

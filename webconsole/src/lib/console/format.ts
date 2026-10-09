@@ -44,6 +44,7 @@ export const canTakeAlerts = (role: Role) => role === "FRAUD_ANALYST" || role ==
 export const STEPS: { step: Step; name: string }[] = [
   { step: "PRIVACY_NOTICE", name: "Aviso de privacidad" },
   { step: "BASIC_DATA", name: "Datos básicos" },
+  { step: "IDENTITY_DOCUMENT", name: "DUI" },
   { step: "INCOME", name: "Ingresos" },
   { step: "EXPECTED_ACTIVITY", name: "Movimiento esperado" },
   { step: "REVIEW", name: "Revisión" },

@@ -30,7 +30,7 @@ public record CaptureSignalsRequest(
 		@Schema(description = "Ubicación aproximada reportada por la app", example = "San Salvador, El Salvador") @Size(max = 120) String approximateLocation,
 		@Schema(description = "País, ISO 3166-1 alfa-2", example = "SV") @Pattern(regexp = "^[A-Za-z]{2}$") String countryIso,
 		@Schema(description = "Ritmo de escritura en caracteres por minuto; el servidor lo clasifica", example = "185") @Min(0) @Max(2000) Short typingSpeedCpm,
-		@Schema(description = "Tiempo por paso del formulario") @Valid @Size(max = 5) List<StepTiming> steps) {
+		@Schema(description = "Tiempo por paso del formulario") @Valid @Size(max = 6) List<StepTiming> steps) {
 
 	/**
 	 * Interaction pattern of one screen of the form: time on the screen (from {@code startedAt} to

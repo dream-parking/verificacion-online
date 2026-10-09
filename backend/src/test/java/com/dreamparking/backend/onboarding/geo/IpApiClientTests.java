@@ -158,4 +158,25 @@ class IpApiClientTests {
 		assertThat(requested.get()).isNull();
 	}
 
+	@Test
+	void anAddressAlreadyLocatedIsAnsweredWithoutAskingTheProviderAgain() throws Exception {
+		IpApiClient client = client(true, "", Duration.ofSeconds(2));
+		IpGeolocation first = client.locate(ip());
+		requested.set(null);
+		statusCode = 500;
+
+		assertThat(client.locate(ip())).isEqualTo(first);
+		assertThat(requested.get()).isNull();
+	}
+
+	@Test
+	void failuresAreNotCached() throws Exception {
+		IpApiClient client = client(true, "", Duration.ofSeconds(2));
+		statusCode = 429;
+		assertThatThrownBy(() -> client.locate(ip())).isInstanceOf(GeolocationException.class);
+		statusCode = 200;
+
+		assertThat(client.locate(ip()).city()).isEqualTo("San Salvador");
+	}
+
 }

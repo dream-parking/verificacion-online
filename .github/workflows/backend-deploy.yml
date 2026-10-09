@@ -1,11 +1,17 @@
 name: backend-deploy
 
-# main -> Dev, QA -> QA. Image goes to GHCR (free), Azure Container Apps pulls it anonymously,
+# dev -> Dev, QA -> QA. Image goes to GHCR (free), Azure Container Apps pulls it anonymously,
 # so the package must be public. Azure login uses OIDC (no stored passwords).
+# No tests here: pushes to dev/QA only arrive through PRs, and the required `test` check (ci.yml) already
+# ran `./mvnw verify` on that same merge result. Docs and test-only changes don't trigger a deploy.
 on:
   push:
-    branches: [main, QA]
-    paths: ["backend/**", ".github/workflows/backend-deploy.yml"]
+    branches: [dev, QA]
+    paths:
+      - "backend/**"
+      - "!backend/**/*.md"
+      - "!backend/src/test/**"
+      - ".github/workflows/backend-deploy.yml"
   workflow_dispatch:
 
 concurrency:
@@ -19,28 +25,14 @@ permissions:
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/verificacion-online-backend
-  APP_ENV: ${{ github.ref_name == 'main' && 'dev' || 'qa' }}
+  APP_ENV: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
   RESOURCE_GROUP: rg-verificaciononline
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: maven
-      - run: ./mvnw -B verify
-
   deploy:
-    needs: test
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'dev' || 'qa' }}
+    timeout-minutes: 20
+    environment: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
     steps:
       - uses: actions/checkout@v4
 

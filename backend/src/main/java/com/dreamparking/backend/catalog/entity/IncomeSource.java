@@ -8,7 +8,7 @@ import jakarta.persistence.Table;
 /** Catalog of declared income sources (salary, own business, remittances...). */
 @Entity
 @Table(name = "income_source")
-public class IncomeSource {
+public class IncomeSource implements CatalogEntry {
 
 	@Id
 	@Column(name = "code", length = 30)

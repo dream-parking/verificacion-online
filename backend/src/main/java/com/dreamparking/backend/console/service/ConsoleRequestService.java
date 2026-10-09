@@ -1,10 +1,11 @@
 package com.dreamparking.backend.console.service;
 
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,14 +14,12 @@ import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.console.dto.ConsoleRequestDetail;
 import com.dreamparking.backend.console.dto.ConsoleRequestListItem;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
-import com.dreamparking.backend.onboarding.entity.RequestListItem;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
-import com.dreamparking.backend.onboarding.repository.RequestListItemRepository;
 import com.dreamparking.backend.onboarding.repository.RequestSignalsRepository;
 import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
@@ -33,7 +32,26 @@ public class ConsoleRequestService {
 
 	static final int MAX_PAGE_SIZE = 100;
 
-	private final RequestListItemRepository listItems;
+	/** Console filters; a null parameter disables its filter. Fixed SQL: the values only travel as bind parameters. */
+	private static final String LIST_FILTER = """
+			WHERE (CAST(:status AS text) IS NULL OR status = CAST(:status AS request_status))
+			  AND (CAST(:riskLevel AS text) IS NULL OR risk_level = CAST(:riskLevel AS risk_level))
+			  AND (CAST(:like AS text) IS NULL
+			       OR lower(name) LIKE CAST(:like AS text) ESCAPE '\\'
+			       OR lower(number) LIKE CAST(:like AS text) ESCAPE '\\')
+			""";
+
+	private static final String LIST_PAGE = """
+			SELECT v.*, p.total FROM (
+			  SELECT id, activity_date, count(*) OVER () AS total FROM v_request_list
+			""" + LIST_FILTER + """
+			  ORDER BY activity_date DESC, id OFFSET :offset LIMIT :limit
+			) p JOIN v_request_list v ON v.id = p.id
+			ORDER BY p.activity_date DESC, p.id""";
+
+	private static final String LIST_COUNT = "SELECT count(*) FROM v_request_list " + LIST_FILTER;
+
+	private final NamedParameterJdbcTemplate jdbc;
 
 	private final OnboardingRequestRepository requests;
 
@@ -49,11 +67,11 @@ public class ConsoleRequestService {
 
 	private final RiskAssessmentService riskAssessments;
 
-	public ConsoleRequestService(RequestListItemRepository listItems, OnboardingRequestRepository requests,
+	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
 			RiskAssessmentService riskAssessments) {
-		this.listItems = listItems;
+		this.jdbc = jdbc;
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
 		this.expectedActivities = expectedActivities;
@@ -63,24 +81,42 @@ public class ConsoleRequestService {
 		this.riskAssessments = riskAssessments;
 	}
 
-	/** Newest first; {@code query} matches the applicant's name or the request number. */
+	/**
+	 * Newest first; {@code query} matches the applicant's name or the request number.
+	 * <p>
+	 * The console reads every page at once, so each page must be cheap: the inner query asks the view for the id and
+	 * date only, PostgreSQL then drops the view's joins and walks {@code ix_request_activity} alone (index-only, also
+	 * for deep pages), and the joins run for the rows of the page only. The total comes in the same round trip. Plain
+	 * JDBC because the list is read-only: loading it as Hibernate entities cost about a third more CPU per page.
+	 */
 	public PageResponse<ConsoleRequestListItem> list(RequestStatus status, RiskLevel riskLevel, String query,
 			int page, int size) {
-		Specification<RequestListItem> spec = (root, q, cb) -> cb.conjunction();
-		if (status != null) {
-			spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status));
+		int pageNumber = Math.max(page, 0);
+		int pageSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+		String like = query == null || query.isBlank() ? null
+				: "%" + escapeLike(query.trim().toLowerCase()) + "%";
+		MapSqlParameterSource params = new MapSqlParameterSource()
+			.addValue("status", status == null ? null : status.name())
+			.addValue("riskLevel", riskLevel == null ? null : riskLevel.name())
+			.addValue("like", like)
+			.addValue("offset", (long) pageNumber * pageSize)
+			.addValue("limit", pageSize);
+
+		long[] total = { -1 };
+		List<ConsoleRequestListItem> content = jdbc.query(LIST_PAGE, params, (rs, row) -> {
+			total[0] = rs.getLong("total");
+			OffsetDateTime date = rs.getObject("activity_date", OffsetDateTime.class);
+			return new ConsoleRequestListItem(rs.getObject("id", UUID.class), rs.getString("number"),
+					rs.getString("name"), date == null ? null : date.toInstant(), rs.getString("transaction_type_label"),
+					rs.getString("monthly_amount_range_label"), RiskLevel.valueOf(rs.getString("risk_level")),
+					RequestStatus.valueOf(rs.getString("status")), rs.getShort("completed_steps"));
+		});
+		if (total[0] < 0) {
+			// Past the last page (or nothing matches): the window count came with no row.
+			total[0] = jdbc.queryForObject(LIST_COUNT, params, Long.class);
 		}
-		if (riskLevel != null) {
-			spec = spec.and((root, q, cb) -> cb.equal(root.get("riskLevel"), riskLevel));
-		}
-		if (query != null && !query.isBlank()) {
-			String like = "%" + escapeLike(query.trim().toLowerCase()) + "%";
-			spec = spec.and((root, q, cb) -> cb.or(cb.like(cb.lower(root.get("name")), like, '\\'),
-					cb.like(cb.lower(root.get("number")), like, '\\')));
-		}
-		PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE),
-				Sort.by(Sort.Order.desc("date"), Sort.Order.asc("id")));
-		return PageResponse.of(listItems.findAll(spec, pageable), ConsoleRequestListItem::of);
+		int totalPages = (int) ((total[0] + pageSize - 1) / pageSize);
+		return new PageResponse<>(content, pageNumber, pageSize, total[0], totalPages);
 	}
 
 	public ConsoleRequestDetail detail(UUID requestId) {
@@ -107,7 +143,7 @@ public class ConsoleRequestService {
 		var stepTimes = steps.findByRequestIdOrderByStartedAt(requestId)
 			.stream()
 			.map(s -> new ConsoleRequestDetail.StepTime(s.getStep(), s.getStartedAt(), s.getCompletedAt(),
-					s.getDurationSeconds(), s.getAttempts()))
+					s.getDurationSeconds(), s.getAttempts(), s.getTypingSpeedCps()))
 			.toList();
 		var timeline = events.findByRequestIdOrderByOccurredAt(requestId)
 			.stream()
@@ -122,9 +158,16 @@ public class ConsoleRequestService {
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {
+		var geo = s.getGeolocation();
+		var ipDetails = geo == null || geo.getLookedUpAt() == null ? null
+				: new ConsoleRequestDetail.IpDetails(geo.getCountry(), geo.getCountryCode(), geo.getRegion(),
+						geo.getRegionName(), geo.getCity(), geo.getZip(), geo.getTimezone(), geo.getIsp(),
+						geo.getOrg(), geo.getAsName(), geo.getFailure(), geo.getLookedUpAt());
 		return new ConsoleRequestDetail.Signals(s.getIp() == null ? null : s.getIp().getHostAddress(),
 				s.getApproximateLocation(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
-				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice());
+				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice(),
+				geo == null ? null : geo.getStatus(), geo == null ? null : geo.getLatitude(),
+				geo == null ? null : geo.getLongitude(), ipDetails, s.getCapturedAt());
 	}
 
 	private static String escapeLike(String text) {

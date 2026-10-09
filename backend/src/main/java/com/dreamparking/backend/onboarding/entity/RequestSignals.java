@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -66,6 +67,13 @@ public class RequestSignals {
 	@Column(name = "requests_from_same_device")
 	private Long requestsFromSameDevice;
 
+	@Column(name = "captured_at")
+	private Instant capturedAt;
+
+	/** Same columns as {@link OnboardingSession}; all null when the request has no session yet. */
+	@Embedded
+	private SessionGeolocation geolocation;
+
 	public UUID getRequestId() {
 		return requestId;
 	}
@@ -112,6 +120,14 @@ public class RequestSignals {
 
 	public Long getRequestsFromSameDevice() {
 		return requestsFromSameDevice;
+	}
+
+	public Instant getCapturedAt() {
+		return capturedAt;
+	}
+
+	public SessionGeolocation getGeolocation() {
+		return geolocation;
 	}
 
 }

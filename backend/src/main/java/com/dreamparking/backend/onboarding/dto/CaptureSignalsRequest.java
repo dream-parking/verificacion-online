@@ -1,9 +1,12 @@
 package com.dreamparking.backend.onboarding.dto;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -29,10 +32,14 @@ public record CaptureSignalsRequest(
 		@Schema(description = "Ritmo de escritura en caracteres por minuto; el servidor lo clasifica", example = "185") @Min(0) @Max(2000) Short typingSpeedCpm,
 		@Schema(description = "Tiempo por paso del formulario") @Valid @Size(max = 5) List<StepTiming> steps) {
 
-	/** Time spent on one step of the form. */
+	/**
+	 * Interaction pattern of one screen of the form: time on the screen (from {@code startedAt} to
+	 * {@code completedAt}) and typing speed. Only the measures travel, never the text typed.
+	 */
 	@Schema(name = "CaptureSignalsStepTiming")
 	public record StepTiming(@NotNull OnboardingStep step, @NotNull Instant startedAt, Instant completedAt,
-			@Min(1) Short attempts) {
+			@Min(1) Short attempts,
+			@Schema(description = "Velocidad de escritura en la pantalla, en caracteres por segundo; se omite si no se escribió nada", example = "3.25") @DecimalMin("0") @DecimalMax("50") BigDecimal typingSpeedCps) {
 	}
 
 }

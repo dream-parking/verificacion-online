@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 
 import '../theme.dart';
 
-/// Botón primario amarillo en píldora (`.btn` del diseño).
-class BotonPrimario extends StatelessWidget {
-  const BotonPrimario({super.key, required this.texto, required this.onPressed});
+/// Yellow pill-shaped primary button (`.btn` in the design).
+class PrimaryButton extends StatelessWidget {
+  const PrimaryButton({super.key, required this.text, required this.onPressed});
 
-  final String texto;
+  final String text;
   final VoidCallback? onPressed;
 
   @override
@@ -23,8 +23,8 @@ class BotonPrimario extends StatelessWidget {
           elevation: const WidgetStatePropertyAll(0),
           backgroundColor: WidgetStateProperty.resolveWith((s) {
             if (s.contains(WidgetState.disabled)) return AppColors.disabled;
-            if (s.contains(WidgetState.pressed) || s.contains(WidgetState.hovered)) return AppColors.yellowHover;
-            return AppColors.yellow;
+            if (s.contains(WidgetState.pressed) || s.contains(WidgetState.hovered)) return AppColors.brandHover;
+            return AppColors.brand;
           }),
           foregroundColor: WidgetStateProperty.resolveWith(
             (s) => s.contains(WidgetState.disabled) ? AppColors.muted : AppColors.ink,
@@ -33,17 +33,17 @@ class BotonPrimario extends StatelessWidget {
             TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.3),
           ),
         ),
-        child: Text(texto.toUpperCase(), textAlign: TextAlign.center),
+        child: Text(text.toUpperCase(), textAlign: TextAlign.center),
       ),
     );
   }
 }
 
-/// Botón secundario con borde (`.btn2` del diseño).
-class BotonSecundario extends StatelessWidget {
-  const BotonSecundario({super.key, required this.texto, required this.onPressed});
+/// Outlined secondary button (`.btn2` in the design).
+class SecondaryButton extends StatelessWidget {
+  const SecondaryButton({super.key, required this.text, required this.onPressed});
 
-  final String texto;
+  final String text;
   final VoidCallback? onPressed;
 
   @override
@@ -65,17 +65,17 @@ class BotonSecundario extends StatelessWidget {
           ),
           textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         ),
-        child: Text(texto.toUpperCase(), textAlign: TextAlign.center),
+        child: Text(text.toUpperCase(), textAlign: TextAlign.center),
       ),
     );
   }
 }
 
-/// Enlace azul subrayado (`.lnk` del diseño).
-class BotonEnlace extends StatelessWidget {
-  const BotonEnlace({super.key, required this.texto, required this.onPressed, this.semanticLabel});
+/// Underlined blue link (`.lnk` in the design).
+class LinkButton extends StatelessWidget {
+  const LinkButton({super.key, required this.text, required this.onPressed, this.semanticLabel});
 
-  final String texto;
+  final String text;
   final VoidCallback onPressed;
   final String? semanticLabel;
 
@@ -98,72 +98,80 @@ class BotonEnlace extends StatelessWidget {
             decorationColor: AppColors.blue,
           ),
         ),
-        child: Text(texto),
+        child: Text(text),
       ),
     );
   }
 }
 
-/// Mensaje de error de validación bajo un campo.
-class TextoError extends StatelessWidget {
-  const TextoError(this.mensaje, {super.key});
+/// Validation error message below a field.
+class ErrorText extends StatelessWidget {
+  const ErrorText(this.message, {super.key});
 
-  final String mensaje;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: Semantics(liveRegion: true, child: Text(mensaje, style: AppText.error)),
+      child: Semantics(liveRegion: true, child: Text(message, style: AppText.error)),
     );
   }
 }
 
-/// Formateador que reemplaza el texto por `formato(texto)` y deja el cursor al final.
-TextInputFormatter mascara(String Function(String) formato) {
-  return TextInputFormatter.withFunction((_, nuevo) {
-    final t = formato(nuevo.text);
-    return TextEditingValue(text: t, selection: TextSelection.collapsed(offset: t.length));
+/// Formatter that replaces the text with `format(text)` (a mask of digits such as DUI or phone).
+/// The cursor stays after the same digit it was after, so a digit can be fixed in the middle
+/// without the cursor jumping to the end.
+TextInputFormatter maskFormatter(String Function(String) format) {
+  return TextInputFormatter.withFunction((_, newValue) {
+    final t = format(newValue.text);
+    final cursor = newValue.selection.isValid ? newValue.selection.extentOffset : newValue.text.length;
+    final digitsBefore = newValue.text.substring(0, cursor.clamp(0, newValue.text.length)).replaceAll(RegExp(r'\D'), '').length;
+    var offset = 0;
+    for (var seen = 0; offset < t.length && seen < digitsBefore; offset++) {
+      if (RegExp(r'\d').hasMatch(t[offset])) seen++;
+    }
+    return TextEditingValue(text: t, selection: TextSelection.collapsed(offset: offset));
   });
 }
 
-/// Campo de texto con línea inferior (`.fld` del diseño).
-class CampoTexto extends StatelessWidget {
-  const CampoTexto({
+/// Text field with a bottom line (`.fld` in the design).
+class LabeledTextField extends StatelessWidget {
+  const LabeledTextField({
     super.key,
     required this.controller,
     required this.placeholder,
     required this.error,
-    this.etiqueta,
-    this.teclado = TextInputType.text,
-    this.autofill,
+    this.label,
+    this.keyboardType = TextInputType.text,
+    this.autofillHints,
     this.formatters = const [],
     this.onChanged,
   });
 
   final TextEditingController controller;
-  final String? etiqueta;
+  final String? label;
   final String placeholder;
   final String error;
-  final TextInputType teclado;
-  final Iterable<String>? autofill;
+  final TextInputType keyboardType;
+  final Iterable<String>? autofillHints;
   final List<TextInputFormatter> formatters;
   final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final hayError = error.isNotEmpty;
-    UnderlineInputBorder linea(Color c, double w) =>
+    final hasError = error.isNotEmpty;
+    UnderlineInputBorder line(Color c, double w) =>
         UnderlineInputBorder(borderSide: BorderSide(color: c, width: w));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (etiqueta != null) Text(etiqueta!, style: AppText.label),
+        if (label != null) Text(label!, style: AppText.label),
         TextField(
           controller: controller,
-          keyboardType: teclado,
-          autofillHints: autofill,
+          keyboardType: keyboardType,
+          autofillHints: autofillHints,
           inputFormatters: formatters,
           onChanged: onChanged,
           style: AppText.body,
@@ -172,43 +180,43 @@ class CampoTexto extends StatelessWidget {
             hintStyle: const TextStyle(color: AppColors.placeholder, fontSize: 16),
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            enabledBorder: hayError ? linea(AppColors.error, 2) : linea(AppColors.dark, 1),
-            focusedBorder: hayError ? linea(AppColors.error, 2) : linea(AppColors.blue, 2),
+            enabledBorder: hasError ? line(AppColors.error, 2) : line(AppColors.dark, 1),
+            focusedBorder: hasError ? line(AppColors.error, 2) : line(AppColors.blue, 2),
           ),
         ),
-        if (hayError) TextoError(error),
+        if (hasError) ErrorText(error),
       ],
     );
   }
 }
 
-/// Opción seleccionable tipo radio en tarjeta (`.opt` del diseño).
-class OpcionTarjeta extends StatelessWidget {
-  const OpcionTarjeta({
+/// Radio-style selectable option card (`.opt` in the design).
+class OptionCard extends StatelessWidget {
+  const OptionCard({
     super.key,
-    required this.titulo,
-    required this.seleccionada,
+    required this.title,
+    required this.selected,
     required this.onTap,
-    this.descripcion = '',
+    this.description = '',
   });
 
-  final String titulo;
-  final String descripcion;
-  final bool seleccionada;
+  final String title;
+  final String description;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final conDescripcion = descripcion.isNotEmpty;
+    final hasDescription = description.isNotEmpty;
     return Semantics(
       inMutuallyExclusiveGroup: true,
-      checked: seleccionada,
+      checked: selected,
       child: Material(
-        color: seleccionada ? AppColors.blueSoft : Colors.white,
+        color: selected ? AppColors.brandSoft : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: seleccionada
-              ? const BorderSide(color: AppColors.blue, width: 2)
+          side: selected
+              ? const BorderSide(color: AppColors.brandGreen, width: 2)
               : const BorderSide(color: AppColors.borderStrong),
         ),
         child: InkWell(
@@ -228,22 +236,22 @@ class OpcionTarjeta extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: Colors.white,
                       border: Border.all(
-                        color: seleccionada ? AppColors.blue : AppColors.muted,
-                        width: seleccionada ? 7 : 2,
+                        color: selected ? AppColors.brandGreen : AppColors.muted,
+                        width: selected ? 7 : 2,
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: conDescripcion
+                    child: hasDescription
                         ? Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(titulo, style: AppText.bodyBold),
-                              Text(descripcion, style: AppText.small),
+                              Text(title, style: AppText.bodyBold),
+                              Text(description, style: AppText.small),
                             ],
                           )
-                        : Text(titulo, style: AppText.body),
+                        : Text(title, style: AppText.body),
                   ),
                 ],
               ),
@@ -255,25 +263,25 @@ class OpcionTarjeta extends StatelessWidget {
   }
 }
 
-/// Barra de progreso segmentada "Paso N de 4".
-class ProgresoPasos extends StatelessWidget {
-  const ProgresoPasos({super.key, required this.paso, this.total = 4});
+/// Segmented "Paso N de 4" progress bar.
+class StepProgress extends StatelessWidget {
+  const StepProgress({super.key, required this.step, this.total = 4});
 
-  final int paso;
+  final int step;
   final int total;
 
   @override
   Widget build(BuildContext context) {
-    final texto = 'Paso $paso de $total';
+    final text = 'Paso $step de $total';
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 14),
       child: Semantics(
-        label: texto,
+        label: text,
         excludeSemantics: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(texto, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.muted)),
+            Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.muted)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -284,7 +292,7 @@ class ProgresoPasos extends StatelessWidget {
                       duration: const Duration(milliseconds: 250),
                       height: 6,
                       decoration: BoxDecoration(
-                        color: i <= paso ? AppColors.blue : AppColors.border,
+                        color: i <= step ? AppColors.brandGreen : AppColors.border,
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -299,36 +307,55 @@ class ProgresoPasos extends StatelessWidget {
   }
 }
 
-/// Logo "Ceiba": círculo amarillo con punto negro.
+/// Banco Tangamandapio brand for the header: round emblem and bank name, as in the web
+/// console sidebar (Logo.tsx), adapted to a white background.
 class Logo extends StatelessWidget {
   const Logo({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(color: AppColors.yellow, shape: BoxShape.circle),
-          child: Container(
-            width: 10,
-            height: 10,
-            decoration: const BoxDecoration(color: AppColors.ink, shape: BoxShape.circle),
+    return Semantics(
+      label: 'Banco Tangamandapio',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // The emblem already has its own round frame: no extra ring, so it does not look like two circles.
+          ClipOval(child: Image.asset('assets/brand/emblem.png', width: 40, height: 40, fit: BoxFit.cover)),
+          const SizedBox(width: 10),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('BANCO', style: AppText.brand(10, color: AppColors.brandGreen, weight: 600, letterSpacing: 3.2)),
+              Text('TANGAMANDAPIO', style: AppText.brand(15, color: AppColors.brandNavy, weight: 700)),
+            ],
           ),
-        ),
-        const SizedBox(width: 8),
-        Text('Ceiba', style: AppText.heading(22)),
-      ],
+        ],
+      ),
     );
   }
 }
 
-/// Círculo negro numerado para listas de pasos.
-class Numero extends StatelessWidget {
-  const Numero(this.n, {super.key, this.size = 32});
+/// Full logo with the tagline, for the welcome screen (same file as the console login).
+class FullLogo extends StatelessWidget {
+  const FullLogo({super.key, this.width = 150});
+
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/brand/logo-tangamandapio.webp',
+      width: width,
+      semanticLabel: 'Banco Tangamandapio. Confianza que nos une, futuro que construimos',
+    );
+  }
+}
+
+/// Numbered black circle for step lists.
+class NumberBadge extends StatelessWidget {
+  const NumberBadge(this.n, {super.key, this.size = 32});
 
   final int n;
   final double size;
@@ -345,12 +372,12 @@ class Numero extends StatelessWidget {
   }
 }
 
-/// Recuadro gris claro con texto explicativo.
-class Aviso extends StatelessWidget {
-  const Aviso({super.key, required this.destacado, required this.texto});
+/// Light gray box with explanatory text.
+class InfoBox extends StatelessWidget {
+  const InfoBox({super.key, required this.highlight, required this.text});
 
-  final String destacado;
-  final String texto;
+  final String highlight;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -360,8 +387,8 @@ class Aviso extends StatelessWidget {
       decoration: BoxDecoration(color: AppColors.neutral100, borderRadius: BorderRadius.circular(8)),
       child: Text.rich(
         TextSpan(children: [
-          TextSpan(text: destacado, style: const TextStyle(fontWeight: FontWeight.w700)),
-          TextSpan(text: ' $texto'),
+          TextSpan(text: highlight, style: const TextStyle(fontWeight: FontWeight.w700)),
+          TextSpan(text: ' $text'),
         ]),
         style: AppText.body,
       ),
@@ -369,13 +396,13 @@ class Aviso extends StatelessWidget {
   }
 }
 
-/// Encabezado de color con "eyebrow" y título (pantallas de ingresos/movimiento).
-class Cabecera extends StatelessWidget {
-  const Cabecera({super.key, required this.color, required this.eyebrow, required this.titulo});
+/// Colored header with an "eyebrow" and a title (income / expected activity screens).
+class ColorHeader extends StatelessWidget {
+  const ColorHeader({super.key, required this.color, required this.eyebrow, required this.title});
 
   final Color color;
   final String eyebrow;
-  final String titulo;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -388,46 +415,46 @@ class Cabecera extends StatelessWidget {
         children: [
           Text(eyebrow, style: AppText.heading(16)),
           const SizedBox(height: 6),
-          Semantics(header: true, child: Text(titulo, style: AppText.heading(28, height: 1.15))),
+          Semantics(header: true, child: Text(title, style: AppText.heading(28, height: 1.15))),
         ],
       ),
     );
   }
 }
 
-/// Título de pantalla (h1).
-class Titulo extends StatelessWidget {
-  const Titulo(this.texto, {super.key, this.size = 28});
+/// Screen title (h1).
+class ScreenTitle extends StatelessWidget {
+  const ScreenTitle(this.text, {super.key, this.size = 28});
 
-  final String texto;
+  final String text;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(header: true, child: Text(texto, style: AppText.heading(size, height: 1.15)));
+    return Semantics(header: true, child: Text(text, style: AppText.heading(size, height: 1.15)));
   }
 }
 
-/// Subtítulo de sección (h2).
-class Subtitulo extends StatelessWidget {
-  const Subtitulo(this.texto, {super.key, this.size = 18});
+/// Section title (h2).
+class SectionTitle extends StatelessWidget {
+  const SectionTitle(this.text, {super.key, this.size = 18});
 
-  final String texto;
+  final String text;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(header: true, child: Text(texto, style: AppText.heading(size)));
+    return Semantics(header: true, child: Text(text, style: AppText.heading(size)));
   }
 }
 
-/// Fila icono + título + descripción.
-class FilaIcono extends StatelessWidget {
-  const FilaIcono({super.key, required this.leading, required this.titulo, required this.descripcion});
+/// Icon + title + description row.
+class IconRow extends StatelessWidget {
+  const IconRow({super.key, required this.leading, required this.title, required this.description});
 
   final Widget leading;
-  final String titulo;
-  final String descripcion;
+  final String title;
+  final String description;
 
   @override
   Widget build(BuildContext context) {
@@ -440,8 +467,8 @@ class FilaIcono extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(titulo, style: AppText.bodyBold),
-              if (descripcion.isNotEmpty) Text(descripcion, style: AppText.bodyMuted),
+              Text(title, style: AppText.bodyBold),
+              if (description.isNotEmpty) Text(description, style: AppText.bodyMuted),
             ],
           ),
         ),

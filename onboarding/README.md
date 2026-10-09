@@ -117,6 +117,16 @@ flutter analyze
 flutter test
 ```
 
+## 7. Instalar las versiones Dev y QA (testers)
+
+Cada push a `dev` o `QA` compila el APK y lo envía por **Firebase App Distribution** (proyecto `tangamandapio-onboarding`) a los grupos `dev` y `qa`.
+
+1. Abrir el correo de invitación de Firebase en el celular Android y aceptarla con la misma cuenta de Google.
+2. Instalar la app **App Tester** que propone Firebase y, desde ahí, descargar la versión.
+3. Las versiones nuevas llegan por correo y se actualizan sin desinstalar.
+
+Dev (`com.dreamparking.onboarding.dev`, *Tangamandapio Dev*) y QA (`com.dreamparking.onboarding.qa`, *Tangamandapio QA*) se pueden tener instaladas a la vez. Para agregar testers: Firebase Console → App Distribution → Testers & Groups.
+
 ## Problemas comunes
 
 - **"No supported devices connected":** el emulador no está encendido o el celular no tiene la depuración USB activada.

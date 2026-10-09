@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consola · Detalle de solicitud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&amp;family=Nunito:wght@700;800&amp;family=Open+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f4f4f4}
+a{color:#00448c}a:hover{color:#1e376e}
+</style>
+
+</head>
+<body>
+<div style="min-height: 2240px; display: flex; flex-wrap: wrap; background: #f4f4f4; color: #1a1b1a; font-family: 'Open Sans', sans-serif">
+  <nav aria-label="Navegación principal" style="flex: 1 1 248px; max-width: 100%; background: #2c2a29; color: #ffffff; display: flex; flex-direction: column; padding: 20px 0">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 20px 22px">
+      <img src="../assets/emblem.png" alt="" style="width: 44px; height: 44px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 0 2px #9ddfa6">
+      <div style="display: flex; flex-direction: column; line-height: 1">
+        <span style="font-family: 'Cinzel', serif; font-size: 10px; font-weight: 600; letter-spacing: 0.32em; color: #9ddfa6">BANCO</span>
+        <span style="font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700">TANGAMANDAPIO</span>
+      </div>
+    </div>
+    <a href="Solicitudes.html" aria-current="page" style="display: flex; align-items: center; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid #9ddfa6; background: #ffffff; color: #1a1b1a; font-weight: 600; text-decoration: none">Solicitudes</a>
+    <a href="#alertas" style="display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid transparent; color: #ffffff; font-weight: 600; text-decoration: none">Bandeja de alertas <span style="min-width: 24px; height: 24px; padding: 0 7px; box-sizing: border-box; border-radius: 50px; background: #9ddfa6; color: #1a1b1a; font-weight: 800; font-size: 13px; display: inline-flex; align-items: center; justify-content: center">3</span></a>
+    <a href="#mapa" style="display: flex; align-items: center; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid transparent; color: #ffffff; font-weight: 600; text-decoration: none">Mapa de ubicaciones</a>
+    <a href="#modelo" style="display: flex; align-items: center; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid transparent; color: #ffffff; font-weight: 600; text-decoration: none">Modelo de score</a>
+    <a href="#usuarios" style="display: flex; align-items: center; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid transparent; color: #ffffff; font-weight: 600; text-decoration: none">Usuarios</a>
+  </nav>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 36px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <div>
+      <a href="Solicitudes.html" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 20px; border-radius: 50px; border: 1px solid #1a1b1a; color: #1a1b1a; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 14px; text-transform: uppercase; text-decoration: none">‹ Volver a solicitudes</a>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px">
+      <div>
+        <h1 style="margin: 0 0 4px; font-family: 'Nunito', sans-serif; font-size: 30px; line-height: 1.1; font-weight: 800">Marta Alejandra Rivas Cruz</h1>
+        <div style="font-size: 16px; line-height: 24px; color: #4a4a4a">Solicitud <strong style="color: #1a1b1a">SOL-2026-00418</strong> · 09/10/2026 · 9:58 a. m.</div>
+      </div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap">
+        <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 3px 10px; font-weight: 700; font-size: 13px; background: #e2f5ec; color: #0b6b4a">✓ Completada</span>
+        <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 3px 10px; font-weight: 700; font-size: 13px; background: #e3edf8; color: #00448c; border: 1px solid #00448c">● Score bajo · 34</span>
+      </div>
+    </div>
+
+    <section aria-labelledby="h-score" style="background: #ffffff; border: 1px solid #e1e1e1; padding: 22px 24px; display: flex; flex-direction: column; gap: 18px">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px 32px; align-items: flex-start">
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 360px">
+          <h2 id="h-score" style="margin: 0; font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 800">Score de riesgo</h2>
+          <p style="margin: 0; font-size: 14px; line-height: 20px; color: #5b5b5b">Combina todas las señales disponibles. Ninguna señal aprueba ni rechaza la solicitud por sí sola.</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 18px">
+          <div style="display: flex; align-items: baseline; gap: 4px">
+            <span style="font-family: 'Nunito', sans-serif; font-size: 52px; line-height: 1; font-weight: 800; color: #00448c">34</span>
+            <span style="font-size: 18px; color: #5b5b5b; font-weight: 600">/ 100</span>
+          </div>
+          <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 5px 14px; font-weight: 700; font-size: 15px; background: #e3edf8; color: #00448c; border: 1px solid #00448c">● Bajo</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div style="position: relative; height: 10px; border-radius: 5px; display: flex; overflow: hidden">
+          <span style="flex: 40; background: #e3edf8"></span>
+          <span style="flex: 30; background: #fff0c2"></span>
+          <span style="flex: 30; background: #f6d9c4"></span>
+        </div>
+        <div style="position: relative; height: 0">
+          <span style="position: absolute; left: 34%; top: -16px; width: 4px; height: 22px; margin-left: -2px; border-radius: 2px; background: #1a1b1a"></span>
+        </div>
+        <div style="display: flex; font-size: 12px; color: #5b5b5b">
+          <span style="flex: 40">Bajo · 0 a 39</span>
+          <span style="flex: 30">Medio · 40 a 69</span>
+          <span style="flex: 30">Alto · 70 a 100</span>
+        </div>
+      </div>
+      <div role="table" aria-label="Aporte de cada señal al score" style="border-top: 1px solid #e8e8e8">
+        <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; padding: 10px 0; border-bottom: 1px solid #989696; font-size: 13px; font-weight: 700; color: #5b5b5b">
+          <div role="columnheader">Señal</div>
+          <div role="columnheader">Qué se observó</div>
+          <div role="columnheader">Aporte</div>
+          <div role="columnheader" style="text-align: right">Puntos</div>
+        </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 54px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; font-size: 15px; color: #1a1b1a">
+            <div role="cell" style="display: flex; flex-direction: column">
+              <span style="font-weight: 700">Monto declarado</span>
+              <span style="font-size: 13px; color: #5b5b5b">Perfil transaccional</span>
+            </div>
+            <div role="cell" style="line-height: 21px">$500 a $1,000 al mes</div>
+            <div role="cell">
+              
+                <span style="display: flex; height: 8px; border-radius: 4px; background: #e8e8e8; overflow: hidden"><span style="width: 32%; background: #00448c"></span></span>
+              
+              
+            </div>
+            <div role="cell" style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 16px">8 / 25</div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 54px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; font-size: 15px; color: #1a1b1a">
+            <div role="cell" style="display: flex; flex-direction: column">
+              <span style="font-weight: 700">Documento de identidad</span>
+              <span style="font-size: 13px; color: #5b5b5b">DUI + OCR</span>
+            </div>
+            <div role="cell" style="line-height: 21px">Legible. Nombre y DUI coinciden con lo escrito; 1 dato corregido.</div>
+            <div role="cell">
+              
+                <span style="display: flex; height: 8px; border-radius: 4px; background: #e8e8e8; overflow: hidden"><span style="width: 45%; background: #00448c"></span></span>
+              
+              
+            </div>
+            <div role="cell" style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 16px">9 / 20</div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 54px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; font-size: 15px; color: #1a1b1a">
+            <div role="cell" style="display: flex; flex-direction: column">
+              <span style="font-weight: 700">Ritmo de escritura</span>
+              <span style="font-size: 13px; color: #5b5b5b">Telemetría</span>
+            </div>
+            <div role="cell" style="line-height: 21px">Normal, unos 190 caracteres por minuto</div>
+            <div role="cell">
+              
+                <span style="display: flex; height: 8px; border-radius: 4px; background: #e8e8e8; overflow: hidden"><span style="width: 27%; background: #00448c"></span></span>
+              
+              
+            </div>
+            <div role="cell" style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 16px">4 / 15</div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 54px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; font-size: 15px; color: #1a1b1a">
+            <div role="cell" style="display: flex; flex-direction: column">
+              <span style="font-weight: 700">Dispositivo</span>
+              <span style="font-size: 13px; color: #5b5b5b">Telemetría</span>
+            </div>
+            <div role="cell" style="line-height: 21px">Primera solicitud desde este teléfono</div>
+            <div role="cell">
+              
+                <span style="display: flex; height: 8px; border-radius: 4px; background: #e8e8e8; overflow: hidden"><span style="width: 20%; background: #00448c"></span></span>
+              
+              
+            </div>
+            <div role="cell" style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 16px">2 / 10</div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 54px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; font-size: 15px; color: #1a1b1a">
+            <div role="cell" style="display: flex; flex-direction: column">
+              <span style="font-weight: 700">Horario</span>
+              <span style="font-size: 13px; color: #5b5b5b">Telemetría</span>
+            </div>
+            <div role="cell" style="line-height: 21px">Diurno: 9:31 a 9:58 a. m.</div>
+            <div role="cell">
+              
+                <span style="display: flex; height: 8px; border-radius: 4px; background: #e8e8e8; overflow: hidden"><span style="width: 0%; background: #00448c"></span></span>
+              
+              
+            </div>
+            <div role="cell" style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 16px">0 / 10</div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 54px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; font-size: 15px; color: #1a1b1a">
+            <div role="cell" style="display: flex; flex-direction: column">
+              <span style="font-weight: 700">Ciudad</span>
+              <span style="font-size: 13px; color: #5b5b5b">Ubicación</span>
+            </div>
+            <div role="cell" style="line-height: 21px">San Salvador; coincide con la IP</div>
+            <div role="cell">
+              
+                <span style="display: flex; height: 8px; border-radius: 4px; background: #e8e8e8; overflow: hidden"><span style="width: 55%; background: #00448c"></span></span>
+              
+              
+            </div>
+            <div role="cell" style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 16px">11 / 20</div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 54px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; font-size: 15px; color: #5b5b5b">
+            <div role="cell" style="display: flex; flex-direction: column">
+              <span style="font-weight: 700">Cotejo RNPN</span>
+              <span style="font-size: 13px; color: #5b5b5b">VDI-17</span>
+            </div>
+            <div role="cell" style="line-height: 21px">Aún no disponible: no suma ni resta</div>
+            <div role="cell">
+              
+              
+                <span style="display: inline-flex; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 12px; background: #ffffff; color: #5b5b5b; border: 1px dashed #989696">Llega en otro sprint</span>
+              
+            </div>
+            <div role="cell" style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 16px">—</div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 54px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; font-size: 15px; color: #5b5b5b">
+            <div role="cell" style="display: flex; flex-direction: column">
+              <span style="font-weight: 700">Prueba de vida</span>
+              <span style="font-size: 13px; color: #5b5b5b">VDI-11</span>
+            </div>
+            <div role="cell" style="line-height: 21px">Aún no disponible: no suma ni resta</div>
+            <div role="cell">
+              
+              
+                <span style="display: inline-flex; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 12px; background: #ffffff; color: #5b5b5b; border: 1px dashed #989696">Llega en otro sprint</span>
+              
+            </div>
+            <div role="cell" style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 16px">—</div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 54px; padding: 8px 0; border-bottom: 1px solid #e8e8e8; font-size: 15px; color: #5b5b5b">
+            <div role="cell" style="display: flex; flex-direction: column">
+              <span style="font-weight: 700">Listas internas</span>
+              <span style="font-size: 13px; color: #5b5b5b">VDI-13</span>
+            </div>
+            <div role="cell" style="line-height: 21px">Aún no disponible: no suma ni resta</div>
+            <div role="cell">
+              
+              
+                <span style="display: inline-flex; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 12px; background: #ffffff; color: #5b5b5b; border: 1px dashed #989696">Llega en otro sprint</span>
+              
+            </div>
+            <div role="cell" style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 16px">—</div>
+          </div>
+        
+        <div style="display: grid; grid-template-columns: 1.1fr 1.6fr 220px 90px; gap: 20px; align-items: center; min-height: 52px; font-weight: 700">
+          <div>Total</div><div></div><div></div>
+          <div style="text-align: right; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px">34 / 100</div>
+        </div>
+      </div>
+      <p style="margin: 0; font-size: 13px; color: #5b5b5b">Modelo de score v1 · evaluado el 09/10/2026 a las 9:58 a. m. · cada aporte queda guardado en el expediente.</p>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: stretch">
+      <section aria-labelledby="h-dui" style="flex: 1 1 520px; min-width: 0; background: #ffffff; border: 1px solid #e1e1e1; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+        <div>
+          <h2 id="h-dui" style="margin: 0 0 4px; font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 800">Documento de identidad</h2>
+          <p style="margin: 0; font-size: 14px; line-height: 20px; color: #5b5b5b">Imágenes cifradas en el expediente. Datos leídos por OCR y confirmados por la persona.</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+          <figure style="margin: 0; display: flex; flex-direction: column; gap: 6px">
+            <div role="img" aria-label="Frente del DUI" style="position: relative; aspect-ratio: 1.585; border-radius: 8px; background: #e3edf8; border: 1px solid #cccccc; overflow: hidden">
+              <div style="position: absolute; inset: 8%; display: flex; gap: 6%">
+                <div style="width: 26%; height: 78%; border-radius: 4px; background: #b9c9db"></div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 9px; padding-top: 4px">
+                  <span style="height: 7px; width: 90%; border-radius: 4px; background: #7d8fa6"></span>
+                  <span style="height: 7px; width: 70%; border-radius: 4px; background: #7d8fa6"></span>
+                  <span style="height: 7px; width: 82%; border-radius: 4px; background: #7d8fa6"></span>
+                  <span style="height: 7px; width: 55%; border-radius: 4px; background: #7d8fa6"></span>
+                </div>
+              </div>
+            </div>
+            <figcaption style="display: flex; justify-content: space-between; font-size: 13px"><span style="font-weight: 700">Frente</span><a href="#ampliar-frente">Ampliar</a></figcaption>
+          </figure>
+          <figure style="margin: 0; display: flex; flex-direction: column; gap: 6px">
+            <div role="img" aria-label="Reverso del DUI" style="position: relative; aspect-ratio: 1.585; border-radius: 8px; background: #e3edf8; border: 1px solid #cccccc; overflow: hidden">
+              <div style="position: absolute; inset: 8%; display: flex; flex-direction: column; gap: 9px">
+                <span style="height: 7px; width: 80%; border-radius: 4px; background: #7d8fa6"></span>
+                <span style="height: 7px; width: 64%; border-radius: 4px; background: #7d8fa6"></span>
+                <span style="height: 7px; width: 72%; border-radius: 4px; background: #7d8fa6"></span>
+                <span style="margin-top: auto; height: 22px; width: 100%; border-radius: 3px; background: repeating-linear-gradient(90deg, #7d8fa6 0 3px, transparent 3px 6px)"></span>
+              </div>
+            </div>
+            <figcaption style="display: flex; justify-content: space-between; font-size: 13px"><span style="font-weight: 700">Reverso</span><a href="#ampliar-reverso">Ampliar</a></figcaption>
+          </figure>
+        </div>
+        <div role="table" aria-label="Datos del DUI">
+          <div role="row" style="display: grid; grid-template-columns: 1.2fr 1fr 1.3fr; gap: 14px; padding: 8px 0; border-bottom: 1px solid #989696; font-size: 13px; font-weight: 700; color: #5b5b5b">
+            <div role="columnheader">Dato</div><div role="columnheader">Leído por OCR</div><div role="columnheader">Confirmado</div>
+          </div>
+          
+            <div role="row" style="display: grid; grid-template-columns: 1.2fr 1fr 1.3fr; gap: 14px; align-items: center; min-height: 44px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+              <div role="cell" style="color: #5b5b5b">Número de DUI</div>
+              <div role="cell" style="color: #4a4a4a">04567891-2</div>
+              <div role="cell" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+                <span style="font-weight: 600">04567891-2</span>
+                
+              </div>
+            </div>
+          
+            <div role="row" style="display: grid; grid-template-columns: 1.2fr 1fr 1.3fr; gap: 14px; align-items: center; min-height: 44px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+              <div role="cell" style="color: #5b5b5b">Nombres</div>
+              <div role="cell" style="color: #4a4a4a">MARTA ALEJANDRA</div>
+              <div role="cell" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+                <span style="font-weight: 600">Marta Alejandra</span>
+                
+              </div>
+            </div>
+          
+            <div role="row" style="display: grid; grid-template-columns: 1.2fr 1fr 1.3fr; gap: 14px; align-items: center; min-height: 44px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+              <div role="cell" style="color: #5b5b5b">Apellidos</div>
+              <div role="cell" style="color: #4a4a4a">RIVAS CRUZ</div>
+              <div role="cell" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+                <span style="font-weight: 600">Rivas Cruz</span>
+                
+              </div>
+            </div>
+          
+            <div role="row" style="display: grid; grid-template-columns: 1.2fr 1fr 1.3fr; gap: 14px; align-items: center; min-height: 44px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+              <div role="cell" style="color: #5b5b5b">Fecha de nacimiento</div>
+              <div role="cell" style="color: #8c1d18">14/08/1991</div>
+              <div role="cell" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+                <span style="font-weight: 600">14/03/1991</span>
+                <span style="display: inline-flex; border-radius: 50px; padding: 1px 8px; font-weight: 700; font-size: 12px; background: #fff0c2; color: #1a1b1a; border: 1px solid #7a4b00">Corregido</span>
+              </div>
+            </div>
+          
+            <div role="row" style="display: grid; grid-template-columns: 1.2fr 1fr 1.3fr; gap: 14px; align-items: center; min-height: 44px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+              <div role="cell" style="color: #5b5b5b">Vence el</div>
+              <div role="cell" style="color: #4a4a4a">22/07/2031</div>
+              <div role="cell" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+                <span style="font-weight: 600">22/07/2031</span>
+                
+              </div>
+            </div>
+          
+        </div>
+      </section>
+
+      <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+        <section aria-labelledby="h-ubi" style="background: #ffffff; border: 1px solid #e1e1e1; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px">
+          <div>
+            <h2 id="h-ubi" style="margin: 0 0 4px; font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 800">Ciudad de la solicitud</h2>
+            <p style="margin: 0; font-size: 14px; line-height: 20px; color: #5b5b5b">Desde el teléfono, con permiso de la persona. Solo ciudad y país, sin coordenadas.</p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px">
+            <span style="flex: none; width: 40px; height: 40px; border-radius: 50%; background: #e3edf8; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00448c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg></span>
+            <span style="font-family: 'Nunito', sans-serif; font-size: 20px; font-weight: 800">San Salvador, El Salvador</span>
+          </div>
+          <dl style="margin: 0; display: grid; grid-template-columns: 170px 1fr; gap: 8px 16px; font-size: 15px">
+            <dt style="color: #5b5b5b">Capturada</dt><dd style="margin: 0">09/10/2026 · 9:44 a. m.</dd>
+            <dt style="color: #5b5b5b">Ciudad por IP</dt><dd style="margin: 0">San Salvador · coincide</dd>
+          </dl>
+          <div style="display: flex; gap: 10px; padding: 10px 12px; background: #f5f7f9; font-size: 13px; line-height: 19px; color: #4a4a4a">
+            <span style="font-weight: 700; color: #1a1b1a; white-space: nowrap">Sin permiso:</span>
+            <span>se muestra «Ubicación no disponible» y la solicitud sigue su curso.</span>
+          </div>
+        </section>
+
+        <section aria-labelledby="h-aviso" style="background: #ffffff; border: 1px solid #e1e1e1; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px">
+          <h2 id="h-aviso" style="margin: 0; font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 800">Consentimiento</h2>
+          <dl style="margin: 0; display: grid; grid-template-columns: 170px 1fr; gap: 8px 16px; font-size: 15px">
+            <dt style="color: #5b5b5b">Aviso de privacidad</dt><dd style="margin: 0">Versión [X.Y] · aceptado</dd>
+            <dt style="color: #5b5b5b">Aceptado el</dt><dd style="margin: 0">09/10/2026 · 9:43 a. m.</dd>
+            <dt style="color: #5b5b5b">Términos</dt><dd style="margin: 0">Aceptados</dd>
+          </dl>
+        </section>
+      </div>
+    </div>
+
+    <section aria-labelledby="h-perfil" style="background: #ffffff; border: 1px solid #e1e1e1; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+      <div>
+        <h2 id="h-perfil" style="margin: 0 0 4px; font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 800">Perfil transaccional declarado</h2>
+        <p style="margin: 0; font-size: 14px; line-height: 20px; color: #5b5b5b">Qué dinero dice la persona que moverá en la cuenta. Cada cambio queda como una versión nueva; la vigente es la base del monitoreo.</p>
+      </div>
+      <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column">
+        
+          <li style="display: grid; grid-template-columns: 28px 1fr; gap: 14px">
+            <div style="display: flex; flex-direction: column; align-items: center">
+              <span style="flex: none; width: 14px; height: 14px; margin-top: 4px; border-radius: 50%; box-sizing: border-box; border: 3px solid #0a402b; background: #9ddfa6"></span>
+              <span style="flex: 1; width: 2px; background: #e1e1e1"></span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 18px">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+                <span style="font-weight: 700; font-size: 16px">Versión 2</span>
+                <span style="display: inline-flex; border-radius: 50px; padding: 1px 10px; font-weight: 700; font-size: 12px; background: #e2f5ec; color: #0b6b4a">Vigente</span>
+                <span style="font-size: 14px; color: #5b5b5b">09/10/2026 · 9:51 a. m. · cambiada por la persona antes de enviar</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px 40px; font-size: 15px">
+                <span><span style="color: #5b5b5b">Tipo de dinero:</span> Salario y transferencias</span>
+                <span><span style="color: #5b5b5b">Monto mensual:</span> <strong>$500 a $1,000</strong></span>
+              </div>
+            </div>
+          </li>
+        
+          <li style="display: grid; grid-template-columns: 28px 1fr; gap: 14px">
+            <div style="display: flex; flex-direction: column; align-items: center">
+              <span style="flex: none; width: 14px; height: 14px; margin-top: 4px; border-radius: 50%; box-sizing: border-box; border: 3px solid #989696; background: #ffffff"></span>
+              <span style="flex: 1; width: 2px; background: transparent"></span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 18px">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+                <span style="font-weight: 700; font-size: 16px">Versión 1</span>
+                
+                <span style="font-size: 14px; color: #5b5b5b">09/10/2026 · 9:49 a. m.</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px 40px; font-size: 15px">
+                <span><span style="color: #5b5b5b">Tipo de dinero:</span> Salario y transferencias</span>
+                <span><span style="color: #5b5b5b">Monto mensual:</span> <strong>Menos de $500</strong></span>
+              </div>
+            </div>
+          </li>
+        
+      </ol>
+    </section>
+  </main>
+</div>
+</body>
+</html>

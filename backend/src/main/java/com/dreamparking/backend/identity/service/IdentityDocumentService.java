@@ -71,7 +71,25 @@ public class IdentityDocumentService {
 	}
 
 	/** A decrypted photo for the console. */
-	public record Photo(String contentType, byte[] content) {
+	public static final class Photo {
+
+		private final String contentType;
+
+		private final byte[] content;
+
+		Photo(String contentType, byte[] content) {
+			this.contentType = contentType;
+			this.content = content.clone();
+		}
+
+		public String contentType() {
+			return contentType;
+		}
+
+		public byte[] content() {
+			return content.clone();
+		}
+
 	}
 
 	/**

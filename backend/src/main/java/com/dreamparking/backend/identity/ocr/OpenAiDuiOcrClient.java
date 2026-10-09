@@ -82,7 +82,7 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 
 	public OpenAiDuiOcrClient(@Value("${app.ocr.enabled:false}") boolean enabled,
 			@Value("${app.ocr.base-url:https://api.openai.com/v1}") String baseUrl,
-			@Value("${app.ocr.api-key:}") String apiKey, @Value("${app.ocr.model:gpt-6-astra}") String model,
+			@Value("${app.ocr.api-key:}") String apiKey, @Value("${app.ocr.model:gpt-5.6-terra}") String model,
 			@Value("${app.ocr.reasoning-effort:low}") String reasoningEffort,
 			@Value("${app.ocr.timeout:40s}") Duration timeout) {
 		this.enabled = enabled;

@@ -186,6 +186,7 @@ export function RequestDetailView({ id }: { id: string }) {
 
   const signalList: Pair[] = s
     ? [
+        { k: "Señales capturadas", v: s.capturedAt ? formatDateTime(s.capturedAt) : "Sin registro de fecha" },
         { k: "Dirección IP", v: noData(s.ip) },
         ...locationRows,
         { k: "Huella de dispositivo", v: noData(s.deviceFingerprint) },

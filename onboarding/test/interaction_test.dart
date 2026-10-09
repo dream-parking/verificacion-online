@@ -54,6 +54,22 @@ void main() {
       expect(r.cpm, 300);
     });
 
+    test('in characters per second: one keystroke every 200 ms is 5.00', () {
+      final r = TypingRhythm();
+      type(r, 'firstNames', 'Marta Alejandra');
+      expect(r.cps, 5.0);
+      expect(TypingRhythm().cps, isNull);
+    });
+
+    test('characters per second are rounded to 2 decimals and never go above 50', () {
+      final r = TypingRhythm();
+      type(r, 'firstNames', 'Marta Alejandra', every: 300);
+      expect(r.cps, 3.33);
+      final fast = TypingRhythm();
+      type(fast, 'firstNames', 'Marta Alejandra', every: 1);
+      expect(fast.cps, 50);
+    });
+
     test('never goes above the API maximum', () {
       final r = TypingRhythm();
       type(r, 'firstNames', 'Marta Alejandra', every: 1);
@@ -92,6 +108,28 @@ void main() {
       expect(step['startedAt'], '2026-10-07T10:00:00.000Z');
       expect(step['completedAt'], '2026-10-07T10:00:12.000Z');
     });
+  });
+
+  test('Signals sends the typing speed of each screen inside its step (VDI-68)', () {
+    final s = Signals();
+    s.steps
+      ..start(Screen.basicData, ms(0))
+      ..start(Screen.income, ms(60000))
+      ..start(Screen.expectedActivity, ms(90000));
+    void typeOn(Screen screen, String field, String text, {required int from, required int every}) {
+      for (var i = 1; i <= text.length; i++) {
+        s.recordTyping(screen, field, text.substring(0, i), ms(from + (i - 1) * every));
+      }
+    }
+
+    typeOn(Screen.basicData, 'firstNames', 'Marta Alejandra', from: 0, every: 200);
+    typeOn(Screen.income, 'incomeSourceDetail', 'Herencia familiar', from: 60000, every: 400);
+
+    final steps = (s.toJson()['steps'] as List).cast<Map<String, Object?>>();
+    expect(steps[0]['typingSpeedCps'], 5.0);
+    expect(steps[1]['typingSpeedCps'], 2.5);
+    expect(steps[2].containsKey('typingSpeedCps'), isFalse, reason: 'nothing was typed on that screen');
+    expect(s.toJson()['typingSpeedCpm'], isNotNull, reason: 'the overall speed is still sent');
   });
 
   test('Signals includes typing speed and steps when there is data', () {

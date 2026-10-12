@@ -33,7 +33,7 @@ Orden: `POST /` → `PUT /{id}/privacy-consent` → `PUT /{id}/basic-data` → `
 | `PUT /{id}/identity-document` | Paso 3, después de los datos básicos (`409` si faltan): `multipart/form-data` con `front` y `back` (fotos del DUI, JPEG o PNG, hasta 5 MB cada una). Responde lo leído (`dui`, `firstNames`, `lastNames`, fechas y `gender`; `null` = no se leyó con claridad) para la pantalla «¿Leímos bien tus datos?». `status: FAILED` = el lector no está disponible: la persona escribe sus datos al confirmar. Fotos ilegibles: `422` con `reason` (`BLURRY`, `GLARE`, `CROPPED`, `TOO_DARK`, `NOT_A_DUI`, `WRONG_SIDES`, `OTHER`) y `side` (`FRONT`, `BACK`, `BOTH`; puede faltar). Las fotos solas no completan el paso. | VDI-79, VDI-80 |
 | `PUT /{id}/identity-document/confirmation` | Paso 3: lo que la persona confirma o corrige: `dui`, `firstNames`, `lastNames`, `birthDate`, `expiryDate`. Completa el paso. `409` si no hay fotos legibles. Fotos nuevas después de confirmar piden confirmar otra vez (`submit` responde `409`). | VDI-78, VDI-79 |
 | `PUT /{id}/income` | Paso 4: `sourceCode`, `rangeCode`, `sourceDetail` (obligatorio si es `OTRO`). | VDI-47 |
-| `PUT /{id}/expected-activity` | Paso 5: `transactionTypeCode` y `monthlyAmountRangeCode`, ambos del catálogo (sin monto libre). Responde el score. | VDI-52, VDI-55 |
+| `PUT /{id}/expected-activity` | Paso 5: `transactionTypeCode` y `monthlyAmountRangeCode`, ambos del catálogo (sin monto libre). Responde el score. Cada cambio del tipo o del rango antes de enviar es una versión nueva del perfil transaccional (la primera declaración es la versión 1); repetir lo mismo no crea versión. | VDI-52, VDI-55, VDI-90 |
 | `POST /{id}/submit` | Envía la solicitud. Responde el `number` único que asigna el servidor (`SOL-AAAA-NNNNN`). Si ya estaba enviada responde `409`: consultar `GET /{id}` para leer su número. | |
 | `PUT /{id}/signals` | Huella, modelo, SO, ritmo de escritura y tiempo por paso. La IP la toma el servidor y con ella resuelve la ubicación aproximada (latitud, longitud y demás datos de ip-api.com); la app no envía coordenadas. Si no se puede ubicar (IP privada, proveedor caído o con límite), la consola recibe `locationStatus: UNAVAILABLE` y el motivo en `ipDetails.failure`; las demás señales se guardan igual. La app es la única fuente de los tiempos e intentos por paso; el servidor rechaza horas imposibles (antes de crear la solicitud o en el futuro, con 5 min de tolerancia). | VDI-41, VDI-42, VDI-43, VDI-67 |
 | `GET /{id}`, `GET /{id}/risk-assessment` | Resumen y score vigente. | |
@@ -62,7 +62,7 @@ Reglas:
 | Método y ruta | Rol | Tarea |
 |---|---|---|
 | `GET /requests?status=&riskLevel=&q=&page=&size=` | cualquiera | VDI-56 |
-| `GET /requests/{id}` (DUI leído, ingresos, movimiento, score con el aporte de cada señal, señales, pasos, línea de tiempo) | cualquiera | VDI-44, 49, 53, 56, 81 |
+| `GET /requests/{id}` (DUI leído, ingresos, movimiento, score con el aporte de cada señal, versiones del perfil transaccional, señales, pasos, línea de tiempo) | cualquiera | VDI-44, 49, 53, 56, 81 |
 | `GET /requests/{id}/identity-document/{side}` (`FRONT` o `BACK`): la foto descifrada, sin caché; cada consulta queda en la auditoría de accesos | cualquiera | VDI-80, VDI-81 |
 | `GET /score-model` (rangos y pesos del modelo vigente) | cualquiera | VDI-82 |
 | `GET /score-rules` (reglas vigentes; R-01 está retirada) | cualquiera | VDI-57 |

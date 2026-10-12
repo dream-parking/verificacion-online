@@ -1,10 +1,9 @@
 package com.dreamparking.backend.risk.service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.Locale;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,51 +12,58 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
+import com.dreamparking.backend.common.exception.InvalidStateException;
 import com.dreamparking.backend.common.exception.NotFoundException;
+import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestEvent;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
+import com.dreamparking.backend.onboarding.repository.RequestSignalsRepository;
 import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 import com.dreamparking.backend.risk.entity.RiskAssessment;
-import com.dreamparking.backend.risk.entity.ScoreRule;
+import com.dreamparking.backend.risk.entity.RiskAssessmentSignal;
+import com.dreamparking.backend.risk.entity.ScoreModel;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 import com.dreamparking.backend.risk.repository.RiskAssessmentRepository;
-import com.dreamparking.backend.risk.repository.ScoreRuleRepository;
+import com.dreamparking.backend.risk.repository.ScoreModelRepository;
 
 /**
- * Risk score engine. Applies rule R-01: a declared monthly amount range that does not go above the threshold scores
- * {@link RiskLevel#LOW}; anything else stays pending review, since R-01 only assigns low risk.
- * Same behavior as the {@code evaluate_risk} database function.
+ * Risk score engine. Scores a request from every signal available at that moment with the {@link ScoreModel} in force
+ * (see {@link ScoreEngine}): a score from 0 to 100, its risk level, and what each signal added, all kept with the
+ * assessment. Without a declared amount there is nothing to score and the request stays not evaluated.
  */
 @Service
 public class RiskAssessmentService {
 
-	static final String LOW_AMOUNT_RULE = "R-01";
+	private static final ZoneId EL_SALVADOR = ZoneId.of("America/El_Salvador");
 
-	private static final BigDecimal DEFAULT_THRESHOLD = new BigDecimal("500");
-
-	private final ScoreRuleRepository rules;
+	private final ScoreModelRepository models;
 
 	private final RiskAssessmentRepository assessments;
 
 	private final RequestEventRepository events;
 
-	public RiskAssessmentService(ScoreRuleRepository rules, RiskAssessmentRepository assessments,
-			RequestEventRepository events) {
-		this.rules = rules;
+	private final IdentityDocumentRepository identityDocuments;
+
+	private final RequestSignalsRepository signals;
+
+	public RiskAssessmentService(ScoreModelRepository models, RiskAssessmentRepository assessments,
+			RequestEventRepository events, IdentityDocumentRepository identityDocuments,
+			RequestSignalsRepository signals) {
+		this.models = models;
 		this.assessments = assessments;
 		this.events = events;
+		this.identityDocuments = identityDocuments;
+		this.signals = signals;
 	}
 
 	/**
-	 * Scores the request from its declared monthly amount range ({@code null} while not declared yet). The value
-	 * evaluated is the top of the range; a range with no top ("more than…") is never low risk.
+	 * Scores the request from its declared monthly amount range ({@code null} while not declared yet) and the other
+	 * signals captured so far. It runs again when the request is submitted, so late signals count.
 	 */
 	@Transactional
 	public RiskAssessmentResponse evaluate(OnboardingRequest request, MonthlyAmountRange range) {
-		ScoreRule rule = rules.findInForce(LOW_AMOUNT_RULE).orElse(null);
-
 		RiskAssessment assessment = new RiskAssessment();
 		assessment.setRequest(request);
 		if (range == null) {
@@ -66,33 +72,33 @@ public class RiskAssessmentService {
 					"La solicitud sigue en progreso: todavía no hay un monto declarado que evaluar.");
 		}
 		else {
+			ScoreModel model = models.findInForce()
+				.orElseThrow(() -> new InvalidStateException("There is no score model in force"));
+			var inputs = new ScoreEngine.Inputs(range, identityDocuments.findById(request.getId()).orElse(null),
+					signals.findById(request.getId()).orElse(null), LocalDate.now(EL_SALVADOR));
+			ScoreEngine.Result result = ScoreEngine.score(model, inputs);
+			RiskLevel level = model.levelOf(result.score());
+			assessment.setLevel(level);
 			assessment.setEvaluatedValue(range.getMaxUsd() != null ? range.getMaxUsd() : range.getMinUsd());
-			if (rule != null && range.getMaxUsd() != null && range.getMaxUsd().compareTo(rule.getThreshold()) <= 0) {
-				assessment.setLevel(rule.getResultIfMatched());
-				assessment.setRule(rule);
-				assessment.setExplanation(
-						"Monto mensual declarado en el rango «%s», que no supera el umbral de USD %s, riesgo bajo."
-							.formatted(range.getLabel(), usd(rule.getThreshold())));
-			}
-			else {
-				assessment.setLevel(rule == null ? RiskLevel.PENDING_REVIEW : rule.getResultIfNotMatched());
-				assessment.setExplanation(("Monto mensual declarado en el rango «%s», que supera el umbral de USD %s. "
-						+ "La regla vigente solo asigna riesgo bajo, así que este caso queda pendiente de evaluación.")
-					.formatted(range.getLabel(), usd(rule == null ? DEFAULT_THRESHOLD : rule.getThreshold())));
-			}
+			assessment.setExplanation(explanation(model, result, level));
+			assessment.setScore(result.score(), model.getVersion(), result.contributions()
+				.stream()
+				.map(c -> new RiskAssessmentSignal(assessment, c.signal(), c.points(), c.maxPoints(), c.observation()))
+				.toList());
 		}
 
 		assessments.retireCurrent(request.getId());
 		assessments.save(assessment);
 		request.setRiskLevel(assessment.getLevel());
 
-		if (assessment.getRule() != null) {
+		if (assessment.getScore() != null) {
 			RequestEvent event = new RequestEvent();
 			event.setRequest(request);
 			event.setType(RequestEventType.SCORE_ASSIGNED);
-			event.setDescription("Score de riesgo asignado: bajo (regla " + LOW_AMOUNT_RULE + ")");
+			event.setDescription("Score de riesgo asignado: %d, %s (modelo v%d)".formatted(assessment.getScore(),
+					levelName(assessment.getLevel()), assessment.getModelVersion()));
 			event.setActor("SYSTEM");
-			event.setData(Map.of("rule", LOW_AMOUNT_RULE, "range", range.getCode()));
+			event.setData(Map.of("score", assessment.getScore(), "modelVersion", assessment.getModelVersion()));
 			events.save(event);
 		}
 		return RiskAssessmentResponse.of(assessment);
@@ -111,11 +117,26 @@ public class RiskAssessmentService {
 			.orElseThrow(() -> new NotFoundException("Request " + requestId + " has no risk assessment"));
 	}
 
-	/** Whole dollars with thousands separators, like {@code to_char(v, 'FM999,999,990')} in the database. */
-	private static String usd(BigDecimal amount) {
-		DecimalFormat format = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(Locale.US));
-		format.setRoundingMode(RoundingMode.HALF_UP);
-		return format.format(amount);
+	private static String explanation(ScoreModel model, ScoreEngine.Result result, RiskLevel level) {
+		List<String> main = result.contributions()
+			.stream()
+			.filter(c -> c.points() != null && c.points() > 0)
+			.sorted(Comparator.comparingInt(ScoreEngine.Contribution::points).reversed())
+			.limit(2)
+			.map(c -> "%s (%d)".formatted(c.signal().label().toLowerCase(), c.points()))
+			.toList();
+		String why = main.isEmpty() ? "ninguna señal sumó puntos" : "suman sobre todo " + String.join(" y ", main);
+		return "Score %d de 100, riesgo %s (%s): %s.".formatted(result.score(), levelName(level), model.getName(), why);
+	}
+
+	private static String levelName(RiskLevel level) {
+		return switch (level) {
+			case LOW -> "bajo";
+			case MEDIUM -> "medio";
+			case HIGH -> "alto";
+			case PENDING_REVIEW -> "pendiente de revisión";
+			case NOT_EVALUATED -> "sin evaluar";
+		};
 	}
 
 }

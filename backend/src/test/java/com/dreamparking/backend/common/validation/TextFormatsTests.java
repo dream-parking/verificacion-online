@@ -137,6 +137,10 @@ class TextFormatsTests {
 		assertThat(violations(new Phone("2222-0000"))).containsExactly("Usa el formato 7000-0000");
 		assertThat(violations(new Mail("nueva.persona@ceiba.example"))).isEmpty();
 		assertThat(violations(new Mail("a@b"))).hasSize(1);
+		assertThat(violations(new Mail("ana@mail.ceiba.example"))).isEmpty();
+		assertThat(violations(new Mail("ana@ceiba..example"))).hasSize(1);
+		assertThat(violations(new Mail("ana@.ceiba.example"))).hasSize(1);
+		assertThat(violations(new Mail("ana@ceiba.example."))).hasSize(1);
 		assertThat(violations(new Mail("\"ana maría\"@ceiba.example"))).hasSize(1);
 	}
 

@@ -26,7 +26,7 @@ Lienzo original (editable): https://claude.ai/artifact/35dGM4tBJHR9FGu3TTCTRL
 
 ## Datos de ejemplo
 
-- Los pesos de cada señal y los rangos del score (Bajo 0–39, Medio 40–69, Alto 70–100) son de ejemplo: los define VDI-82.
+- Los pesos de cada señal y los rangos del score (Bajo 0–39, Medio 40–69, Alto 70–100) son los del modelo de score v1 (VDI-82, `GET /api/console/score-model`); en el prototipo los puntos de cada señal son de ejemplo.
 - RNPN, prueba de vida y listas internas aparecen como «Llega en otro sprint»: no suman ni restan al score.
 - La versión del aviso queda como `[X.Y]` hasta que Legal apruebe el texto.
 - Las fotos del DUI son dibujos de relleno, no imágenes reales.

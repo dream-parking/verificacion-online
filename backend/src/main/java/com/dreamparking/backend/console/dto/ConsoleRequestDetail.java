@@ -22,12 +22,13 @@ import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
 /**
  * Everything the console's request detail screen shows. {@code identityDocument}, {@code income},
- * {@code expectedActivity}, {@code risk} and {@code signals} are null until the customer reaches that point of the flow.
+ * {@code expectedActivity}, {@code risk} and {@code signals} are null until the customer reaches that point of the flow;
+ * {@code expectedActivityVersions} is empty until then.
  */
 public record ConsoleRequestDetail(UUID id, String number, RequestStatus status, short completedSteps,
 		RiskLevel riskLevel, Instant startedAt, Instant submittedAt, Applicant applicant,
 		IdentityDocument identityDocument, Income income, ExpectedActivity expectedActivity,
-		RiskAssessmentResponse risk, Signals signals, List<StepTime> steps, List<TimelineEntry> timeline) {
+		List<ExpectedActivityVersion> expectedActivityVersions, RiskAssessmentResponse risk, Signals signals, List<StepTime> steps, List<TimelineEntry> timeline) {
 
 	/** Personal data as declared; internal use only. */
 	@Schema(name = "ConsoleRequestApplicant")
@@ -60,10 +61,20 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			String rangeLabel, Instant registeredAt, Instant updatedAt) {
 	}
 
-	/** Declared expected activity (VDI-24). */
+	/** Declared transactional profile in force (VDI-24); {@code version} is its version number. */
 	@Schema(name = "ConsoleRequestExpectedActivity")
-	public record ExpectedActivity(String transactionTypeCode, String transactionTypeLabel,
+	public record ExpectedActivity(short version, String transactionTypeCode, String transactionTypeLabel,
 			String monthlyAmountRangeCode, String monthlyAmountRangeLabel, Instant registeredAt, Instant updatedAt) {
+	}
+
+	/**
+	 * A version of the declared transactional profile (VDI-90), as the customer declared it at {@code registeredAt}.
+	 * {@code current} marks the version in force, the base for monitoring the account.
+	 */
+	@Schema(name = "ConsoleRequestExpectedActivityVersion")
+	public record ExpectedActivityVersion(short version, boolean current, String transactionTypeCode,
+			String transactionTypeLabel, String monthlyAmountRangeCode, String monthlyAmountRangeLabel,
+			Instant registeredAt) {
 	}
 
 	/**

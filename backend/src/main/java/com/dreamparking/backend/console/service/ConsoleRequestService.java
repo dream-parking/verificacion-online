@@ -24,6 +24,7 @@ import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
+import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
@@ -69,6 +70,8 @@ public class ConsoleRequestService {
 
 	private final ExpectedActivityRepository expectedActivities;
 
+	private final ExpectedActivityVersionRepository expectedActivityVersions;
+
 	private final RequestSignalsRepository signals;
 
 	private final RequestStepRepository steps;
@@ -83,13 +86,14 @@ public class ConsoleRequestService {
 
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
-			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
+			ExpectedActivityVersionRepository expectedActivityVersions, RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
 			RiskAssessmentService riskAssessments, IdentityDocumentRepository identityDocuments,
 			IdentityDocumentImageRepository identityDocumentImages) {
 		this.jdbc = jdbc;
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
 		this.expectedActivities = expectedActivities;
+		this.expectedActivityVersions = expectedActivityVersions;
 		this.signals = signals;
 		this.steps = steps;
 		this.events = events;
@@ -149,10 +153,17 @@ public class ConsoleRequestService {
 					d.getUpdatedAt()))
 			.orElse(null);
 		var expectedActivity = expectedActivities.findById(requestId)
-			.map(a -> new ConsoleRequestDetail.ExpectedActivity(a.getTransactionType().getCode(),
+			.map(a -> new ConsoleRequestDetail.ExpectedActivity(a.getVersion(), a.getTransactionType().getCode(),
 					a.getTransactionType().getLabel(), a.getMonthlyAmountRange().getCode(),
 					a.getMonthlyAmountRange().getLabel(), a.getRegisteredAt(), a.getUpdatedAt()))
 			.orElse(null);
+		var versions = this.expectedActivityVersions.findByIdRequestIdOrderByIdVersionDesc(requestId)
+			.stream()
+			.map(v -> new ConsoleRequestDetail.ExpectedActivityVersion(v.getVersion(),
+					expectedActivity != null && v.getVersion() == expectedActivity.version(),
+					v.getTransactionType().getCode(), v.getTransactionType().getLabel(),
+					v.getMonthlyAmountRange().getCode(), v.getMonthlyAmountRange().getLabel(), v.getRegisteredAt()))
+			.toList();
 		var risk = riskAssessments.findCurrent(requestId).orElse(null);
 		var signalsView = signals.findById(requestId)
 			.filter(s -> s.getIp() != null || s.getDeviceFingerprint() != null)
@@ -171,7 +182,8 @@ public class ConsoleRequestService {
 
 		return new ConsoleRequestDetail(request.getId(), request.getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
-				request.getSubmittedAt(), applicant, identityDocument, income, expectedActivity, risk, signalsView, stepTimes,
+				request.getSubmittedAt(), applicant, identityDocument, income, expectedActivity, versions,
+				risk, signalsView, stepTimes,
 				timeline);
 	}
 

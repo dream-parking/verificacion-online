@@ -19,7 +19,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
 import com.dreamparking.backend.catalog.entity.TransactionType;
 
-/** Expected account activity (step 3), one per request: type of money and the chosen monthly amount range. Input of score rule R-01. */
+/**
+ * Declared transactional profile (step 5), one per request: type of money and the chosen monthly amount range. It is
+ * the version in force; every version, this one included, is kept in {@link ExpectedActivityVersion}.
+ */
 @Entity
 @Table(name = "expected_activity")
 public class ExpectedActivity {
@@ -40,6 +43,9 @@ public class ExpectedActivity {
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "monthly_amount_range_code", nullable = false)
 	private MonthlyAmountRange monthlyAmountRange;
+
+	@Column(name = "version", nullable = false)
+	private Short version = (short) 1;
 
 	@CreationTimestamp
 	@Column(name = "registered_at", nullable = false)
@@ -75,6 +81,14 @@ public class ExpectedActivity {
 
 	public void setMonthlyAmountRange(MonthlyAmountRange monthlyAmountRange) {
 		this.monthlyAmountRange = monthlyAmountRange;
+	}
+
+	public Short getVersion() {
+		return version;
+	}
+
+	public void setVersion(Short version) {
+		this.version = version;
 	}
 
 	public Instant getRegisteredAt() {

@@ -518,6 +518,12 @@
           "expectedActivity" : {
             "$ref" : "#/components/schemas/ConsoleRequestExpectedActivity"
           },
+          "expectedActivityVersions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ConsoleRequestExpectedActivityVersion"
+            },
+            "type" : "array"
+          },
           "id" : {
             "format" : "uuid",
             "type" : "string"
@@ -618,6 +624,38 @@
           "updatedAt" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestExpectedActivityVersion" : {
+        "properties" : {
+          "current" : {
+            "type" : "boolean"
+          },
+          "monthlyAmountRangeCode" : {
+            "type" : "string"
+          },
+          "monthlyAmountRangeLabel" : {
+            "type" : "string"
+          },
+          "registeredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "transactionTypeCode" : {
+            "type" : "string"
+          },
+          "transactionTypeLabel" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"

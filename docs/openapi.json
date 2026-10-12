@@ -1494,6 +1494,142 @@
         "required" : [ "newPassword" ],
         "type" : "object"
       },
+      "ResumeBasicData" : {
+        "properties" : {
+          "dui" : {
+            "type" : "string"
+          },
+          "firstNames" : {
+            "type" : "string"
+          },
+          "lastNames" : {
+            "type" : "string"
+          },
+          "mobilePhone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ResumeExpectedActivity" : {
+        "properties" : {
+          "monthlyAmountRangeCode" : {
+            "type" : "string"
+          },
+          "transactionTypeCode" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ResumeIdentityDocument" : {
+        "properties" : {
+          "confirmed" : {
+            "type" : "boolean"
+          },
+          "ocrStatus" : {
+            "enum" : [ "READ", "UNREADABLE", "FAILED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ResumeIncome" : {
+        "properties" : {
+          "rangeCode" : {
+            "type" : "string"
+          },
+          "sourceCode" : {
+            "type" : "string"
+          },
+          "sourceDetail" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ResumeResponse" : {
+        "properties" : {
+          "completedSteps" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "currentStep" : {
+            "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "IDENTITY_DOCUMENT", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "firstName" : {
+            "type" : "string"
+          },
+          "lastActivityAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "saved" : {
+            "$ref" : "#/components/schemas/ResumeSaved"
+          },
+          "state" : {
+            "enum" : [ "RESUMABLE", "EXPIRED", "COMPLETED", "ABANDONED" ],
+            "type" : "string"
+          },
+          "steps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ResumeStepProgress"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ResumeSaved" : {
+        "properties" : {
+          "basicData" : {
+            "$ref" : "#/components/schemas/ResumeBasicData"
+          },
+          "expectedActivity" : {
+            "$ref" : "#/components/schemas/ResumeExpectedActivity"
+          },
+          "identityDocument" : {
+            "$ref" : "#/components/schemas/ResumeIdentityDocument"
+          },
+          "income" : {
+            "$ref" : "#/components/schemas/ResumeIncome"
+          }
+        },
+        "type" : "object"
+      },
+      "ResumeStepProgress" : {
+        "properties" : {
+          "savedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "state" : {
+            "enum" : [ "DONE", "SKIPPED", "CURRENT", "PENDING" ],
+            "type" : "string"
+          },
+          "step" : {
+            "enum" : [ "PRIVACY_NOTICE", "BASIC_DATA", "IDENTITY_DOCUMENT", "INCOME", "EXPECTED_ACTIVITY", "REVIEW" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "RiskAssessmentResponse" : {
         "properties" : {
           "evaluatedAt" : {
@@ -4183,6 +4319,55 @@
         "tags" : [ "Onboarding" ]
       }
     },
+    "/api/onboarding/requests/{requestId}/abandon" : {
+      "post" : {
+        "description" : "Deja la solicitud como `ABANDONED` para que la app abra una nueva con `POST /`.",
+        "operationId" : "onboardingAbandon",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingRequestResponse"
+                }
+              }
+            },
+            "description" : "Solicitud abandonada"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud ya no está en progreso"
+          }
+        },
+        "summary" : "Empezar de nuevo: abandona la solicitud a medias",
+        "tags" : [ "Onboarding" ]
+      }
+    },
     "/api/onboarding/requests/{requestId}/basic-data" : {
       "put" : {
         "description" : "DUI (00000000-0), nombres, apellidos y celular (7000-0000). Un DUI ya registrado con otros nombres o celular, o un celular de otro DUI, se rechaza con 409.",
@@ -4617,6 +4802,45 @@
           }
         },
         "summary" : "Acepta el aviso de privacidad vigente",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}/resume" : {
+      "get" : {
+        "description" : "Cada paso queda guardado al completarse. Devuelve el paso en el que se quedó (`currentStep`), el estado de cada paso y lo guardado para llenar las pantallas de nuevo. `state` dice si se puede continuar: `RESUMABLE`; `EXPIRED` si pasaron más de 7 días sin actividad; `COMPLETED` o `ABANDONED` si ya no está en progreso. Fuera de `RESUMABLE` no trae `saved` ni `currentStep`.",
+        "operationId" : "onboardingResume",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResumeResponse"
+                }
+              }
+            },
+            "description" : "Dónde se quedó la solicitud y lo que ya se guardó"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          }
+        },
+        "summary" : "Retoma una solicitud a medias (VDI-86)",
         "tags" : [ "Onboarding" ]
       }
     },

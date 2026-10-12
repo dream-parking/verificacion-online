@@ -1430,6 +1430,19 @@
         "required" : [ "accountId", "reason", "typeCode" ],
         "type" : "object"
       },
+      "Range" : {
+        "properties" : {
+          "from" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "to" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ResetPasswordRequest" : {
         "properties" : {
           "newPassword" : {
@@ -1459,6 +1472,10 @@
             "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
             "type" : "string"
           },
+          "modelVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
           "ruleCode" : {
             "type" : "string"
           },
@@ -1467,6 +1484,47 @@
           },
           "ruleThreshold" : {
             "type" : "number"
+          },
+          "score" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "signals" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SignalContribution"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ScoreModelResponse" : {
+        "properties" : {
+          "high" : {
+            "$ref" : "#/components/schemas/Range"
+          },
+          "low" : {
+            "$ref" : "#/components/schemas/Range"
+          },
+          "medium" : {
+            "$ref" : "#/components/schemas/Range"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "validFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "weights" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Weight"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -1520,6 +1578,29 @@
           "version" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "SignalContribution" : {
+        "properties" : {
+          "maxPoints" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "observation" : {
+            "type" : "string"
+          },
+          "points" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "signal" : {
+            "enum" : [ "AMOUNT", "IDENTITY_DOCUMENT", "TYPING_PACE", "DEVICE", "TIME_OF_DAY", "CITY", "RNPN", "LIVENESS", "INTERNAL_LISTS" ],
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -1604,6 +1685,22 @@
           }
         },
         "required" : [ "active", "fullName", "jobTitle", "role" ],
+        "type" : "object"
+      },
+      "Weight" : {
+        "properties" : {
+          "maxPoints" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "signal" : {
+            "enum" : [ "AMOUNT", "IDENTITY_DOCUMENT", "TYPING_PACE", "DEVICE", "TIME_OF_DAY", "CITY", "RNPN", "LIVENESS", "INTERNAL_LISTS" ],
+            "type" : "string"
+          }
+        },
         "type" : "object"
       }
     },
@@ -3536,9 +3633,42 @@
         "tags" : [ "Consola · Solicitudes" ]
       }
     },
+    "/api/console/score-model" : {
+      "get" : {
+        "description" : "Los rangos del score (bajo, medio, alto) y los puntos máximos de cada señal. Las señales sin peso (RNPN, prueba de vida, listas internas) llegan con maxPoints nulo.",
+        "operationId" : "scoreModelInForce",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ScoreModelResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Modelo de score vigente",
+        "tags" : [ "Consola · Modelo de score" ]
+      }
+    },
     "/api/console/score-rules" : {
       "get" : {
-        "description" : "Hoy solo R-01 (monto mensual bajo → riesgo bajo). Los umbrales no se editan en este sprint.",
+        "description" : "R-01 (monto mensual bajo → riesgo bajo) está retirada: el score lo calcula el modelo de `/api/console/score-model`. Esta lista queda vacía mientras no haya una versión vigente.",
         "operationId" : "scoreRuleInForce",
         "responses" : {
           "200" : {
@@ -4651,5 +4781,8 @@
   }, {
     "description" : "Bandeja de trabajo del analista de fraude",
     "name" : "Consola · Alertas"
+  }, {
+    "description" : "Modelo de ponderación del score (solo lectura)",
+    "name" : "Consola · Modelo de score"
   } ]
 }

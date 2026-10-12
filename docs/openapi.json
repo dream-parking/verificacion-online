@@ -97,6 +97,20 @@
         },
         "type" : "object"
       },
+      "AdditionalTransactionType" : {
+        "properties" : {
+          "code" : {
+            "description" : "Código del tipo de transacción (`transactionTypes` de GET /api/catalogs)",
+            "example" : "REMESAS",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "code" ],
+        "type" : "object"
+      },
       "AlertCommentRequest" : {
         "properties" : {
           "comment" : {
@@ -1165,12 +1179,10 @@
       },
       "ExpectedActivityRequest" : {
         "properties" : {
-          "additionalTransactionTypeCodes" : {
+          "additionalTransactionTypes" : {
             "description" : "Otros tipos de dinero que también moverá, además del principal (opcional, hasta 3)",
-            "example" : [ "REMESAS" ],
             "items" : {
-              "minLength" : 1,
-              "type" : "string"
+              "$ref" : "#/components/schemas/AdditionalTransactionType"
             },
             "maxItems" : 3,
             "minItems" : 0,
@@ -1678,6 +1690,7 @@
             "example" : "Planilla octubre",
             "maxLength" : 150,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "direction" : {
@@ -1690,6 +1703,7 @@
             "example" : "core-20261012-000123",
             "maxLength" : 64,
             "minLength" : 0,
+            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
             "type" : "string"
           },
           "occurredAt" : {
@@ -1698,8 +1712,11 @@
             "type" : "string"
           },
           "transactionTypeCode" : {
-            "description" : "Tipo de dinero según el core (`transactionTypes` de GET /api/catalogs); vacío si no está clasificado",
+            "description" : "Tipo de dinero según el core (`transactionTypes` de GET /api/catalogs); null si no está clasificado",
             "example" : "PAGO_SALARIO",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           }
         },

@@ -37,6 +37,8 @@ Orden: `POST /` → `PUT /{id}/privacy-consent` → `PUT /{id}/basic-data` → `
 | `POST /{id}/submit` | Envía la solicitud. Responde el `number` único que asigna el servidor (`SOL-AAAA-NNNNN`). Si ya estaba enviada responde `409`: consultar `GET /{id}` para leer su número. | |
 | `PUT /{id}/signals` | Huella, modelo, SO, ritmo de escritura y tiempo por paso. La IP la toma el servidor y con ella resuelve la ubicación aproximada (latitud, longitud y demás datos de ip-api.com); la app no envía coordenadas. Si no se puede ubicar (IP privada, proveedor caído o con límite), la consola recibe `locationStatus: UNAVAILABLE` y el motivo en `ipDetails.failure`; las demás señales se guardan igual. La app es la única fuente de los tiempos e intentos por paso; el servidor rechaza horas imposibles (antes de crear la solicitud o en el futuro, con 5 min de tolerancia). | VDI-41, VDI-42, VDI-43, VDI-67 |
 | `GET /{id}`, `GET /{id}/risk-assessment` | Resumen y score vigente. | |
+| `GET /{id}/resume` | Retomar una solicitud a medias: `state` (`RESUMABLE`, `EXPIRED` si pasaron más de 7 días sin actividad, `COMPLETED`, `ABANDONED`), `currentStep`, el estado de cada paso con su fecha de guardado (`DONE`, `SKIPPED` para el DUI mientras es opcional, `CURRENT`, `PENDING`) y lo guardado (`saved`) para llenar las pantallas de nuevo. Fuera de `RESUMABLE` no trae `saved` ni `currentStep`. La app guarda el `id` de la solicitud en el teléfono. La ventana se cambia con `app.onboarding.resume-window-days`. | VDI-86 |
+| `POST /{id}/abandon` | «Empezar de nuevo»: deja la solicitud en `ABANDONED` y registra el evento; la app abre una nueva con `POST /`. `409` si ya no está en progreso. | VDI-86 |
 
 Reglas:
 

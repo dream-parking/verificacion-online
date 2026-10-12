@@ -11,10 +11,13 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.method.ParameterErrors;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -57,6 +60,32 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 		for (FieldError error : ex.getBindingResult().getFieldErrors()) {
 			errors.putIfAbsent(error.getField(), error.getDefaultMessage());
 		}
+		return invalidFields(errors);
+	}
+
+	/**
+	 * Raised instead of the one above when the method also has constraints on its query parameters or path
+	 * variables: same answer, with each parameter listed by its name next to the body fields.
+	 */
+	@Override
+	protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex,
+			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+		Map<String, String> errors = new LinkedHashMap<>();
+		for (ParameterValidationResult result : ex.getParameterValidationResults()) {
+			if (result instanceof ParameterErrors body) {
+				for (FieldError error : body.getFieldErrors()) {
+					errors.putIfAbsent(error.getField(), error.getDefaultMessage());
+				}
+			}
+			else {
+				String name = result.getMethodParameter().getParameterName();
+				result.getResolvableErrors().forEach(error -> errors.putIfAbsent(name, error.getDefaultMessage()));
+			}
+		}
+		return invalidFields(errors);
+	}
+
+	private static ResponseEntity<Object> invalidFields(Map<String, String> errors) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
 				"Some fields are invalid: " + String.join(", ", errors.keySet()));
 		problem.setProperty("errors", errors);

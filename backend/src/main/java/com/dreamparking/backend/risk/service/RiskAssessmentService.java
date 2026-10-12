@@ -2,6 +2,7 @@ package com.dreamparking.backend.risk.service;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -120,7 +121,7 @@ public class RiskAssessmentService {
 		List<String> main = result.contributions()
 			.stream()
 			.filter(c -> c.points() != null && c.points() > 0)
-			.sorted((a, b) -> b.points() - a.points())
+			.sorted(Comparator.comparingInt(ScoreEngine.Contribution::points).reversed())
 			.limit(2)
 			.map(c -> "%s (%d)".formatted(c.signal().label().toLowerCase(), c.points()))
 			.toList();

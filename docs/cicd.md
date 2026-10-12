@@ -56,7 +56,7 @@ Los certificados son gestionados por Container Apps (gratis). Reservados sin DNS
 | Componente | Proyecto de Sonar | CI (job) | Cobertura |
 |---|---|---|---|
 | Backend | `dream-parking_verificacion-online` | `ci` → job `test` | JaCoCo (`target/site/jacoco/jacoco.xml`) |
-| Webconsole | `dream-parking_verificacion-online-webconsole` | `ci` → job `lint-build` | Vitest (`npm run test:coverage`) → `coverage/lcov.info` |
+| Webconsole | `dream-parking_verificacion-online-webconsole` | `ci` → job `lint-build` | Vitest (`npm run test:coverage`) → `coverage/lcov.info`; `src/app/**` excluido de la cobertura de Sonar hasta que tenga pruebas |
 | Onboarding (Flutter) | `dream-parking_verificacion-online-onboarding` | `ci` → job `analyze-test` | `flutter test --coverage` → `coverage/lcov.info` |
 
 - **Ahorro de minutos de Actions:** los tres CI viven en un solo workflow (`.github/workflows/ci.yml`). Un job inicial (`changes`) mira qué carpetas tocó el PR y solo se ejecutan los jobs de esos componentes; los demás se omiten con `if`, GitHub los reporta como *skipped* (cuenta como éxito para los checks obligatorios) y no gastan minutos. Los PRs en borrador no corren nada. Un PR de solo documentación (`*.md`) gasta ~1 minuto. Si se modifica `ci.yml`, se prueba todo.

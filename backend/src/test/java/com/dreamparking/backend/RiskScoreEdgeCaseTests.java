@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -40,6 +41,9 @@ class RiskScoreEdgeCaseTests {
 
 	@Autowired
 	MockMvc mvc;
+
+	@Autowired
+	JdbcTemplate jdbc;
 
 	@Autowired
 	OnboardingRequestRepository requests;
@@ -113,12 +117,54 @@ class RiskScoreEdgeCaseTests {
 		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.riskLevel").value("LOW"));
 	}
 
+	@Test
+	void theRangesOfTheModelInForceSetTheLevel() throws Exception {
+		// Model v2 with narrower ranges: low up to 3, medium up to 6, high above; v1 stops being in force
+		publishModel(3, 6);
+		assertLevel("HASTA_200", "LOW", 0);
+		assertLevel("200_500", "MEDIUM", 4);
+		assertLevel("500_1000", "HIGH", 8);
+
+		String id = startRequest();
+		registerRange(id, "PAGO_SALARIO", "500_1000");
+		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id))
+			.andExpect(jsonPath("$.modelVersion").value(2))
+			.andExpect(jsonPath("$.explanation").value(
+					"Score 8 de 100, riesgo alto (Modelo de score v2): suman sobre todo monto declarado (8)."));
+	}
+
+	@Test
+	void withoutAModelInForceTheRequestCannotBeScored() throws Exception {
+		jdbc.update("update score_model set valid_to = now() + interval '1 second' where valid_to is null");
+		jdbc.update("update score_model set valid_to = now() where valid_to is not null");
+		String id = startRequest();
+
+		registerRange(id, "PAGO_SALARIO", "HASTA_200").andExpect(status().isConflict());
+	}
+
 	private void assertScore(String rangeCode, int score, double evaluatedValue) throws Exception {
 		String id = startRequest();
 		registerRange(id, "PAGO_SALARIO", rangeCode).andExpect(status().isOk())
 			.andExpect(jsonPath("$.level").value("LOW"))
 			.andExpect(jsonPath("$.score").value(score))
 			.andExpect(jsonPath("$.evaluatedValue").value(evaluatedValue));
+	}
+
+	private void assertLevel(String rangeCode, String level, int score) throws Exception {
+		String id = startRequest();
+		registerRange(id, "PAGO_SALARIO", rangeCode).andExpect(status().isOk())
+			.andExpect(jsonPath("$.level").value(level))
+			.andExpect(jsonPath("$.score").value(score));
+		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.riskLevel").value(level));
+	}
+
+	/** Replaces model v1 with a v2 that has the same weights and these ranges. */
+	private void publishModel(int lowMax, int mediumMax) {
+		jdbc.update("update score_model set valid_to = now() where version = 1");
+		jdbc.update("insert into score_model (version, name, low_max, medium_max, valid_from)"
+				+ " values (2, 'Modelo de score v2', ?, ?, now())", lowMax, mediumMax);
+		jdbc.update("insert into score_model_weight (model_version, signal, max_points)"
+				+ " select 2, signal, max_points from score_model_weight where model_version = 1");
 	}
 
 	private ResultActions registerRange(String id, String type, String rangeCode) throws Exception {

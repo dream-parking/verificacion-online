@@ -73,10 +73,6 @@ public class ScoreModel {
 		return validFrom;
 	}
 
-	public Instant getValidTo() {
-		return validTo;
-	}
-
 	/** Points the signal can add at most, or {@code null} when the model gives it no weight. */
 	public Integer weightOf(ScoreSignal signal) {
 		Short weight = weights.get(signal);

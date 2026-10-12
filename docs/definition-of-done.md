@@ -26,5 +26,5 @@ Los tres proyectos usan el gate por defecto, *Sonar way*. En el plan gratis de S
 Sonar way no tiene una condición de cobertura **global**. El mínimo de 40 % sobre todo el código que pide la DoD se hace cumplir en el CI de cada componente (backend: JaCoCo 70 %; onboarding y webconsole: paso "Cobertura mínima", 40 %).
 
 ## Pendiente
-- **Webconsole**: la cobertura (Vitest + React Testing Library) mide `src/lib` y `src/components`; las pantallas (`src/app`) aún no tienen pruebas y quedan fuera de `sonar.coverage.exclusions` hasta que se agreguen.
+- **Webconsole**: la cobertura (Vitest + React Testing Library) mide `src/lib` y `src/components`; las pantallas (`src/app`) aún no tienen pruebas y están en `sonar.coverage.exclusions` hasta que se agreguen.
 - **Revisión por Scrum Master y QA**: se puede exigir con la regla del repositorio (aprobaciones requeridas en el PR, o `CODEOWNERS` con sus usuarios de GitHub).

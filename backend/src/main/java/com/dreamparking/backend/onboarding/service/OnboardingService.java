@@ -195,9 +195,10 @@ public class OnboardingService {
 	}
 
 	/**
-	 * Step 5: saves (or replaces) the expected activity and scores the request's risk from the monthly amount range.
-	 * Besides the main type and the range, the customer may declare other types of money, an estimated amount inside
-	 * the range, how many incoming movements and how much outflow a month: the baseline of VDI-3.
+	 * Step 5: saves (or replaces) the expected activity and scores the request's risk (see
+	 * {@link RiskAssessmentService}). Besides the main type and the range, the customer may declare other types of
+	 * money, an estimated amount inside the range, how many incoming movements and how much outflow a month: the
+	 * baseline of VDI-3.
 	 */
 	@Transactional
 	public RiskAssessmentResponse registerExpectedActivity(UUID requestId, ExpectedActivityRequest body) {
@@ -249,7 +250,7 @@ public class OnboardingService {
 		return amount;
 	}
 
-	/** Review and submit: assigns the SOL-YYYY-NNNNN number and closes the request. */
+	/** Review and submit: assigns the SOL-YYYY-NNNNN number, closes the request and scores it with every signal. */
 	@Transactional
 	public OnboardingRequestResponse submit(UUID requestId) {
 		OnboardingRequest request = findInProgress(requestId);
@@ -269,6 +270,9 @@ public class OnboardingService {
 		request.setSubmittedAt(now);
 		recordEvent(request, RequestEventType.REQUEST_SUBMITTED, "Solicitud enviada",
 				Map.of("number", request.getNumber()));
+		// The signals captured after the amount was declared (telemetry, DUI) count in the final score.
+		expectedActivities.findById(requestId)
+			.ifPresent(activity -> riskAssessmentService.evaluate(request, activity.getMonthlyAmountRange()));
 		return OnboardingRequestResponse.of(request);
 	}
 

@@ -40,7 +40,7 @@ Orden: `POST /` → `PUT /{id}/privacy-consent` → `PUT /{id}/basic-data` → `
 
 Reglas:
 
-- **Score (R-01):** un rango de monto mensual cuyo techo no supera USD 500 (`HASTA_200`, `200_500`) da riesgo bajo; `500_1000` y `MAS_1000` quedan `PENDING_REVIEW`. El umbral es provisional (VDI-54).
+- **Score (modelo v1, VDI-82):** un puntaje de 0 a 100 que suma los puntos de cada señal disponible; ninguna señal aprueba ni rechaza por sí sola. Bajo 0–39, medio 40–69, alto 70–100. Pesos máximos: monto declarado 25, documento de identidad 20, ritmo de escritura 15, dispositivo 10, horario 10 y ciudad 20 (la ciudad llega con VDI-72 y hasta entonces no suma). Cotejo RNPN, prueba de vida y listas internas no tienen peso todavía. Una señal no capturada no suma ni resta. Se calcula al declarar el monto y otra vez al enviar la solicitud, para contar la telemetría que llegue después. La respuesta (`score`, `modelVersion`, `signals`) trae el aporte de cada señal y queda guardada en el expediente. Reemplaza a la regla R-01, que quedó retirada.
 - **Expediente inmutable (VDI-23):** al salir de `IN_PROGRESS` la base de datos rechaza editar o borrar las declaraciones (el `registeredAt` original se conserva siempre).
 - Los rangos traen `minUsd` y `maxUsd` (primer y último monto; `null` si no tiene piso o techo).
 
@@ -62,9 +62,10 @@ Reglas:
 | Método y ruta | Rol | Tarea |
 |---|---|---|
 | `GET /requests?status=&riskLevel=&q=&page=&size=` | cualquiera | VDI-56 |
-| `GET /requests/{id}` (DUI leído, ingresos, movimiento, score y regla, señales, pasos, línea de tiempo) | cualquiera | VDI-44, 49, 53, 56, 81 |
+| `GET /requests/{id}` (DUI leído, ingresos, movimiento, score con el aporte de cada señal, señales, pasos, línea de tiempo) | cualquiera | VDI-44, 49, 53, 56, 81 |
 | `GET /requests/{id}/identity-document/{side}` (`FRONT` o `BACK`): la foto descifrada, sin caché; cada consulta queda en la auditoría de accesos | cualquiera | VDI-80, VDI-81 |
-| `GET /score-rules` | cualquiera | VDI-57 |
+| `GET /score-model` (rangos y pesos del modelo vigente) | cualquiera | VDI-82 |
+| `GET /score-rules` (reglas vigentes; R-01 está retirada) | cualquiera | VDI-57 |
 | `GET /alerts?status=&assigneeId=&account=&from=&to=` | cualquiera | VDI-62 |
 | `POST /alerts/{id}/take` (la toma el usuario de la sesión) | `FRAUD_ANALYST`, `ADMIN` | VDI-61 |
 | `GET /auth/me`, `POST /auth/change-password` | cualquiera | |

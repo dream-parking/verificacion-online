@@ -54,63 +54,6 @@
         },
         "type" : "object"
       },
-      "ActualActivity" : {
-        "properties" : {
-          "inflowByTransactionType" : {
-            "items" : {
-              "$ref" : "#/components/schemas/ActualActivityByType"
-            },
-            "type" : "array"
-          },
-          "inflowCount" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "inflowUsd" : {
-            "type" : "number"
-          },
-          "outflowCount" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "outflowUsd" : {
-            "type" : "number"
-          }
-        },
-        "type" : "object"
-      },
-      "ActualActivityByType" : {
-        "properties" : {
-          "amountUsd" : {
-            "type" : "number"
-          },
-          "count" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "declared" : {
-            "type" : "boolean"
-          },
-          "transactionTypeCode" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "AdditionalTransactionType" : {
-        "properties" : {
-          "code" : {
-            "description" : "Código del tipo de transacción (`transactionTypes` de GET /api/catalogs)",
-            "example" : "REMESAS",
-            "maxLength" : 30,
-            "minLength" : 0,
-            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
-            "type" : "string"
-          }
-        },
-        "required" : [ "code" ],
-        "type" : "object"
-      },
       "AlertCommentRequest" : {
         "properties" : {
           "comment" : {
@@ -656,31 +599,11 @@
       },
       "ConsoleRequestExpectedActivity" : {
         "properties" : {
-          "additionalTransactionTypeCodes" : {
-            "description" : "Otros tipos de dinero declarados además del principal",
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          },
           "monthlyAmountRangeCode" : {
             "type" : "string"
           },
           "monthlyAmountRangeLabel" : {
             "type" : "string"
-          },
-          "monthlyAmountUsd" : {
-            "description" : "Monto mensual estimado en USD (null si no lo declaró)",
-            "type" : "number"
-          },
-          "monthlyOutflowUsd" : {
-            "description" : "Salidas de dinero al mes en USD (null si no lo declaró)",
-            "type" : "number"
-          },
-          "monthlyTransactionCount" : {
-            "description" : "Depósitos o pagos recibidos al mes (null si no lo declaró)",
-            "format" : "int32",
-            "type" : "integer"
           },
           "registeredAt" : {
             "format" : "date-time",
@@ -1144,50 +1067,8 @@
         },
         "type" : "object"
       },
-      "DeclaredProfile" : {
-        "properties" : {
-          "monthlyAmountRangeCode" : {
-            "type" : "string"
-          },
-          "monthlyAmountRangeLabel" : {
-            "type" : "string"
-          },
-          "monthlyAmountUsd" : {
-            "type" : "number"
-          },
-          "monthlyOutflowUsd" : {
-            "type" : "number"
-          },
-          "monthlyTransactionCount" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "rangeMaxUsd" : {
-            "type" : "number"
-          },
-          "rangeMinUsd" : {
-            "type" : "number"
-          },
-          "transactionTypeCodes" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          }
-        },
-        "type" : "object"
-      },
       "ExpectedActivityRequest" : {
         "properties" : {
-          "additionalTransactionTypes" : {
-            "description" : "Otros tipos de dinero que también moverá, además del principal (opcional, hasta 3)",
-            "items" : {
-              "$ref" : "#/components/schemas/AdditionalTransactionType"
-            },
-            "maxItems" : 3,
-            "minItems" : 0,
-            "type" : "array"
-          },
           "monthlyAmountRangeCode" : {
             "description" : "Código del rango de monto mensual (`monthlyAmountRanges` de GET /api/catalogs)",
             "example" : "200_500",
@@ -1196,28 +1077,8 @@
             "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           },
-          "monthlyAmountUsd" : {
-            "description" : "Monto mensual estimado en USD; debe estar dentro del rango elegido (opcional)",
-            "example" : 350.0,
-            "exclusiveMinimum" : 0,
-            "type" : "number"
-          },
-          "monthlyOutflowUsd" : {
-            "description" : "Dinero que saldrá de la cuenta al mes en USD: retiros, transferencias y pagos (opcional)",
-            "example" : 300.0,
-            "minimum" : 0,
-            "type" : "number"
-          },
-          "monthlyTransactionCount" : {
-            "description" : "Cantidad de depósitos o pagos que recibirá al mes (opcional)",
-            "example" : 2,
-            "format" : "int32",
-            "maximum" : 1000,
-            "minimum" : 1,
-            "type" : "integer"
-          },
           "transactionTypeCode" : {
-            "description" : "Código del tipo de transacción principal (`transactionTypes` de GET /api/catalogs)",
+            "description" : "Código del tipo de transacción (`transactionTypes` de GET /api/catalogs)",
             "example" : "PAGO_SALARIO",
             "maxLength" : 30,
             "minLength" : 0,
@@ -1351,43 +1212,6 @@
           },
           "user" : {
             "$ref" : "#/components/schemas/ConsoleUserResponse"
-          }
-        },
-        "type" : "object"
-      },
-      "MovementResponse" : {
-        "properties" : {
-          "accountId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "amountUsd" : {
-            "type" : "number"
-          },
-          "description" : {
-            "type" : "string"
-          },
-          "direction" : {
-            "enum" : [ "IN", "OUT" ],
-            "type" : "string"
-          },
-          "externalId" : {
-            "type" : "string"
-          },
-          "id" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "occurredAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "registeredAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "transactionTypeCode" : {
-            "type" : "string"
           }
         },
         "type" : "object"
@@ -1530,77 +1354,6 @@
         },
         "type" : "object"
       },
-      "ProfileComparisonResponse" : {
-        "properties" : {
-          "accountId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "actual" : {
-            "$ref" : "#/components/schemas/ActualActivity"
-          },
-          "declared" : {
-            "$ref" : "#/components/schemas/DeclaredProfile"
-          },
-          "deviations" : {
-            "items" : {
-              "$ref" : "#/components/schemas/ProfileDeviation"
-            },
-            "type" : "array"
-          },
-          "month" : {
-            "description" : "Mes comparado (calendario de El Salvador)",
-            "example" : "2026-10",
-            "type" : "string"
-          },
-          "requestId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "tolerancePercent" : {
-            "description" : "Margen sobre lo declarado antes de considerarlo una desviación",
-            "example" : 20,
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "withinProfile" : {
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ProfileDeviation" : {
-        "properties" : {
-          "actualValue" : {
-            "type" : "number"
-          },
-          "alertId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "alertTypeCode" : {
-            "type" : "string"
-          },
-          "declaredValue" : {
-            "type" : "number"
-          },
-          "detail" : {
-            "type" : "string"
-          },
-          "detectedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "limitValue" : {
-            "type" : "number"
-          },
-          "type" : {
-            "enum" : [ "INFLOW_ABOVE_RANGE", "INFLOW_ABOVE_DECLARED_AMOUNT", "MORE_TRANSACTIONS_THAN_DECLARED", "OUTFLOW_ABOVE_DECLARED", "UNDECLARED_TRANSACTION_TYPE" ],
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
       "PublishPrivacyNoticeRequest" : {
         "properties" : {
           "textHash" : {
@@ -1677,62 +1430,15 @@
         "required" : [ "accountId", "reason", "typeCode" ],
         "type" : "object"
       },
-      "RegisterMovementRequest" : {
+      "Range" : {
         "properties" : {
-          "amountUsd" : {
-            "description" : "Monto en USD",
-            "example" : 350.0,
-            "exclusiveMinimum" : 0,
-            "type" : "number"
+          "from" : {
+            "format" : "int32",
+            "type" : "integer"
           },
-          "description" : {
-            "description" : "Descripción del core",
-            "example" : "Planilla octubre",
-            "maxLength" : 150,
-            "minLength" : 0,
-            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
-            "type" : "string"
-          },
-          "direction" : {
-            "description" : "IN si el dinero entra a la cuenta, OUT si sale",
-            "enum" : [ "IN", "OUT" ],
-            "type" : "string"
-          },
-          "externalId" : {
-            "description" : "Id del movimiento en el core; no se acepta dos veces para la misma cuenta",
-            "example" : "core-20261012-000123",
-            "maxLength" : 64,
-            "minLength" : 0,
-            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
-            "type" : "string"
-          },
-          "occurredAt" : {
-            "description" : "Fecha y hora del movimiento",
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "transactionTypeCode" : {
-            "description" : "Tipo de dinero según el core (`transactionTypes` de GET /api/catalogs); null si no está clasificado",
-            "example" : "PAGO_SALARIO",
-            "maxLength" : 30,
-            "minLength" : 0,
-            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
-            "type" : "string"
-          }
-        },
-        "required" : [ "amountUsd", "direction", "externalId", "occurredAt" ],
-        "type" : "object"
-      },
-      "RegisteredMovementResponse" : {
-        "properties" : {
-          "movement" : {
-            "$ref" : "#/components/schemas/MovementResponse"
-          },
-          "newDeviations" : {
-            "items" : {
-              "$ref" : "#/components/schemas/ProfileDeviation"
-            },
-            "type" : "array"
+          "to" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -1766,6 +1472,10 @@
             "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
             "type" : "string"
           },
+          "modelVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
           "ruleCode" : {
             "type" : "string"
           },
@@ -1774,6 +1484,47 @@
           },
           "ruleThreshold" : {
             "type" : "number"
+          },
+          "score" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "signals" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SignalContribution"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ScoreModelResponse" : {
+        "properties" : {
+          "high" : {
+            "$ref" : "#/components/schemas/Range"
+          },
+          "low" : {
+            "$ref" : "#/components/schemas/Range"
+          },
+          "medium" : {
+            "$ref" : "#/components/schemas/Range"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "validFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "weights" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Weight"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -1827,6 +1578,29 @@
           "version" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "SignalContribution" : {
+        "properties" : {
+          "maxPoints" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "observation" : {
+            "type" : "string"
+          },
+          "points" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "signal" : {
+            "enum" : [ "AMOUNT", "IDENTITY_DOCUMENT", "TYPING_PACE", "DEVICE", "TIME_OF_DAY", "CITY", "RNPN", "LIVENESS", "INTERNAL_LISTS" ],
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -1911,6 +1685,22 @@
           }
         },
         "required" : [ "active", "fullName", "jobTitle", "role" ],
+        "type" : "object"
+      },
+      "Weight" : {
+        "properties" : {
+          "maxPoints" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "signal" : {
+            "enum" : [ "AMOUNT", "IDENTITY_DOCUMENT", "TYPING_PACE", "DEVICE", "TIME_OF_DAY", "CITY", "RNPN", "LIVENESS", "INTERNAL_LISTS" ],
+            "type" : "string"
+          }
+        },
         "type" : "object"
       }
     },
@@ -2072,239 +1862,6 @@
         } ],
         "summary" : "Una cuenta",
         "tags" : [ "Consola · Cuentas" ]
-      }
-    },
-    "/api/console/accounts/{accountId}/movements" : {
-      "get" : {
-        "operationId" : "accountActivityMovements",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "accountId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "description" : "Mes a consultar (AAAA-MM, calendario de El Salvador); por defecto el actual",
-          "in" : "query",
-          "name" : "month",
-          "required" : false,
-          "schema" : {
-            "example" : "2026-10",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "items" : {
-                    "$ref" : "#/components/schemas/MovementResponse"
-                  },
-                  "type" : "array"
-                }
-              }
-            },
-            "description" : "Movimientos del mes, del más antiguo al más reciente"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Mes inválido"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Falta el token o ya no es válido"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "La cuenta no existe"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "summary" : "Movimientos de una cuenta en un mes",
-        "tags" : [ "Consola · Perfil transaccional" ]
-      },
-      "post" : {
-        "description" : "Suma el mes del movimiento y lo compara con lo declarado. La primera vez que aparece un tipo de desviación en el mes se guarda y genera una alerta (PERFIL_EXCEDIDO u ORIGEN_DISTINTO).",
-        "operationId" : "accountActivityRegister",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "accountId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/RegisterMovementRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "201" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/RegisteredMovementResponse"
-                }
-              }
-            },
-            "description" : "Movimiento registrado y desviaciones nuevas del mes"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Datos inválidos o tipo de transacción desconocido"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Falta el token o ya no es válido"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "La cuenta no existe"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "La cuenta está cerrada o el movimiento ya estaba registrado"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "summary" : "Registra un movimiento reportado por el core y lo compara con el perfil declarado",
-        "tags" : [ "Consola · Perfil transaccional" ]
-      }
-    },
-    "/api/console/accounts/{accountId}/profile-comparison" : {
-      "get" : {
-        "operationId" : "accountActivityCompare",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "accountId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "description" : "Mes a consultar (AAAA-MM, calendario de El Salvador); por defecto el actual",
-          "in" : "query",
-          "name" : "month",
-          "required" : false,
-          "schema" : {
-            "example" : "2026-10",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProfileComparisonResponse"
-                }
-              }
-            },
-            "description" : "Perfil declarado, actividad real y desviaciones del mes"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Mes inválido"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Falta el token o ya no es válido"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "La cuenta no existe"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "La cuenta no se abrió desde una solicitud con perfil declarado"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "summary" : "Compara la actividad real de un mes con el perfil transaccional declarado",
-        "tags" : [ "Consola · Perfil transaccional" ]
       }
     },
     "/api/console/accounts/{accountId}/status" : {
@@ -4076,9 +3633,42 @@
         "tags" : [ "Consola · Solicitudes" ]
       }
     },
+    "/api/console/score-model" : {
+      "get" : {
+        "description" : "Los rangos del score (bajo, medio, alto) y los puntos máximos de cada señal. Las señales sin peso (RNPN, prueba de vida, listas internas) llegan con maxPoints nulo.",
+        "operationId" : "scoreModelInForce",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ScoreModelResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Modelo de score vigente",
+        "tags" : [ "Consola · Modelo de score" ]
+      }
+    },
     "/api/console/score-rules" : {
       "get" : {
-        "description" : "Hoy solo R-01 (monto mensual bajo → riesgo bajo). Los umbrales no se editan en este sprint.",
+        "description" : "R-01 (monto mensual bajo → riesgo bajo) está retirada: el score lo calcula el modelo de `/api/console/score-model`. Esta lista queda vacía mientras no haya una versión vigente.",
         "operationId" : "scoreRuleInForce",
         "responses" : {
           "200" : {
@@ -5153,9 +4743,6 @@
     "url" : "http://localhost:8080"
   } ],
   "tags" : [ {
-    "description" : "Movimientos reales de la cuenta comparados con el perfil declarado",
-    "name" : "Consola · Perfil transaccional"
-  }, {
     "description" : "Clientes identificados por su DUI",
     "name" : "Consola · Clientes"
   }, {
@@ -5194,5 +4781,8 @@
   }, {
     "description" : "Bandeja de trabajo del analista de fraude",
     "name" : "Consola · Alertas"
+  }, {
+    "description" : "Modelo de ponderación del score (solo lectura)",
+    "name" : "Consola · Modelo de score"
   } ]
 }

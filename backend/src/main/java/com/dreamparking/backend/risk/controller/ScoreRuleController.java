@@ -27,7 +27,8 @@ public class ScoreRuleController {
 	}
 
 	@Operation(summary = "Reglas de score vigentes y su umbral",
-			description = "Hoy solo R-01 (monto mensual bajo → riesgo bajo). Los umbrales no se editan en este sprint.")
+			description = "R-01 (monto mensual bajo → riesgo bajo) está retirada: el score lo calcula el modelo de "
+					+ "`/api/console/score-model`. Esta lista queda vacía mientras no haya una versión vigente.")
 	@GetMapping
 	@Transactional(readOnly = true)
 	public List<ScoreRuleResponse> inForce() {

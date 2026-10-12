@@ -8,6 +8,8 @@ on:
     paths:
       - "webconsole/**"
       - "!webconsole/**/*.md"
+      - "!webconsole/**/*.test.ts*"
+      - "!webconsole/**/*.spec.ts*"
       - ".github/workflows/webconsole-deploy.yml"
   workflow_dispatch:
 

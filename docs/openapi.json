@@ -104,6 +104,7 @@
             "example" : "Revisando estados de cuenta",
             "maxLength" : 2000,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\r\\n\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\r\\n\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           }
         },
@@ -278,6 +279,7 @@
             "example" : "1.0.0+1",
             "maxLength" : 20,
             "minLength" : 0,
+            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
             "type" : "string"
           },
           "approximateLocation" : {
@@ -285,6 +287,7 @@
             "example" : "San Salvador, El Salvador",
             "maxLength" : 120,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "countryIso" : {
@@ -298,6 +301,7 @@
             "example" : "d4f1·9a3c·e7b2",
             "maxLength" : 64,
             "minLength" : 0,
+            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
             "type" : "string"
           },
           "deviceModel" : {
@@ -305,6 +309,7 @@
             "example" : "iPhone 15",
             "maxLength" : 80,
             "minLength" : 0,
+            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
             "type" : "string"
           },
           "operatingSystem" : {
@@ -312,6 +317,7 @@
             "example" : "iOS",
             "maxLength" : 30,
             "minLength" : 0,
+            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
             "type" : "string"
           },
           "steps" : {
@@ -450,11 +456,13 @@
           "currentPassword" : {
             "maxLength" : 200,
             "minLength" : 0,
+            "pattern" : "[^\\p{Cc}]*",
             "type" : "string"
           },
           "newPassword" : {
             "maxLength" : 200,
             "minLength" : 0,
+            "pattern" : "[^\\p{Cc}]*",
             "type" : "string"
           }
         },
@@ -468,6 +476,7 @@
             "example" : "Pago de aguinaldo",
             "maxLength" : 2000,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\r\\n\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\r\\n\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "resolution" : {
@@ -475,6 +484,7 @@
             "example" : "FALSO_POSITIVO",
             "maxLength" : 30,
             "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           }
         },
@@ -988,8 +998,9 @@
           "code" : {
             "description" : "Código único, en mayúsculas",
             "example" : "RETIROS_FRACCIONADOS",
-            "minLength" : 1,
-            "pattern" : "[A-Z0-9_]{1,40}",
+            "maxLength" : 40,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           },
           "defaultCriticality" : {
@@ -1003,6 +1014,7 @@
             "example" : "Retiros fraccionados para no superar el umbral",
             "maxLength" : 200,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           }
         },
@@ -1019,8 +1031,9 @@
           "code" : {
             "description" : "Código único, en mayúsculas; no se puede cambiar después",
             "example" : "MAS_5000",
-            "minLength" : 1,
-            "pattern" : "[A-Z0-9_]{1,30}",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           },
           "label" : {
@@ -1028,6 +1041,7 @@
             "example" : "Más de USD 5,000",
             "maxLength" : 80,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "maxUsd" : {
@@ -1066,18 +1080,21 @@
             "example" : "Nuevo Analista",
             "maxLength" : 150,
             "minLength" : 0,
+            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
             "type" : "string"
           },
           "initialPassword" : {
             "description" : "Contraseña inicial, de 10 a 72 caracteres; la persona debe cambiarla al entrar",
             "maxLength" : 200,
             "minLength" : 0,
+            "pattern" : "[^\\p{Cc}]*",
             "type" : "string"
           },
           "jobTitle" : {
             "example" : "Analista de fraude y cumplimiento",
             "maxLength" : 120,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "role" : {
@@ -1162,7 +1179,9 @@
           "monthlyAmountRangeCode" : {
             "description" : "Código del rango de monto mensual (`monthlyAmountRanges` de GET /api/catalogs)",
             "example" : "200_500",
-            "minLength" : 1,
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           },
           "monthlyAmountUsd" : {
@@ -1188,7 +1207,9 @@
           "transactionTypeCode" : {
             "description" : "Código del tipo de transacción principal (`transactionTypes` de GET /api/catalogs)",
             "example" : "PAGO_SALARIO",
-            "minLength" : 1,
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           }
         },
@@ -1254,13 +1275,17 @@
           "rangeCode" : {
             "description" : "Código del rango de ingreso (catálogo)",
             "example" : "500_1500",
-            "minLength" : 1,
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           },
           "sourceCode" : {
             "description" : "Código de la fuente de ingreso (catálogo)",
             "example" : "SALARIO",
-            "minLength" : 1,
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           },
           "sourceDetail" : {
@@ -1268,6 +1293,7 @@
             "example" : "Venta de artesanías",
             "maxLength" : 150,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           }
         },
@@ -1281,6 +1307,7 @@
             "example" : "abeltran@ceiba.example",
             "maxLength" : 150,
             "minLength" : 0,
+            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
             "type" : "string"
           },
           "password" : {
@@ -1288,6 +1315,7 @@
             "example" : "una-clave-larga-1",
             "maxLength" : 200,
             "minLength" : 0,
+            "pattern" : "[^\\p{Cc}]*",
             "type" : "string"
           }
         },
@@ -1394,6 +1422,7 @@
           "numberToken" : {
             "maxLength" : 64,
             "minLength" : 0,
+            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
             "type" : "string"
           },
           "requestId" : {
@@ -1572,8 +1601,8 @@
           "version" : {
             "description" : "Versión, única",
             "example" : "2026.2",
-            "maxLength" : 20,
-            "minLength" : 0,
+            "minLength" : 1,
+            "pattern" : "[0-9A-Za-z._-]{1,20}",
             "type" : "string"
           }
         },
@@ -1593,6 +1622,7 @@
             "example" : "Umbral confirmado por Conozca a su Cliente",
             "maxLength" : 250,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "threshold" : {
@@ -1622,10 +1652,13 @@
           "reason" : {
             "maxLength" : 250,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "typeCode" : {
-            "minLength" : 1,
+            "maxLength" : 40,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           }
         },
@@ -1693,6 +1726,7 @@
             "description" : "Contraseña nueva, de 10 a 72 caracteres",
             "maxLength" : 200,
             "minLength" : 0,
+            "pattern" : "[^\\p{Cc}]*",
             "type" : "string"
           }
         },
@@ -1793,6 +1827,7 @@
             "example" : "Movimientos por encima del perfil declarado",
             "maxLength" : 200,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           }
         },
@@ -1811,6 +1846,7 @@
             "example" : "Hasta USD 500",
             "maxLength" : 80,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "maxUsd" : {
@@ -1843,11 +1879,13 @@
           "fullName" : {
             "maxLength" : 150,
             "minLength" : 0,
+            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
             "type" : "string"
           },
           "jobTitle" : {
             "maxLength" : 120,
             "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "role" : {
@@ -2415,6 +2453,9 @@
           "name" : "code",
           "required" : true,
           "schema" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           }
         } ],
@@ -2497,6 +2538,7 @@
           "required" : true,
           "schema" : {
             "enum" : [ "income-sources", "income-ranges", "monthly-amount-ranges", "transaction-types" ],
+            "pattern" : "[a-z-]{1,40}",
             "type" : "string"
           }
         } ],
@@ -2559,6 +2601,7 @@
           "name" : "catalog",
           "required" : true,
           "schema" : {
+            "pattern" : "[a-z-]{1,40}",
             "type" : "string"
           }
         } ],
@@ -2650,6 +2693,7 @@
           "name" : "catalog",
           "required" : true,
           "schema" : {
+            "pattern" : "[a-z-]{1,40}",
             "type" : "string"
           }
         }, {
@@ -2657,6 +2701,9 @@
           "name" : "code",
           "required" : true,
           "schema" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           }
         } ],
@@ -2865,6 +2912,9 @@
           "name" : "code",
           "required" : true,
           "schema" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           }
         } ],
@@ -2927,6 +2977,9 @@
           "name" : "code",
           "required" : true,
           "schema" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
             "type" : "string"
           }
         } ],
@@ -3069,6 +3122,9 @@
           "name" : "account",
           "required" : false,
           "schema" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[0-9 *-]*",
             "type" : "string"
           }
         }, {
@@ -3678,6 +3734,7 @@
           "name" : "dui",
           "required" : true,
           "schema" : {
+            "pattern" : "[0-9]{8}-[0-9]",
             "type" : "string"
           }
         } ],
@@ -3840,6 +3897,9 @@
           "name" : "q",
           "required" : false,
           "schema" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           }
         }, {

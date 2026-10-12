@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dreamparking.backend.catalog.entity.IncomeSource;
 import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
+import com.dreamparking.backend.catalog.entity.TransactionType;
 import com.dreamparking.backend.catalog.service.CatalogService;
 import com.dreamparking.backend.catalog.service.PrivacyNoticeService;
 import com.dreamparking.backend.common.exception.InvalidInputException;
@@ -25,6 +26,7 @@ import com.dreamparking.backend.onboarding.dto.ExpectedActivityRequest;
 import com.dreamparking.backend.onboarding.dto.IncomeDeclarationRequest;
 import com.dreamparking.backend.onboarding.dto.OnboardingRequestResponse;
 import com.dreamparking.backend.onboarding.entity.ExpectedActivity;
+import com.dreamparking.backend.onboarding.entity.ExpectedActivityVersion;
 import com.dreamparking.backend.onboarding.entity.IncomeDeclaration;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.PrivacyConsent;
@@ -33,6 +35,7 @@ import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
+import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
 import com.dreamparking.backend.onboarding.repository.PrivacyConsentRepository;
@@ -61,6 +64,8 @@ public class OnboardingService {
 
 	private final ExpectedActivityRepository expectedActivities;
 
+	private final ExpectedActivityVersionRepository expectedActivityVersions;
+
 	private final RequestEventRepository events;
 
 	private final CatalogService catalogService;
@@ -77,7 +82,7 @@ public class OnboardingService {
 
 	public OnboardingService(OnboardingRequestRepository requests, PrivacyConsentRepository consents,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
-			RequestEventRepository events, CatalogService catalogService,
+			ExpectedActivityVersionRepository expectedActivityVersions, RequestEventRepository events, CatalogService catalogService,
 			PrivacyNoticeService privacyNoticeService, CustomerService customerService,
 			RiskAssessmentService riskAssessmentService, IdentityDocumentRepository identityDocuments,
 			@Value("${app.onboarding.identity-document-required:true}") boolean identityDocumentRequired) {
@@ -85,6 +90,7 @@ public class OnboardingService {
 		this.consents = consents;
 		this.incomeDeclarations = incomeDeclarations;
 		this.expectedActivities = expectedActivities;
+		this.expectedActivityVersions = expectedActivityVersions;
 		this.events = events;
 		this.catalogService = catalogService;
 		this.privacyNoticeService = privacyNoticeService;
@@ -191,20 +197,42 @@ public class OnboardingService {
 		recordEvent(request, RequestEventType.INCOME_REGISTERED, "Ingresos registrados");
 	}
 
-	/** Step 5: saves (or replaces) the expected activity and scores the request's risk (see {@link RiskAssessmentService}). */
+	/**
+	 * Step 5: declares the transactional profile (type of money and monthly amount range) and scores the request's
+	 * risk (see {@link RiskAssessmentService}). The first declaration is version 1 and each change of the type or the
+	 * range before submitting is a new version; declaring the same thing again changes nothing. The latest version is
+	 * the one in force.
+	 */
 	@Transactional
 	public RiskAssessmentResponse registerExpectedActivity(UUID requestId, ExpectedActivityRequest body) {
 		OnboardingRequest request = findInProgress(requestId);
 
-		ExpectedActivity activity = expectedActivities.findById(requestId).orElseGet(ExpectedActivity::new);
-		activity.setRequest(request);
-		activity.setTransactionType(catalogService.activeTransactionType(body.transactionTypeCode()));
+		TransactionType type = catalogService.activeTransactionType(body.transactionTypeCode());
 		MonthlyAmountRange range = catalogService.activeMonthlyAmountRange(body.monthlyAmountRangeCode());
-		activity.setMonthlyAmountRange(range);
-		expectedActivities.save(activity);
+		ExpectedActivity current = expectedActivities.findById(requestId).orElse(null);
+		boolean changed = current == null || !current.getTransactionType().getCode().equals(type.getCode())
+				|| !current.getMonthlyAmountRange().getCode().equals(range.getCode());
+		if (changed) {
+			ExpectedActivity activity = current == null ? new ExpectedActivity() : current;
+			short version = current == null ? 1 : (short) (current.getVersion() + 1);
+			activity.setRequest(request);
+			activity.setTransactionType(type);
+			activity.setMonthlyAmountRange(range);
+			activity.setVersion(version);
+			expectedActivities.save(activity);
+			expectedActivityVersions.save(new ExpectedActivityVersion(request, version, type, range));
+			if (current == null) {
+				recordEvent(request, RequestEventType.EXPECTED_ACTIVITY_REGISTERED, "Movimiento esperado registrado",
+						Map.of("version", version));
+			}
+			else {
+				recordEvent(request, RequestEventType.EXPECTED_ACTIVITY_REGISTERED,
+						"Perfil transaccional cambiado: versión " + version,
+						Map.of("version", version, "transactionType", type.getCode(), "monthlyAmountRange", range.getCode()));
+			}
+		}
 
 		completeStep(request, OnboardingStep.EXPECTED_ACTIVITY);
-		recordEvent(request, RequestEventType.EXPECTED_ACTIVITY_REGISTERED, "Movimiento esperado registrado");
 		return riskAssessmentService.evaluate(request, range);
 	}
 

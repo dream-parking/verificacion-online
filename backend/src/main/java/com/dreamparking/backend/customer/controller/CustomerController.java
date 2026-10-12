@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.dreamparking.backend.common.validation.Dui;
 import com.dreamparking.backend.customer.dto.CustomerResponse;
 import com.dreamparking.backend.customer.service.CustomerService;
 
@@ -41,7 +42,7 @@ public class CustomerController {
 	@Operation(summary = "Busca un cliente por DUI", description = "Formato 00000000-0.")
 	@ApiResponse(responseCode = "404", description = "No hay cliente con ese DUI", content = @Content)
 	@GetMapping(params = "dui")
-	public CustomerResponse getByDui(@RequestParam String dui) {
+	public CustomerResponse getByDui(@RequestParam @Dui String dui) {
 		return customerService.getByDui(dui);
 	}
 

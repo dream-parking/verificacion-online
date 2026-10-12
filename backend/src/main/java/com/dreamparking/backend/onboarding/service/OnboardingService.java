@@ -223,13 +223,13 @@ public class OnboardingService {
 	/** Extra types of money: active catalog codes, without repeating the main type or each other. */
 	private Set<String> extraTransactionTypes(ExpectedActivityRequest body) {
 		Set<String> codes = new LinkedHashSet<>();
-		if (body.additionalTransactionTypeCodes() == null) {
+		if (body.additionalTransactionTypes() == null) {
 			return codes;
 		}
-		for (String code : body.additionalTransactionTypeCodes()) {
-			String active = catalogService.activeTransactionType(code).getCode();
+		for (ExpectedActivityRequest.AdditionalTransactionType type : body.additionalTransactionTypes()) {
+			String active = catalogService.activeTransactionType(type.code()).getCode();
 			if (active.equals(body.transactionTypeCode()) || !codes.add(active)) {
-				throw new InvalidInputException("additionalTransactionTypeCodes repeats the type " + active);
+				throw new InvalidInputException("additionalTransactionTypes repeats the type " + active);
 			}
 		}
 		return codes;

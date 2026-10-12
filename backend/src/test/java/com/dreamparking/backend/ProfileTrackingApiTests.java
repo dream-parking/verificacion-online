@@ -49,7 +49,7 @@ class ProfileTrackingApiTests {
 	/** Salary and remittances, USD 200.01–500 (about 350) in 2 deposits, and about USD 300 of outflow a month. */
 	private static final String FULL_PROFILE = """
 			{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "200_500",
-			 "additionalTransactionTypeCodes": ["REMESAS"], "monthlyAmountUsd": 350.00,
+			 "additionalTransactionTypes": [{"code": "REMESAS"}], "monthlyAmountUsd": 350.00,
 			 "monthlyTransactionCount": 2, "monthlyOutflowUsd": 300.00}
 			""";
 
@@ -113,17 +113,17 @@ class ProfileTrackingApiTests {
 		String requestId = requestAtExpectedActivity();
 		expectedActivity(requestId, """
 				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "200_500",
-				 "additionalTransactionTypeCodes": ["PAGO_SALARIO"]}
+				 "additionalTransactionTypes": [{"code": "PAGO_SALARIO"}]}
 				""")
 			.andExpect(status().isBadRequest());
 		expectedActivity(requestId, """
 				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "200_500",
-				 "additionalTransactionTypeCodes": ["REMESAS", "REMESAS"]}
+				 "additionalTransactionTypes": [{"code": "REMESAS"}, {"code": "REMESAS"}]}
 				""")
 			.andExpect(status().isBadRequest());
 		expectedActivity(requestId, """
 				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "200_500",
-				 "additionalTransactionTypeCodes": ["LOTERIA"]}
+				 "additionalTransactionTypes": [{"code": "LOTERIA"}]}
 				""")
 			.andExpect(status().isBadRequest());
 		expectedActivity(requestId, """

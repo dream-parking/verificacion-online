@@ -94,6 +94,7 @@ jobs:
           cache-dependency-path: webconsole/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm run test:coverage # genera coverage/lcov.info para Sonar
       - run: npm run build
 
       # Si el Quality Gate falla, falla este paso. Sin SONAR_TOKEN (forks) se omite.

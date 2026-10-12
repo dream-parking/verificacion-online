@@ -22,7 +22,7 @@ import jakarta.validation.constraints.Email;
  * {@code a@b}, quoted local parts with spaces and other forms no mail server here uses. {@code null} is valid.
  */
 @Documented
-@Email(regexp = "[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}")
+@Email(regexp = "[A-Za-z0-9._%+-]+@(?![.-])(?!.*\\.\\.)[A-Za-z0-9.-]+\\.[A-Za-z]{2,}")
 @ReportAsSingleViolation
 @Constraint(validatedBy = {})
 @Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })

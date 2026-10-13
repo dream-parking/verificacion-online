@@ -22,6 +22,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.dreamparking.backend.customer.entity.Device;
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 
 /** Session and behavior signals captured while the customer fills in a request. */
@@ -55,6 +56,21 @@ public class OnboardingSession {
 
 	@Embedded
 	private SessionGeolocation geolocation = new SessionGeolocation();
+
+	/** City and country as the phone reports them (VDI-72); {@code null} until the app reports a location. */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "device_location_status", length = 12)
+	private LocationStatus deviceLocationStatus;
+
+	@Column(name = "device_city", length = 120)
+	private String deviceCity;
+
+	@JdbcTypeCode(SqlTypes.CHAR)
+	@Column(name = "device_country_iso", length = 2)
+	private String deviceCountryIso;
+
+	@Column(name = "device_location_captured_at")
+	private Instant deviceLocationCapturedAt;
 
 	@Column(name = "user_agent", columnDefinition = "text")
 	private String userAgent;
@@ -183,6 +199,74 @@ public class OnboardingSession {
 
 	public void setCapturedAt(Instant capturedAt) {
 		this.capturedAt = capturedAt;
+	}
+
+	/** The phone reported its city and country. */
+	public void setDeviceLocation(String city, String countryIso, Instant now) {
+		this.deviceLocationStatus = LocationStatus.AVAILABLE;
+		this.deviceCity = city;
+		this.deviceCountryIso = countryIso == null ? null : countryIso.toUpperCase();
+		this.deviceLocationCapturedAt = now;
+	}
+
+	/** The phone has no location to report (permission denied or the reading failed): not the same as not reported yet. */
+	public void setDeviceLocationUnavailable(Instant now) {
+		this.deviceLocationStatus = LocationStatus.UNAVAILABLE;
+		this.deviceCity = null;
+		this.deviceCountryIso = null;
+		this.deviceLocationCapturedAt = now;
+	}
+
+	public LocationStatus getDeviceLocationStatus() {
+		return deviceLocationStatus;
+	}
+
+	public String getDeviceCity() {
+		return deviceCity;
+	}
+
+	public String getDeviceCountryIso() {
+		return deviceCountryIso;
+	}
+
+	public Instant getDeviceLocationCapturedAt() {
+		return deviceLocationCapturedAt;
+	}
+
+	/** How the location of the phone compares with the one resolved from the IP. */
+	public enum LocationMatch {
+
+		SAME_CITY,
+
+		SAME_COUNTRY,
+
+		DIFFERENT_COUNTRY
+
+	}
+
+	/**
+	 * Compares the city and country of the phone with those of the IP; {@code null} when either is missing (no
+	 * location on the phone, or the IP could not be located).
+	 */
+	public LocationMatch compareDeviceLocationWithIp() {
+		if (deviceLocationStatus != LocationStatus.AVAILABLE || !geolocation.isAvailable()
+				|| geolocation.getCountryCode() == null) {
+			return null;
+		}
+		if (!geolocation.getCountryCode().equalsIgnoreCase(deviceCountryIso)) {
+			return LocationMatch.DIFFERENT_COUNTRY;
+		}
+		return geolocation.getCity() != null && plain(geolocation.getCity()).equals(plain(deviceCity))
+				? LocationMatch.SAME_CITY : LocationMatch.SAME_COUNTRY;
+	}
+
+	/** Lower case, without accents and extra spaces: «San Salvador» and «san  salvadór» are the same city. */
+	private static String plain(String text) {
+		return java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
+			.replaceAll("\\p{M}", "")
+			.toLowerCase(java.util.Locale.ROOT)
+			.trim()
+			.replaceAll("\\s+", " ");
 	}
 
 }

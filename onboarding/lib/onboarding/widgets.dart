@@ -33,7 +33,7 @@ class PrimaryButton extends StatelessWidget {
             TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.3),
           ),
         ),
-        child: Text(text.toUpperCase(), textAlign: TextAlign.center),
+        child: Text(text, textAlign: TextAlign.center),
       ),
     );
   }
@@ -65,7 +65,7 @@ class SecondaryButton extends StatelessWidget {
           ),
           textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         ),
-        child: Text(text.toUpperCase(), textAlign: TextAlign.center),
+        child: Text(text, textAlign: TextAlign.center),
       ),
     );
   }

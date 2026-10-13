@@ -268,13 +268,13 @@
           "firstNames" : {
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           },
           "lastNames" : {
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           },
           "mobilePhone" : {
@@ -531,7 +531,7 @@
             "example" : "Marta Alejandra",
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           },
           "lastNames" : {
@@ -539,7 +539,7 @@
             "example" : "Rivas Cruz",
             "maxLength" : 100,
             "minLength" : 0,
-            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           }
         },
@@ -1094,7 +1094,7 @@
             "example" : "Nuevo Analista",
             "maxLength" : 150,
             "minLength" : 0,
-            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           },
           "initialPassword" : {
@@ -1108,7 +1108,7 @@
             "example" : "Analista de fraude y cumplimiento",
             "maxLength" : 120,
             "minLength" : 0,
-            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,()/&'\\-]*",
             "type" : "string"
           },
           "role" : {
@@ -1977,13 +1977,13 @@
           "fullName" : {
             "maxLength" : 150,
             "minLength" : 0,
-            "pattern" : "\\s*\\p{L}+( \\p{L}+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           },
           "jobTitle" : {
             "maxLength" : 120,
             "minLength" : 0,
-            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,()/&'\\-]*",
             "type" : "string"
           },
           "role" : {

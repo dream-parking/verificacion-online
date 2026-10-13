@@ -76,6 +76,26 @@ class InputValidationApiTests {
 	}
 
 	@Test
+	void consoleUsersRejectNamesAndJobTitlesWithInvalidCharacters() throws Exception {
+		MockMvc admin = auth.mockMvcAs(context, auth.user(ConsoleRole.ADMIN));
+		admin.perform(post("/api/console/users").contentType(JSON).content("""
+				{"email": "nueva@ceiba.example", "fullName": "Иван Петров", "jobTitle": "#1 @ 50%",
+				 "role": "FRAUD_ANALYST", "initialPassword": "clave-inicial-123"}
+				"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors.fullName").value("Solo se permiten letras y espacios"))
+			.andExpect(jsonPath("$.errors.jobTitle").exists());
+
+		admin.perform(put("/api/console/users/{id}", auth.user(ConsoleRole.FRAUD_ANALYST).getId()).contentType(JSON)
+			.content("""
+					{"fullName": "Ana Rivas", "jobTitle": "12345", "role": "FRAUD_ANALYST", "active": true}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors.jobTitle").exists())
+			.andExpect(jsonPath("$.errors.fullName").doesNotExist());
+	}
+
+	@Test
 	void queryParametersAndPathVariablesAreValidatedToo() throws Exception {
 		MockMvc admin = auth.mockMvcAs(context, auth.user(ConsoleRole.ADMIN));
 

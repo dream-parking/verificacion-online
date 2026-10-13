@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -56,41 +54,66 @@ abstract interface class DeviceLocationSource {
   Future<DeviceLocation> read();
 }
 
+/// Coordinates used only to look up the city.
+typedef Coordinates = ({double latitude, double longitude});
+
 /// Reads the city with `geolocator` (coarse permission, low accuracy) and `geocoding` (reverse geocoding on
 /// the phone). The coordinates are only used to find the city and are not sent nor stored.
+///
+/// The plugin calls can be replaced: tests pass fake ones.
 class PlatformDeviceLocationSource implements DeviceLocationSource {
+  PlatformDeviceLocationSource({
+    Future<LocationPermission> Function()? checkPermission,
+    Future<LocationPermission> Function()? requestPermission,
+    Future<bool> Function()? serviceEnabled,
+    Future<Coordinates> Function()? position,
+    Future<List<Placemark>> Function(double latitude, double longitude)? placemarks,
+    this.timeLimit = const Duration(seconds: 15),
+  })  : _checkPermission = checkPermission ?? Geolocator.checkPermission,
+        _requestPermission = requestPermission ?? Geolocator.requestPermission,
+        _serviceEnabled = serviceEnabled ?? Geolocator.isLocationServiceEnabled,
+        _position = position ?? _lowAccuracyPosition,
+        _placemarks = placemarks ?? placemarkFromCoordinates;
+
+  final Future<LocationPermission> Function() _checkPermission;
+  final Future<LocationPermission> Function() _requestPermission;
+  final Future<bool> Function() _serviceEnabled;
+  final Future<Coordinates> Function() _position;
+  final Future<List<Placemark>> Function(double latitude, double longitude) _placemarks;
+
   /// The whole lookup (position and city) gives up after this time.
-  static const timeLimit = Duration(seconds: 15);
+  final Duration timeLimit;
 
   static final _countryIso = RegExp(r'^[A-Za-z]{2}$');
+
+  static Future<Coordinates> _lowAccuracyPosition() async {
+    final p = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.low));
+    return (latitude: p.latitude, longitude: p.longitude);
+  }
 
   @override
   Future<DeviceLocation> read() async {
     try {
-      var permission = await Geolocator.checkPermission();
+      var permission = await _checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await _requestPermission();
       }
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         return const DeviceLocation.denied();
       }
-      if (permission == LocationPermission.unableToDetermine || !await Geolocator.isLocationServiceEnabled()) {
+      if (permission == LocationPermission.unableToDetermine || !await _serviceEnabled()) {
         return const DeviceLocation.unavailable();
       }
       return await _city().timeout(timeLimit);
-    } on TimeoutException {
-      return const DeviceLocation.unavailable();
     } on Exception {
-      // Permission dialog already open, location services off, no geocoder on the phone...
+      // Timeout, permission dialog already open, location services off, no geocoder on the phone...
       return const DeviceLocation.unavailable();
     }
   }
 
   Future<DeviceLocation> _city() async {
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
-    );
-    final places = await placemarkFromCoordinates(position.latitude, position.longitude);
+    final position = await _position();
+    final places = await _placemarks(position.latitude, position.longitude);
     if (places.isEmpty) return const DeviceLocation.unavailable();
     final p = places.first;
     final city = [p.locality, p.subAdministrativeArea, p.administrativeArea]

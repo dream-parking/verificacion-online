@@ -65,14 +65,15 @@ void main() {
 
     test('names follow the same rule as the basic data', () {
       expect((confirmed()..idFirstNames = '').messages()['idFirstNames'], 'Escribe tus nombres.');
-      expect((confirmed()..idFirstNames = 'Ana2').messages()['idFirstNames'],
-          'Usa solo letras y espacios, sin números ni símbolos.');
-      expect((confirmed()..idFirstNames = 'Ana 😀').messages()['idFirstNames'],
-          'Usa solo letras y espacios, sin números ni símbolos.');
+      const rule = "Escribe tus nombres solo con letras. También puedes usar espacios, apóstrofo (') o guion (-).";
+      expect((confirmed()..idFirstNames = 'Ana2').messages()['idFirstNames'], rule);
+      expect((confirmed()..idFirstNames = 'Ana 😀').messages()['idFirstNames'], rule);
+      expect((confirmed()..idFirstNames = 'Ana-María').messages()['idFirstNames'], isEmpty);
       expect((confirmed()..idFirstNames = 'A' * 101).messages()['idFirstNames'], 'Usa como máximo 100 caracteres.');
       expect((confirmed()..idLastNames = '').messages()['idLastNames'], 'Escribe tus apellidos.');
       expect((confirmed()..idLastNames = 'Pérez 2#').messages()['idLastNames'],
-          'Usa solo letras y espacios, sin números ni símbolos.');
+          "Escribe tus apellidos solo con letras. También puedes usar espacios, apóstrofo (') o guion (-).");
+      expect((confirmed()..idLastNames = "Rivas-Cruz D'Aubuisson").messages()['idLastNames'], isEmpty);
     });
 
     test('birth date must be a real date before today', () {

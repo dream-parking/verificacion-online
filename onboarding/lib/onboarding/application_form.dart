@@ -1,5 +1,5 @@
 /// Flow screens, in order.
-enum Screen { welcome, privacy, basicData, income, expectedActivity, review, confirmation }
+enum Screen { welcome, privacy, location, basicData, income, expectedActivity, review, confirmation }
 
 /// A catalog option (income source, income range, transaction type, amount range).
 class Option {

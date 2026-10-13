@@ -105,6 +105,7 @@ class FakeApi {
     this.activityErrors = const [],
     this.submitErrors = const [],
     this.identityResponses = const [],
+    this.confirmationErrors = const [],
     this.number = 'SOL-2026-00419',
   });
 
@@ -130,6 +131,9 @@ class FakeApi {
   /// Responses of the first `PUT /identity-document` calls, as (HTTP code, body); then 200 with a reading.
   List<(int, String)> identityResponses;
 
+  /// HTTP codes returned by the first `PUT /identity-document/confirmation` calls (then 200).
+  List<int> confirmationErrors;
+
   /// Number the server assigns on submit.
   final String number;
 
@@ -142,6 +146,8 @@ class FakeApi {
   List<http.Request> get privacyConsents => calls.where((r) => r.url.path.endsWith('/privacy-consent')).toList();
   List<http.Request> get basicData => calls.where((r) => r.url.path.endsWith('/basic-data')).toList();
   List<http.Request> get identityUploads => calls.where((r) => r.url.path.endsWith('/identity-document')).toList();
+  List<http.Request> get identityConfirmations =>
+      calls.where((r) => r.url.path.endsWith('/identity-document/confirmation')).toList();
   List<http.Request> get submits => calls.where((r) => r.url.path.endsWith('/submit')).toList();
   List<http.Request> get incomes => calls.where((r) => r.url.path.endsWith('/income')).toList();
   List<http.Request> get activities => calls.where((r) => r.url.path.endsWith('/expected-activity')).toList();
@@ -175,6 +181,10 @@ class FakeApi {
           if (req.url.path.endsWith('/basic-data')) {
             return error(basicDataErrors, (r) => basicDataErrors = r) ??
                 http.Response('{"status":"IN_PROGRESS","completedSteps":2}', 200);
+          }
+          if (req.url.path.endsWith('/identity-document/confirmation')) {
+            return error(confirmationErrors, (r) => confirmationErrors = r) ??
+                http.Response('{"status":"IN_PROGRESS","completedSteps":3}', 200);
           }
           if (req.url.path.endsWith('/identity-document')) {
             if (identityResponses.isNotEmpty) {
@@ -305,11 +315,11 @@ void main() {
 
     final shutter = find.byKey(const Key('shutter'));
 
-    /// Photographs the front and the back of the DUI and moves on from the confirmation placeholder (VDI-78).
+    /// Photographs the front and the back of the DUI and confirms the data that was read (VDI-77 and VDI-78).
     Future<void> passDui(WidgetTester tester) async {
       await tap(tester, shutter);
       await tap(tester, shutter);
-      await tapContinue(tester);
+      await tap(tester, find.text('MIS DATOS SON CORRECTOS'));
     }
 
     Widget app(FakeApi fake, {DeviceInfoSource? device, DateTime Function()? clock, FakeCamera? camera}) => OnboardingApp(
@@ -714,28 +724,6 @@ void main() {
         expect(body, allOf(contains('name="front"'), contains('name="back"')));
 
         expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
-        expect(find.text('DUI: 01234567-8'), findsOneWidget);
-        expect(find.text('Nombres: María José'), findsOneWidget);
-        expect(find.text('Apellidos: Pérez López'), findsOneWidget);
-        expect(find.text('Nacimiento: 1990-04-12'), findsOneWidget);
-        expect(find.text('Vencimiento: 2029-06-01'), findsOneWidget);
-      });
-
-      testWidgets('a field the reader did not read clearly says so', (tester) async {
-        final fake = FakeApi(identityResponses: [
-          (200, '{"status":"READ","attempts":1,"dui":"01234567-8","firstNames":null,"lastNames":"Pérez"}'),
-        ]);
-        await goToDui(tester, fake, FakeCamera());
-        await takeBoth(tester);
-        expect(find.text('Nombres: No se leyó'), findsOneWidget);
-        expect(find.text('Nacimiento: No se leyó'), findsOneWidget);
-      });
-
-      testWidgets('if the reader is unavailable the person is told they will type their data', (tester) async {
-        final fake = FakeApi(identityResponses: [(200, '{"status":"FAILED","attempts":1}')]);
-        await goToDui(tester, fake, FakeCamera());
-        await takeBoth(tester);
-        expect(find.text('No pudimos leer tus datos. Los escribirás en el siguiente paso.'), findsOneWidget);
       });
 
       testWidgets('an unreadable front says what happened, shows how to improve it and does not let it advance',
@@ -920,6 +908,302 @@ void main() {
         await tester.pumpWidget(app(FakeApi()));
         expect(find.text('Tu DUI'), findsOneWidget);
         expect(find.text('Una foto del frente y otra del reverso.'), findsOneWidget);
+      });
+    });
+
+    group('confirm the DUI data (VDI-78)', () {
+      final confirmButton = find.text('MIS DATOS SON CORRECTOS');
+
+      Future<void> goToDui(WidgetTester tester, FakeApi fake, FakeCamera camera) async {
+        await tester.pumpWidget(app(fake, camera: camera));
+        await tap(tester, find.text('EMPEZAR'));
+        await acceptNotice(tester);
+        await tapContinue(tester);
+        await fillBasicData(tester);
+        await tapContinue(tester);
+        await tap(tester, shutter);
+        await tap(tester, shutter);
+      }
+
+      Future<void> goToConfirmation(WidgetTester tester, FakeApi fake, [FakeCamera? camera]) =>
+          goToDui(tester, fake, camera ?? FakeCamera());
+
+      /// Text of the n-th field: 0 DUI, 1 first names, 2 last names, 3 birth date, 4 expiry date.
+      String field(WidgetTester tester, int n) => tester.widget<TextField>(find.byType(TextField).at(n)).controller!.text;
+      Future<void> type(WidgetTester tester, int n, String text) async {
+        await tester.enterText(find.byType(TextField).at(n), text);
+        await tester.pumpAndSettle();
+      }
+
+      const notClear = 'No lo leímos con claridad. Revísalo.';
+
+      testWidgets('shows the five data that were read, the photos and the button', (tester) async {
+        await goToConfirmation(tester, FakeApi());
+
+        expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
+        expect(find.text('Los sacamos de las fotos de tu DUI. Corrige lo que no esté bien.'), findsOneWidget);
+        expect(find.text('Paso 2 de 5'), findsOneWidget);
+        expect(
+          [for (var i = 0; i < 5; i++) field(tester, i)],
+          ['01234567-8', 'María José', 'Pérez López', '12/04/1990', '01/06/2029'],
+        );
+        for (final label in ['Número de DUI', 'Nombres', 'Apellidos', 'Fecha de nacimiento', 'Vence el']) {
+          expect(find.text(label), findsOneWidget);
+        }
+        expect(find.text('Frente'), findsOneWidget);
+        expect(find.text('Reverso'), findsOneWidget);
+        expect(find.text('Repetir'), findsNWidgets(2));
+        expect(find.text(notClear), findsNothing, reason: 'everything was read clearly');
+        expect(confirmButton, findsOneWidget);
+        expect(find.text('CONTINUAR'), findsNothing);
+      });
+
+      testWidgets('confirming sends the data with the dates as year-month-day and moves on', (tester) async {
+        final fake = FakeApi();
+        await goToConfirmation(tester, fake);
+        await tap(tester, confirmButton);
+
+        expect(jsonDecode(fake.identityConfirmations.single.body), {
+          'dui': '01234567-8',
+          'firstNames': 'María José',
+          'lastNames': 'Pérez López',
+          'birthDate': '1990-04-12',
+          'expiryDate': '2029-06-01',
+        });
+        expect(find.text('Paso 3 de 5'), findsOneWidget);
+      });
+
+      testWidgets('the person can correct any of the five data and the corrected ones are sent', (tester) async {
+        final fake = FakeApi();
+        await goToConfirmation(tester, fake);
+        await type(tester, 0, '09876543-2');
+        await type(tester, 1, '  Maria   Jose ');
+        await type(tester, 2, 'Perez Lopez');
+        await type(tester, 3, '13/04/1990');
+        await type(tester, 4, '02/06/2030');
+        await tap(tester, confirmButton);
+
+        expect(jsonDecode(fake.identityConfirmations.single.body), {
+          'dui': '09876543-2',
+          'firstNames': 'Maria Jose',
+          'lastNames': 'Perez Lopez',
+          'birthDate': '1990-04-13',
+          'expiryDate': '2030-06-02',
+        });
+      });
+
+      testWidgets('dates are typed with the mask: only digits, slashes appear by themselves', (tester) async {
+        await goToConfirmation(tester, FakeApi());
+        await type(tester, 3, '14031991');
+        expect(field(tester, 3), '14/03/1991');
+        await type(tester, 3, '1a4-0b3 1991999');
+        expect(field(tester, 3), '14/03/1991');
+        await type(tester, 0, '012345678');
+        expect(field(tester, 0), '01234567-8');
+      });
+
+      testWidgets('a datum that was not read is empty and marked to review, and does not let the person continue',
+          (tester) async {
+        final fake = FakeApi(identityResponses: [
+          (200, '{"status":"READ","attempts":1,"dui":"01234567-8","firstNames":"María José","lastNames":"Pérez López",'
+              '"birthDate":null,"expiryDate":"2029-06-01"}'),
+        ]);
+        await goToConfirmation(tester, fake);
+
+        expect(field(tester, 3), '');
+        expect(find.text(notClear), findsOneWidget, reason: 'only the birth date is marked');
+
+        await tap(tester, confirmButton);
+        expect(find.text('Escribe tu fecha de nacimiento como día/mes/año, por ejemplo 14/03/1991.'), findsOneWidget);
+        expect(fake.identityConfirmations, isEmpty, reason: 'nothing is sent while a datum is invalid');
+        expect(find.text('Paso 2 de 5'), findsOneWidget);
+
+        await type(tester, 3, '14031991');
+        expect(find.text(notClear), findsNothing, reason: 'the mark goes away when the person writes it');
+        await tap(tester, confirmButton);
+        expect(fake.identityConfirmations, hasLength(1));
+        expect(find.text('Paso 3 de 5'), findsOneWidget);
+      });
+
+      testWidgets('a datum read badly is marked too, and the person can fix it', (tester) async {
+        final fake = FakeApi(identityResponses: [
+          (200, '{"status":"READ","attempts":1,"dui":"0123456-8","firstNames":"M4ria","lastNames":"Pérez",'
+              '"birthDate":"1990-04-12","expiryDate":"2029-06-01"}'),
+        ]);
+        await goToConfirmation(tester, fake);
+
+        expect(find.text(notClear), findsNWidgets(2), reason: 'DUI and first names');
+        expect(field(tester, 0), '0123456-8');
+        await type(tester, 0, '01234567-8');
+        await type(tester, 1, 'Maria');
+        expect(find.text(notClear), findsNothing);
+        await tap(tester, confirmButton);
+        expect(fake.identityConfirmations, hasLength(1));
+      });
+
+      testWidgets('if the reader is unavailable it says so, everything is empty and nothing is marked', (tester) async {
+        final fake = FakeApi(identityResponses: [(200, '{"status":"FAILED","attempts":1}')]);
+        await goToConfirmation(tester, fake);
+
+        expect(find.text('No pudimos leer las fotos de tu DUI. Escribe tus datos tal como aparecen en él.'), findsOneWidget);
+        expect([for (var i = 0; i < 5; i++) field(tester, i)], ['', '', '', '', '']);
+        expect(find.text(notClear), findsNothing);
+
+        await tap(tester, confirmButton);
+        expect(fake.identityConfirmations, isEmpty);
+        expect(find.text('Escribe tu DUI con el formato 00000000-0.'), findsOneWidget);
+        expect(find.text('Escribe tus nombres.'), findsOneWidget);
+        expect(find.text('Escribe tus apellidos.'), findsOneWidget);
+
+        await type(tester, 0, '012345678');
+        await type(tester, 1, 'María');
+        await type(tester, 2, 'Pérez');
+        await type(tester, 3, '12041990');
+        await type(tester, 4, '01062029');
+        await tap(tester, confirmButton);
+        expect(fake.identityConfirmations, hasLength(1));
+      });
+
+      testWidgets('odd values are rejected with a clear message and nothing is sent', (tester) async {
+        final fake = FakeApi();
+        await goToConfirmation(tester, fake);
+
+        await type(tester, 0, '12345');
+        await type(tester, 1, 'Ana 😀');
+        await type(tester, 2, '');
+        await type(tester, 3, '31021990');
+        await type(tester, 4, '01011980');
+        await tap(tester, confirmButton);
+
+        expect(find.text('Escribe tu DUI con el formato 00000000-0.'), findsOneWidget);
+        expect(find.text('Usa solo letras y espacios, sin números ni símbolos.'), findsOneWidget);
+        expect(find.text('Escribe tus apellidos.'), findsOneWidget);
+        expect(find.text('Escribe tu fecha de nacimiento como día/mes/año, por ejemplo 14/03/1991.'), findsOneWidget);
+        expect(find.text('La fecha de vencimiento debe ser posterior a la de nacimiento.'), findsNothing,
+            reason: 'with an invalid birth date there is nothing to compare the expiry with');
+        expect(fake.identityConfirmations, isEmpty);
+
+        await type(tester, 3, '12041990');
+        await tap(tester, confirmButton);
+        expect(find.text('La fecha de vencimiento debe ser posterior a la de nacimiento.'), findsOneWidget);
+
+        await type(tester, 3, '01012999');
+        await tap(tester, confirmButton);
+        expect(find.text('La fecha de nacimiento debe ser anterior a hoy.'), findsOneWidget);
+      });
+
+      testWidgets('repeating the front takes only that photo and sends both to be read again', (tester) async {
+        final fake = FakeApi();
+        final camera = FakeCamera();
+        await goToConfirmation(tester, fake, camera);
+        await type(tester, 1, 'Maria Jose');
+
+        await tap(tester, find.text('Repetir').first);
+        expect(find.text('Coloca el frente de tu DUI dentro del marco'), findsOneWidget);
+        expect(find.text('Ahora coloca el reverso de tu DUI dentro del marco'), findsNothing);
+        await tap(tester, shutter);
+
+        expect(fake.identityUploads, hasLength(2));
+        expect(camera.photos, 3, reason: 'only the front was photographed again');
+        expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
+        expect(field(tester, 1), 'Maria Jose', reason: 'what the person corrected is kept');
+      });
+
+      testWidgets('repeating the back asks only for the back', (tester) async {
+        final camera = FakeCamera();
+        await goToConfirmation(tester, FakeApi(), camera);
+        await tap(tester, find.text('Repetir').last);
+        expect(find.text('Ahora coloca el reverso de tu DUI dentro del marco'), findsOneWidget);
+        await tap(tester, shutter);
+        expect(camera.photos, 3);
+        expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
+      });
+
+      testWidgets('going back while repeating a photo returns to the confirmation, not to the basic data',
+          (tester) async {
+        final fake = FakeApi();
+        await goToConfirmation(tester, fake);
+        await tap(tester, find.text('Repetir').first);
+        await tap(tester, find.byTooltip('Volver al paso anterior'));
+        expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
+        expect(fake.identityUploads, hasLength(1));
+      });
+
+      testWidgets('if the repeated photo is unreadable it explains and the confirmation comes back after retaking it',
+          (tester) async {
+        final fake = FakeApi(identityResponses: [
+          (200, duiReading),
+          (422, unreadable('GLARE', 'FRONT')),
+        ]);
+        await goToConfirmation(tester, fake);
+        await tap(tester, find.text('Repetir').first);
+        await tap(tester, shutter);
+        expect(find.text('Revisa la foto del frente'), findsOneWidget);
+
+        await tap(tester, find.text('TOMAR OTRA FOTO'));
+        await tap(tester, shutter);
+        expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
+        expect(fake.identityUploads, hasLength(3));
+      });
+
+      testWidgets('while saving it cannot be tapped twice and a failure keeps the data and allows a retry',
+          (tester) async {
+        final fake = FakeApi(confirmationErrors: [503]);
+        await goToConfirmation(tester, fake);
+        await type(tester, 1, 'Maria');
+        await tap(tester, confirmButton);
+
+        expect(find.text('No pudimos guardar los datos de tu DUI'), findsOneWidget);
+        expect(find.text('Revisa tu conexión a internet e inténtalo de nuevo.'), findsOneWidget);
+        expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
+        expect(field(tester, 1), 'Maria');
+
+        await tap(tester, find.text('REINTENTAR'));
+        expect(fake.identityConfirmations, hasLength(2));
+        expect(find.text('Paso 3 de 5'), findsOneWidget);
+      });
+
+      testWidgets('a rejected field (400) is named in Spanish, without the server text', (tester) async {
+        final fake = FakeApi(confirmationErrors: [400]);
+        await goToConfirmation(tester, fake);
+        await tap(tester, confirmButton);
+        expect(find.textContaining('Revisa estos datos e inténtalo de nuevo'), findsOneWidget);
+        expect(find.textContaining('Some fields'), findsNothing);
+      });
+
+      testWidgets('a 409 does not say that the request was submitted', (tester) async {
+        final fake = FakeApi(confirmationErrors: [409]);
+        await goToConfirmation(tester, fake);
+        await tap(tester, confirmButton);
+        expect(
+          find.text('No pudimos guardar los datos de tu DUI. Vuelve a tomar las fotos e inténtalo de nuevo.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('ya fue enviada'), findsNothing);
+      });
+
+      testWidgets('typing and attempts of the confirmation count in the DUI step of the signals', (tester) async {
+        final fake = FakeApi();
+        await goToConfirmation(tester, fake);
+        await type(tester, 3, '');
+        await tap(tester, confirmButton); // fails: empty birth date
+        await type(tester, 3, '12041990');
+        await tap(tester, confirmButton);
+        await tester.pumpAndSettle();
+
+        final last = jsonDecode(fake.signals.last.body) as Map<String, dynamic>;
+        final dui = (last['steps'] as List).firstWhere((s) => s['step'] == 'IDENTITY_DOCUMENT') as Map<String, dynamic>;
+        expect(dui['attempts'], 2);
+        expect(dui['completedAt'], isNotNull);
+        expect((last['steps'] as List).where((s) => s['step'] == 'IDENTITY_DOCUMENT'), hasLength(1));
+      });
+
+      testWidgets('the confirmation does not appear if the photos were not read: back goes to the capture',
+          (tester) async {
+        final camera = FakeCamera();
+        await goToConfirmation(tester, FakeApi(), camera);
+        await tap(tester, find.byTooltip('Volver al paso anterior'));
+        expect(find.text('Coloca el frente de tu DUI dentro del marco'), findsOneWidget);
       });
     });
 

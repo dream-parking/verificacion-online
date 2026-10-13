@@ -211,6 +211,49 @@ void main() {
     );
   });
 
+  test('confirmIdentityDocument sends the data the person confirmed, with the dates as year-month-day', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        expect(req.method, 'PUT');
+        expect(req.url.toString(), 'https://api.test/api/onboarding/requests/abc/identity-document/confirmation');
+        expect(jsonDecode(req.body), {
+          'dui': '01234567-8',
+          'firstNames': 'María José',
+          'lastNames': 'Pérez López',
+          'birthDate': '1990-04-12',
+          'expiryDate': '2029-06-01',
+        });
+        return http.Response('{"status":"IN_PROGRESS","completedSteps":3}', 200);
+      }),
+    );
+    await api.confirmIdentityDocument(
+      'abc',
+      dui: '01234567-8',
+      firstNames: 'María José',
+      lastNames: 'Pérez López',
+      birthDate: DateTime(1990, 4, 12),
+      expiryDate: DateTime(2029, 6, 1),
+    );
+  });
+
+  test('confirmIdentityDocument keeps the rejected fields of a 400', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((_) async => http.Response(
+          '{"status":400,"detail":"Some fields are invalid","errors":{"birthDate":"must be a past date"}}', 400)),
+    );
+    await expectLater(
+      api.confirmIdentityDocument('abc',
+          dui: '01234567-8',
+          firstNames: 'A',
+          lastNames: 'B',
+          birthDate: DateTime(2999),
+          expiryDate: DateTime(3000)),
+      throwsA(isA<ApiException>().having((e) => e.fields, 'fields', ['birthDate'])),
+    );
+  });
+
   group('identity document (VDI-77)', () {
     final front = Uint8List.fromList([0xFF, 0xD8, 0x01]);
     final back = Uint8List.fromList([0xFF, 0xD8, 0x02]);

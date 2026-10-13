@@ -1322,12 +1322,9 @@ class _LocationPermission extends StatelessWidget {
 class _Welcome extends StatelessWidget {
   const _Welcome();
 
-  /// Steps the person goes through; the DUI is the new one and carries the «Nuevo» badge.
-  static const _newStep = 'Tu DUI';
-
   static const _steps = [
     ('Datos básicos', 'Tu nombre, DUI y celular.'),
-    (_newStep, 'Una foto del frente y otra del reverso.'),
+    ('Tu DUI', 'Una foto del frente y otra del reverso.'),
     ('Tus ingresos', 'De dónde viene tu dinero y cuánto ganas.'),
     ('El dinero de tu cuenta', 'Qué dinero esperas mover cada mes.'),
     ('Revisar y enviar', 'Confirmas todo antes de mandarlo.'),
@@ -1388,12 +1385,7 @@ class _Welcome extends StatelessWidget {
               const SectionTitle('Esto es lo que te vamos a pedir', size: 22),
               const SizedBox(height: 16),
               for (var i = 0; i < _steps.length; i++) ...[
-                IconRow(
-                  leading: NumberBadge(i + 1, soft: _steps[i].$1 != _newStep),
-                  title: _steps[i].$1,
-                  description: _steps[i].$2,
-                  badge: _steps[i].$1 == _newStep ? 'Nuevo' : null,
-                ),
+                IconRow(leading: NumberBadge(i + 1, soft: true), title: _steps[i].$1, description: _steps[i].$2),
                 const SizedBox(height: 14),
               ],
             ],

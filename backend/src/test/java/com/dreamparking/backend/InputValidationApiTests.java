@@ -134,15 +134,31 @@ class InputValidationApiTests {
 	}
 
 	@Test
-	void newPasswordsCannotHaveEmojis() throws Exception {
-		MockMvc admin = auth.mockMvcAs(context, auth.user(ConsoleRole.ADMIN));
+	void passwordsCannotHaveEmojisOnAnyEndpoint() throws Exception {
+		String message = "La contraseña no puede tener emojis ni caracteres de control";
+		var user = auth.user(ConsoleRole.ADMIN);
+		MockMvc admin = auth.mockMvcAs(context, user);
 		admin.perform(post("/api/console/users").contentType(JSON).content("""
 				{"email": "nueva@ceiba.example", "fullName": "Nueva Persona", "jobTitle": "Analista",
-				 "role": "FRAUD_ANALYST", "initialPassword": "clave-larga-🔑"}
+				 "role": "FRAUD_ANALYST", "initialPassword": "😀😀😀😀😀"}
 				"""))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.detail").value(
-					"La contraseña no puede tener emojis: pueden escribirse distinto en otro teclado o dispositivo"));
+			.andExpect(jsonPath("$.errors.initialPassword").value(message));
+		admin.perform(post("/api/console/users/{id}/password", user.getId()).contentType(JSON).content("""
+				{"newPassword": "clave-larga-🔑"}
+				"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors.newPassword").value(message));
+		admin.perform(post("/api/console/auth/change-password").contentType(JSON).content("""
+				{"currentPassword": "una-clave-larga-1", "newPassword": "clave-larga-👍🏽"}
+				"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors.newPassword").value(message));
+		mvc.perform(post("/api/console/auth/login").contentType(JSON).content("""
+				{"email": "%s", "password": "clave-larga-🇸🇻"}
+				""".formatted(user.getEmail())))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors.password").value(message));
 	}
 
 	private String startRequest() throws Exception {

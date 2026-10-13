@@ -11,7 +11,7 @@
  * <li>{@link Dui}, {@link MobilePhone}, {@link EmailAddress}: fixed formats.</li>
  * <li>{@link SafeText}: values the app generates (device model, versions, tokens): anything printable except
  * markup, symbols and emojis.</li>
- * <li>{@link Password}: anything but control characters; the policy is checked by the service.</li>
+ * <li>{@link Password}: anything but control characters and emojis; the rest of the policy is checked by the service.</li>
  * </ul>
  * All of them are built on {@link jakarta.validation.constraints.Pattern}, so the regular expressions are published in
  * {@code docs/openapi.json} for the app and the console. One-off shapes can still use {@code @Pattern} directly.

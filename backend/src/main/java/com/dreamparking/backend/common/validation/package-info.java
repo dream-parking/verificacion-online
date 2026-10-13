@@ -3,7 +3,8 @@
  * path variable carries one of them ({@code InputFormatRulesTests} fails the build otherwise), so a new field cannot
  * slip in accepting digits in a name, emojis, markup or invisible characters:
  * <ul>
- * <li>{@link PersonName}: names of people, only letters and single spaces.</li>
+ * <li>{@link PersonName}: names of people, only Latin letters and single spaces.</li>
+ * <li>{@link JobTitle}: job titles of console users, starting with a letter and with little punctuation.</li>
  * <li>{@link FreeText}, {@link MultilineText}: what a person writes (labels, job titles, comments): letters, digits
  * and common punctuation.</li>
  * <li>{@link Code}: catalog and rule codes, {@code PAGO_SALARIO}, {@code R-01}.</li>

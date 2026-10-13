@@ -62,7 +62,7 @@ class SignalsApiTests {
 			.content("""
 					{"deviceFingerprint": "aa11·bb22·cc33", "deviceModel": "iPhone 15", "operatingSystem": "iOS",
 					 "appVersion": "1.0.0+1", "approximateLocation": "San Salvador, El Salvador", "countryIso": "sv",
-					 "typingSpeedCpm": 185,
+					 "deviceLocationStatus": "AVAILABLE", "typingSpeedCpm": 185,
 					 "steps": [{"step": "PRIVACY_NOTICE", "startedAt": "%s", "completedAt": "%s"},
 					           {"step": "INCOME", "startedAt": "%s", "attempts": 2, "typingSpeedCps": 3.257}]}
 					""".formatted(shown, done, done)))
@@ -75,6 +75,9 @@ class SignalsApiTests {
 			.andExpect(jsonPath("$.signals.deviceFingerprint").value("aa11·bb22·cc33"))
 			.andExpect(jsonPath("$.signals.device").value("iPhone 15 · iOS"))
 			.andExpect(jsonPath("$.signals.approximateLocation").value("San Salvador, El Salvador"))
+			.andExpect(jsonPath("$.signals.deviceLocationStatus").value("AVAILABLE"))
+			.andExpect(jsonPath("$.signals.deviceLocation").value("San Salvador, El Salvador"))
+			.andExpect(jsonPath("$.signals.deviceCountryIso").value("SV"))
 			.andExpect(jsonPath("$.signals.typingSpeedCpm").value(185))
 			.andExpect(jsonPath("$.signals.typingPace").value("NORMAL"))
 			.andExpect(jsonPath("$.signals.requestsFromSameDevice").value(1))
@@ -119,8 +122,10 @@ class SignalsApiTests {
 		String first = startRequest();
 		String second = startRequest();
 
-		capture(first, "{\"deviceFingerprint\": \"fp-compartido\", \"approximateLocation\": \"Santa Ana\"}", 204);
-		capture(first, "{\"deviceFingerprint\": \"fp-compartido\", \"approximateLocation\": \"San Miguel\"}", 204);
+		capture(first, "{\"deviceFingerprint\": \"fp-compartido\", \"approximateLocation\": \"Santa Ana\","
+				+ " \"deviceLocationStatus\": \"AVAILABLE\"}", 204);
+		capture(first, "{\"deviceFingerprint\": \"fp-compartido\", \"approximateLocation\": \"San Miguel\","
+				+ " \"deviceLocationStatus\": \"AVAILABLE\"}", 204);
 		capture(second, "{\"deviceFingerprint\": \"fp-compartido\"}", 204);
 
 		flushAndClear();

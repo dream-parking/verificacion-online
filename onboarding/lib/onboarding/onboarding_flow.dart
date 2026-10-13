@@ -9,19 +9,21 @@ import '../identity/document_camera.dart';
 import '../identity/dui_capture.dart';
 import '../identity/identity_document.dart';
 import '../signals/device_fingerprint.dart';
+import '../signals/device_location.dart';
 import '../signals/signals.dart';
 import '../theme.dart';
 import 'application_form.dart';
 import 'privacy_notice.dart';
 import 'widgets.dart';
 
-/// Account opening flow: welcome → privacy → 5 steps → confirmation.
+/// Account opening flow: welcome → privacy → location permission → 5 steps → confirmation.
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({
     super.key,
     this.api,
     this.deviceInfo,
     this.camera = const PlatformDocumentCamera(),
+    this.location,
     this.clock = DateTime.now,
   });
 
@@ -34,6 +36,9 @@ class OnboardingFlow extends StatefulWidget {
   /// Camera that photographs the DUI (VDI-77); tests pass a fake one.
   final DocumentCamera camera;
 
+  /// Approximate location reader (VDI-73); tests pass a fake one.
+  final DeviceLocationSource? location;
+
   /// Current time used to measure timings (VDI-43); tests pass a controlled one.
   final DateTime Function() clock;
 
@@ -44,7 +49,8 @@ class OnboardingFlow extends StatefulWidget {
 class _OnboardingFlowState extends State<OnboardingFlow> {
   static const _next = {
     Screen.welcome: Screen.privacy,
-    Screen.privacy: Screen.basicData,
+    Screen.privacy: Screen.location,
+    Screen.location: Screen.basicData,
     Screen.basicData: Screen.identityDocument,
     Screen.identityDocument: Screen.identityConfirmation,
     Screen.identityConfirmation: Screen.income,
@@ -53,7 +59,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   };
   static const _previous = {
     Screen.privacy: Screen.welcome,
-    Screen.basicData: Screen.privacy,
+    Screen.location: Screen.privacy,
+    Screen.basicData: Screen.location,
     Screen.identityDocument: Screen.basicData,
     Screen.identityConfirmation: Screen.identityDocument,
     Screen.income: Screen.identityConfirmation,
@@ -85,6 +92,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   late final OnboardingApi _api = widget.api ?? OnboardingApi();
   late final DeviceInfoSource _deviceInfo = widget.deviceInfo ?? PlatformDeviceInfoSource();
+  late final DeviceLocationSource _location = widget.location ?? PlatformDeviceLocationSource();
   var _form = ApplicationForm();
 
   /// Request created in the backend whose privacy notice could not be recorded yet: the retry reuses it.
@@ -101,6 +109,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   final _attempted = <Screen>{};
   var _submitting = false;
   var _starting = false;
+  var _locating = false;
   String? _startError;
   var _saving = false;
   String? _saveError;
@@ -380,7 +389,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         : 'Revisa estos datos e inténtalo de nuevo: ${names.join(', ')}.';
   }
 
-  bool get _busy => _submitting || _starting || _saving || _uploadingDui;
+  bool get _busy => _submitting || _starting || _saving || _uploadingDui || _locating;
 
   /// VDI-40: reads the device and sends its fingerprint. It only runs after the notice is accepted.
   /// If it fails it does not interrupt the customer: signals feed the score, they do not block the flow.
@@ -393,6 +402,26 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       return;
     }
     await _sendSignals();
+  }
+
+  /// VDI-73: "Permitir ubicación aproximada" asks the system for the permission and looks up the city.
+  Future<void> _allowLocation() async {
+    if (_busy) return;
+    setState(() => _locating = true);
+    final location = await _location.read();
+    if (!mounted) return;
+    setState(() => _locating = false);
+    _decideLocation(location);
+  }
+
+  /// VDI-73: with or without permission the request goes on; without it the location is sent as not
+  /// available (`DENIED`), never left out.
+  void _decideLocation(DeviceLocation location) {
+    if (_busy) return;
+    _signals.location = location;
+    // Sent before moving on, so the screen change does not send the same signals twice.
+    unawaited(_sendSignals());
+    _goTo(Screen.basicData);
   }
 
   /// Sends all captured signals; if it fails, it is retried on the next screen change.
@@ -444,7 +473,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _starting = false;
       });
       _signals.steps.complete(Screen.privacy, _form.privacyAcceptedAt!);
-      _goTo(Screen.basicData);
+      _goTo(Screen.location);
       unawaited(_captureDevice());
     } on ApiException {
       if (!mounted) return;
@@ -557,6 +586,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 const _LoadingOverlay(title: 'Revisando tu DUI…', detail: 'Estamos leyendo tus fotos. Puede tardar unos segundos.'),
               if (_starting)
                 const _LoadingOverlay(title: 'Preparando tu solicitud…', detail: 'Esto puede tardar unos segundos.'),
+              if (_locating)
+                const _LoadingOverlay(title: 'Buscando tu ciudad…', detail: 'Esto puede tardar unos segundos.'),
             ],
           ),
         ),
@@ -603,13 +634,29 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       padding: EdgeInsets.fromLTRB(24, 12, 24, 20 + MediaQuery.paddingOf(context).bottom),
-      child: PrimaryButton(text: text, onPressed: _busy ? null : _continue),
+      child: _screen == Screen.location
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PrimaryButton(text: 'Permitir ubicación aproximada', onPressed: _busy ? null : _allowLocation),
+                const SizedBox(height: 4),
+                Center(
+                  child: LinkButton(
+                    text: 'Ahora no',
+                    onPressed: () => _decideLocation(const DeviceLocation.denied()),
+                  ),
+                ),
+              ],
+            )
+          : PrimaryButton(text: text, onPressed: _busy ? null : _continue),
     );
   }
 
   Widget _content() => switch (_screen) {
         Screen.welcome => const _Welcome(),
         Screen.privacy => _privacy(),
+        Screen.location => const _LocationPermission(),
         Screen.basicData => _basicData(),
         Screen.identityDocument => _duiProblem(),
         Screen.identityConfirmation => _identityConfirmation(),
@@ -1218,6 +1265,52 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           const Divider(color: AppColors.border, height: 1),
           const SizedBox(height: 12),
           Center(child: LinkButton(text: 'Volver al inicio', onPressed: _restart)),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- 2b. Location permission (VDI-73)
+
+/// Asks for the approximate location before the form. It can be declined: the request goes on and the
+/// console shows «Ubicación no disponible». The buttons are in the action bar.
+class _LocationPermission extends StatelessWidget {
+  const _LocationPermission();
+
+  static const _points = [
+    (Icons.location_city_outlined, 'Solo guardamos ciudad y país.'),
+    (Icons.location_off_outlined, 'No guardamos tu dirección ni tus coordenadas.'),
+    (Icons.check_circle_outline, 'Si prefieres no compartirla, puedes completar tu solicitud igual.'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Center(child: Icon(Icons.place_outlined, size: 64, color: AppColors.brandGreen)),
+          const SizedBox(height: 16),
+          const ScreenTitle('¿Desde qué ciudad nos escribes?'),
+          const SizedBox(height: 12),
+          const Text(
+            'Saber tu ciudad nos ayuda a detectar si alguien intenta abrir una cuenta a tu nombre desde otro lugar.',
+            style: AppText.body,
+          ),
+          const SizedBox(height: 20),
+          for (final (icon, text) in _points) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 24, color: AppColors.brandGreen),
+                const SizedBox(width: 12),
+                Expanded(child: Text(text, style: AppText.body)),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
         ],
       ),
     );

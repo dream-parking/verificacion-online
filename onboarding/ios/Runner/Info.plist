@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Usamos la cámara para fotografiar el frente y el reverso de tu DUI.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Usamos tu ciudad para detectar si alguien intenta abrir una cuenta a tu nombre desde otro lugar. No guardamos tu dirección ni tus coordenadas.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

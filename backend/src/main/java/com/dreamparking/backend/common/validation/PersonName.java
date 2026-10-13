@@ -18,9 +18,9 @@ import jakarta.validation.ReportAsSingleViolation;
 import jakarta.validation.constraints.Pattern;
 
 /**
- * First names, last names or full name of a person: letters (accents and ñ included) in words separated by single
- * spaces; no digits, symbols or emojis. Blanks around the name are tolerated because the services trim them.
- * {@code null} is valid; combine with {@code @NotBlank} and {@code @Size}.
+ * First names, last names or full name of a person: Latin letters (accents, diaeresis and ñ included) in words
+ * separated by single spaces; no digits, symbols, emojis or letters of other alphabets. Blanks around the name are
+ * tolerated because the services trim them. {@code null} is valid; combine with {@code @NotBlank} and {@code @Size}.
  * <p>
  * Checked on the way in, not on the entities: a rule on an entity would also reject saving a record already stored
  * with other data.
@@ -33,7 +33,14 @@ import jakarta.validation.constraints.Pattern;
 @Retention(RUNTIME)
 public @interface PersonName {
 
-	String REGEXP = "\\s*\\p{L}+( \\p{L}+)*\\s*";
+	/**
+	 * Latin letters with accents, diaeresis and ñ: basic Latin, Latin-1 and Latin Extended-A, without {@code ª º × ÷}.
+	 * Written as ranges instead of {@code \p{IsLatin}} so the pattern published in the OpenAPI also works in
+	 * JavaScript.
+	 */
+	String LETTERS = "A-Za-zÀ-ÖØ-öø-ž";
+
+	String REGEXP = "\\s*[" + LETTERS + "]+( [" + LETTERS + "]+)*\\s*";
 
 	String message() default "Solo se permiten letras y espacios";
 

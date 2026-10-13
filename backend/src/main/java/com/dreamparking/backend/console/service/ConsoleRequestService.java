@@ -202,7 +202,8 @@ public class ConsoleRequestService {
 				s.getApproximateLocation(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
 				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice(),
 				geo == null ? null : geo.getStatus(), geo == null ? null : geo.getLatitude(),
-				geo == null ? null : geo.getLongitude(), ipDetails, s.getCapturedAt());
+				geo == null ? null : geo.getLongitude(), ipDetails, s.getCapturedAt(),
+				s.getDeviceLocationStatus(), s.getDeviceLocation(), s.getDeviceCountryIso());
 	}
 
 	private static String escapeLike(String text) {

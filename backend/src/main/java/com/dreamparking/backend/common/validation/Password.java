@@ -18,8 +18,8 @@ import jakarta.validation.ReportAsSingleViolation;
 import jakarta.validation.constraints.Pattern;
 
 /**
- * A password, as typed: any character except control characters. Deliberately loose so that existing passwords keep
- * working at sign-in; the rules for a new password (length, no emojis…) are in {@code PasswordPolicy}.
+ * A password, as typed: any character except control characters and emojis, on every endpoint (sign-in included).
+ * The rest of the rules for a new password (length, not the email…) are in {@code PasswordPolicy}.
  */
 @Documented
 @Pattern(regexp = Password.REGEXP)
@@ -29,9 +29,17 @@ import jakarta.validation.constraints.Pattern;
 @Retention(RUNTIME)
 public @interface Password {
 
-	String REGEXP = "[^\\p{Cc}]*";
+	/**
+	 * Emojis, flags, skin tones and the characters that glue them together (zero-width joiner, variation selectors,
+	 * keycap, tags), as the inside of a character class. © and ® are emoji too, but they are ordinary symbols on a
+	 * keyboard and are allowed.
+	 */
+	String EMOJI = "\\p{IsExtended_Pictographic}\\p{IsEmoji_Modifier}\\x{1F1E6}-\\x{1F1FF}\\u200D\\uFE0E\\uFE0F\\u20E3"
+			+ "\\x{E0020}-\\x{E007F}";
 
-	String message() default "Tiene caracteres no permitidos";
+	String REGEXP = "(?:[©®]|[^\\p{Cc}" + EMOJI + "])*";
+
+	String message() default "La contraseña no puede tener emojis ni caracteres de control";
 
 	Class<?>[] groups() default {};
 

@@ -4,6 +4,7 @@
  * slip in accepting digits in a name, emojis, markup or invisible characters:
  * <ul>
  * <li>{@link PersonName}: names of people, only Latin letters and single spaces.</li>
+ * <li>{@link UserName}: names of console users, like {@link PersonName} plus apostrophes and hyphens.</li>
  * <li>{@link JobTitle}: job titles of console users, starting with a letter and with little punctuation.</li>
  * <li>{@link FreeText}, {@link MultilineText}: what a person writes (labels, job titles, comments): letters, digits
  * and common punctuation.</li>

@@ -313,7 +313,7 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> tapContinue(WidgetTester tester) => tap(tester, find.text('CONTINUAR'));
+    Future<void> tapContinue(WidgetTester tester) => tap(tester, find.text('Continuar'));
 
     /// Checks the privacy notice and the terms and conditions.
     Future<void> acceptNotice(WidgetTester tester) async {
@@ -340,7 +340,7 @@ void main() {
     Future<void> passDui(WidgetTester tester) async {
       await tap(tester, shutter);
       await tap(tester, shutter);
-      await tap(tester, find.text('MIS DATOS SON CORRECTOS'));
+      await tap(tester, find.text('Mis datos son correctos'));
     }
 
     Widget app(
@@ -365,7 +365,7 @@ void main() {
       await tester.pumpWidget(app(fake));
       expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
 
-      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.text('Empezar'));
 
       // Privacy: does not move on without accepting.
       await tapContinue(tester);
@@ -378,7 +378,7 @@ void main() {
 
       // Approximate location: allowed.
       expect(find.text('¿Desde qué ciudad nos escribes?'), findsOneWidget);
-      await tap(tester, find.text('PERMITIR UBICACIÓN APROXIMADA'));
+      await tap(tester, find.text('Permitir ubicación aproximada'));
 
       // Basic data.
       expect(find.text('Paso 1 de 5'), findsOneWidget);
@@ -421,9 +421,9 @@ void main() {
       expect(fake.activities, hasLength(1));
 
       // The first submit fails (503) and the retry works.
-      await tap(tester, find.text('ENVIAR SOLICITUD'));
+      await tap(tester, find.text('Enviar solicitud'));
       expect(find.text('No pudimos enviar tu solicitud'), findsOneWidget);
-      await tap(tester, find.text('REINTENTAR'));
+      await tap(tester, find.text('Reintentar'));
 
       // The number is the one the server assigned, not a sample one.
       expect(fake.submits, hasLength(2));
@@ -435,7 +435,7 @@ void main() {
     testWidgets('if recording the notice fails, the retry reuses the same request', (tester) async {
       final fake = FakeApi(privacyErrors: [503]);
       await tester.pumpWidget(app(fake));
-      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.text('Empezar'));
       await acceptNotice(tester);
 
       await tapContinue(tester);
@@ -451,7 +451,7 @@ void main() {
     testWidgets('basic data is saved in the API before moving on', (tester) async {
       final fake = FakeApi(basicDataErrors: [503]);
       await tester.pumpWidget(app(fake));
-      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.text('Empezar'));
       await acceptNotice(tester);
       await tapContinue(tester);
       await skipLocation(tester);
@@ -470,7 +470,7 @@ void main() {
     testWidgets('if the API rejects a field, the message is in Spanish and names it', (tester) async {
       final fake = FakeApi(basicDataErrors: [400]);
       await tester.pumpWidget(app(fake));
-      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.text('Empezar'));
       await acceptNotice(tester);
       await tapContinue(tester);
       await skipLocation(tester);
@@ -486,7 +486,7 @@ void main() {
       // The server saved the submit but the phone did not get the response: the retry answers 409.
       final fake = FakeApi(submitErrors: [409], number: 'SOL-2026-00420')..submitted = true;
       await tester.pumpWidget(app(fake));
-      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.text('Empezar'));
       await acceptNotice(tester);
       await tapContinue(tester);
       await skipLocation(tester);
@@ -500,14 +500,14 @@ void main() {
       await tap(tester, find.text('Más de USD 1,000'));
       await tapContinue(tester);
 
-      await tap(tester, find.text('ENVIAR SOLICITUD'));
+      await tap(tester, find.text('Enviar solicitud'));
       expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       expect(find.text('SOL-2026-00420'), findsOneWidget);
     });
 
     testWidgets('the back arrow goes to the previous step', (tester) async {
       await tester.pumpWidget(app(FakeApi()));
-      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.text('Empezar'));
       expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
       await tap(tester, find.byTooltip('Volver al paso anterior'));
       expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
@@ -517,7 +517,7 @@ void main() {
       testWidgets('does not create the request until the notice is accepted', (tester) async {
         final fake = FakeApi();
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         expect(find.text('Texto provisional · pendiente de revisión legal'), findsNothing);
 
         await tapContinue(tester);
@@ -534,7 +534,7 @@ void main() {
       testWidgets('without the terms and conditions it does not move on', (tester) async {
         final fake = FakeApi();
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await tap(tester, find.text('He leído y acepto el aviso de privacidad.'));
         await tapContinue(tester);
 
@@ -550,7 +550,7 @@ void main() {
 
       testWidgets('there is no demo data link on the basic data screen', (tester) async {
         await tester.pumpWidget(app(FakeApi()));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
         await skipLocation(tester);
@@ -560,7 +560,7 @@ void main() {
       testWidgets('when coming back, the notice stays accepted and no other request is created', (tester) async {
         final fake = FakeApi();
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
         await skipLocation(tester);
@@ -583,14 +583,14 @@ void main() {
       testWidgets('if the connection fails it shows the error and allows a retry', (tester) async {
         final fake = FakeApi(failStartTimes: 1);
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
 
         expect(find.text('No pudimos iniciar tu solicitud'), findsOneWidget);
         expect(find.text('Paso 1 de 5'), findsNothing);
 
-        await tap(tester, find.text('REINTENTAR'));
+        await tap(tester, find.text('Reintentar'));
         await skipLocation(tester);
         expect(find.text('Paso 1 de 5'), findsOneWidget);
         expect(fake.starts, hasLength(2));
@@ -602,7 +602,7 @@ void main() {
         final fake = FakeApi();
         final device = FakeDeviceInfo();
         await tester.pumpWidget(app(fake, device: device));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await tapContinue(tester);
         expect(device.reads, 0);
         expect(fake.signals, isEmpty);
@@ -611,7 +611,7 @@ void main() {
       testWidgets('after accepting it sends the fingerprint, model, system and version', (tester) async {
         final fake = FakeApi();
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
 
@@ -633,7 +633,7 @@ void main() {
       testWidgets('if sending fails it does not block and retries on the next screen', (tester) async {
         final fake = FakeApi(failSignalsTimes: 1);
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
         expect(find.text('¿Desde qué ciudad nos escribes?'), findsOneWidget);
@@ -648,7 +648,7 @@ void main() {
     group('approximate location (VDI-73)', () {
       Future<void> goToLocation(WidgetTester tester, FakeApi fake, FakeLocation location) async {
         await tester.pumpWidget(app(fake, location: location));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
         expect(find.text('¿Desde qué ciudad nos escribes?'), findsOneWidget);
@@ -660,7 +660,7 @@ void main() {
         final fake = FakeApi();
         final location = FakeLocation();
         await tester.pumpWidget(app(fake, location: location));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await tapContinue(tester);
         expect(find.text('¿Desde qué ciudad nos escribes?'), findsNothing);
         expect(location.reads, 0);
@@ -671,7 +671,7 @@ void main() {
         final location = FakeLocation();
         await goToLocation(tester, fake, location);
 
-        await tap(tester, find.text('PERMITIR UBICACIÓN APROXIMADA'));
+        await tap(tester, find.text('Permitir ubicación aproximada'));
         expect(location.reads, 1);
         expect(find.text('Paso 1 de 5'), findsOneWidget);
         final body = lastSignals(fake);
@@ -700,7 +700,7 @@ void main() {
         final fake = FakeApi();
         await goToLocation(tester, fake, FakeLocation(const DeviceLocation.denied()));
 
-        await tap(tester, find.text('PERMITIR UBICACIÓN APROXIMADA'));
+        await tap(tester, find.text('Permitir ubicación aproximada'));
         expect(find.text('Paso 1 de 5'), findsOneWidget);
         expect(lastSignals(fake)['deviceLocationStatus'], 'DENIED');
       });
@@ -709,7 +709,7 @@ void main() {
         final fake = FakeApi();
         await goToLocation(tester, fake, FakeLocation(const DeviceLocation.unavailable()));
 
-        await tap(tester, find.text('PERMITIR UBICACIÓN APROXIMADA'));
+        await tap(tester, find.text('Permitir ubicación aproximada'));
         expect(find.text('Paso 1 de 5'), findsOneWidget);
         expect(lastSignals(fake)['deviceLocationStatus'], 'UNAVAILABLE');
       });
@@ -727,7 +727,7 @@ void main() {
         await tap(tester, find.text('Ahorro'));
         await tap(tester, find.text('USD 200.01 a 500'));
         await tapContinue(tester);
-        await tap(tester, find.text('ENVIAR SOLICITUD'));
+        await tap(tester, find.text('Enviar solicitud'));
 
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
         expect(lastSignals(fake)['deviceLocationStatus'], 'DENIED');
@@ -741,7 +741,7 @@ void main() {
         final fake = FakeApi();
         await tester.pumpWidget(app(fake, clock: () => now));
 
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         advance(8000);
         await acceptNotice(tester);
         await tapContinue(tester);
@@ -775,7 +775,7 @@ void main() {
         await tapContinue(tester);
 
         advance(3000);
-        await tap(tester, find.text('ENVIAR SOLICITUD'));
+        await tap(tester, find.text('Enviar solicitud'));
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
         await tester.pumpAndSettle();
 
@@ -797,7 +797,7 @@ void main() {
       testWidgets('measures nothing that is sent before the notice is accepted', (tester) async {
         final fake = FakeApi();
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await tapContinue(tester);
         await tapContinue(tester);
         expect(fake.calls.where((r) => r.url.path != '/api/catalogs'), isEmpty);
@@ -807,7 +807,7 @@ void main() {
     group('DUI capture (VDI-77)', () {
       Future<void> goToDui(WidgetTester tester, FakeApi fake, FakeCamera camera) async {
         await tester.pumpWidget(app(fake, camera: camera));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
         await skipLocation(tester);
@@ -833,7 +833,7 @@ void main() {
         }
         expect(find.text('1 · Frente'), findsOneWidget);
         expect(find.text('2 · Reverso'), findsOneWidget);
-        expect(find.text('CONTINUAR'), findsNothing, reason: 'the shutter is the only action while the camera is open');
+        expect(find.text('Continuar'), findsNothing, reason: 'the shutter is the only action while the camera is open');
 
         await tap(tester, shutter);
         expect(find.text('Ahora coloca el reverso de tu DUI dentro del marco'), findsOneWidget);
@@ -876,7 +876,7 @@ void main() {
         for (final tip in UnreadablePhotos.tips) {
           expect(find.text(tip), findsOneWidget);
         }
-        expect(find.text('CONTINUAR'), findsNothing);
+        expect(find.text('Continuar'), findsNothing);
         expect(find.text('¿Leímos bien tus datos?'), findsNothing);
         expect(find.text('Some fields'), findsNothing);
         expect(find.textContaining('GLARE'), findsNothing, reason: 'the code is never shown');
@@ -890,7 +890,7 @@ void main() {
         await takeBoth(tester);
         final firstBody = latin1.decode(fake.identityUploads.single.bodyBytes);
 
-        await tap(tester, find.text('TOMAR OTRA FOTO'));
+        await tap(tester, find.text('Tomar otra foto'));
         expect(find.text('Coloca el frente de tu DUI dentro del marco'), findsOneWidget);
         await tap(tester, shutter);
 
@@ -909,7 +909,7 @@ void main() {
 
         expect(find.text('Revisa la foto del reverso'), findsOneWidget);
         expect(find.text('La foto salió borrosa. Toma otra con el teléfono bien quieto.'), findsOneWidget);
-        await tap(tester, find.text('TOMAR OTRA FOTO'));
+        await tap(tester, find.text('Tomar otra foto'));
         expect(find.text('Ahora coloca el reverso de tu DUI dentro del marco'), findsOneWidget);
         await tap(tester, shutter);
         expect(camera.photos, 3);
@@ -923,7 +923,7 @@ void main() {
         await takeBoth(tester);
 
         expect(find.text('Revisa las fotos de tu DUI'), findsOneWidget);
-        await tap(tester, find.text('TOMAR OTRAS FOTOS'));
+        await tap(tester, find.text('Tomar otras fotos'));
         expect(find.text('Coloca el frente de tu DUI dentro del marco'), findsOneWidget);
         await takeBoth(tester);
         expect(camera.photos, 4);
@@ -936,7 +936,7 @@ void main() {
         await takeBoth(tester);
         expect(find.text('Revisa las fotos de tu DUI'), findsOneWidget);
         expect(find.text('No parece que sea un DUI. Toma otra foto de tu DUI.'), findsOneWidget);
-        expect(find.text('TOMAR OTRAS FOTOS'), findsOneWidget);
+        expect(find.text('Tomar otras fotos'), findsOneWidget);
       });
 
       for (final (reason, message) in [
@@ -958,7 +958,7 @@ void main() {
         await takeBoth(tester);
         expect(find.text('Una de las fotos pesa demasiado. Toma otra foto.'), findsOneWidget);
         expect(find.textContaining('Payload'), findsNothing);
-        expect(find.text('TOMAR OTRAS FOTOS'), findsOneWidget);
+        expect(find.text('Tomar otras fotos'), findsOneWidget);
       });
 
       testWidgets('a rejected upload (400) asks to take the photos again', (tester) async {
@@ -980,7 +980,7 @@ void main() {
         expect(find.text('Revisa tu conexión a internet e inténtalo de nuevo.'), findsOneWidget);
         expect(find.textContaining('Service unavailable'), findsNothing);
 
-        await tap(tester, find.text('REINTENTAR'));
+        await tap(tester, find.text('Reintentar'));
         expect(fake.identityUploads, hasLength(2));
         expect(camera.photos, 2, reason: 'the photos were kept: no new ones were taken');
         expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
@@ -1005,7 +1005,7 @@ void main() {
         expect(find.textContaining('Permítelo en los ajustes'), findsOneWidget);
         expect(shutter, findsNothing);
 
-        await tap(tester, find.text('INTENTAR DE NUEVO'));
+        await tap(tester, find.text('Intentar de nuevo'));
         expect(camera.opens, 2);
       });
 
@@ -1014,7 +1014,7 @@ void main() {
         await goToDui(tester, FakeApi(), camera);
         expect(find.text('No pudimos abrir la cámara. Cierra otras aplicaciones que la estén usando e inténtalo de nuevo.'),
             findsOneWidget);
-        await tap(tester, find.text('INTENTAR DE NUEVO'));
+        await tap(tester, find.text('Intentar de nuevo'));
         expect(shutter, findsOneWidget);
       });
 
@@ -1049,11 +1049,11 @@ void main() {
     });
 
     group('confirm the DUI data (VDI-78)', () {
-      final confirmButton = find.text('MIS DATOS SON CORRECTOS');
+      final confirmButton = find.text('Mis datos son correctos');
 
       Future<void> goToDui(WidgetTester tester, FakeApi fake, FakeCamera camera) async {
         await tester.pumpWidget(app(fake, camera: camera));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
         await skipLocation(tester);
@@ -1093,7 +1093,7 @@ void main() {
         expect(find.text('Repetir'), findsNWidgets(2));
         expect(find.text(notClear), findsNothing, reason: 'everything was read clearly');
         expect(confirmButton, findsOneWidget);
-        expect(find.text('CONTINUAR'), findsNothing);
+        expect(find.text('Continuar'), findsNothing);
       });
 
       testWidgets('confirming sends the data with the dates as year-month-day and moves on', (tester) async {
@@ -1278,7 +1278,7 @@ void main() {
         await tap(tester, shutter);
         expect(find.text('Revisa la foto del frente'), findsOneWidget);
 
-        await tap(tester, find.text('TOMAR OTRA FOTO'));
+        await tap(tester, find.text('Tomar otra foto'));
         await tap(tester, shutter);
         expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
         expect(fake.identityUploads, hasLength(3));
@@ -1296,7 +1296,7 @@ void main() {
         expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
         expect(field(tester, 1), 'Maria');
 
-        await tap(tester, find.text('REINTENTAR'));
+        await tap(tester, find.text('Reintentar'));
         expect(fake.identityConfirmations, hasLength(2));
         expect(find.text('Paso 3 de 5'), findsOneWidget);
       });
@@ -1348,7 +1348,7 @@ void main() {
     group('income screen (VDI-48)', () {
       Future<void> goToIncome(WidgetTester tester, FakeApi fake) async {
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
         await skipLocation(tester);
@@ -1398,7 +1398,7 @@ void main() {
         expect(find.text('No pudimos cargar las opciones'), findsOneWidget);
         expect(find.byType(OptionCard), findsNothing);
 
-        await tap(tester, find.text('REINTENTAR'));
+        await tap(tester, find.text('Reintentar'));
         expect(find.byType(OptionCard), findsNWidgets(9));
         expect(fake.catalogs, hasLength(2));
       });
@@ -1407,7 +1407,7 @@ void main() {
     group('saving the income (VDI-47)', () {
       Future<void> goToIncome(WidgetTester tester, FakeApi fake) async {
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
         await skipLocation(tester);
@@ -1455,7 +1455,7 @@ void main() {
         expect(find.text('No pudimos guardar tus ingresos'), findsOneWidget);
         expect(find.text('Paso 3 de 5'), findsOneWidget);
 
-        await tap(tester, find.text('REINTENTAR'));
+        await tap(tester, find.text('Reintentar'));
         expect(find.text('Paso 4 de 5'), findsOneWidget);
         expect(fake.incomes, hasLength(2));
       });
@@ -1473,7 +1473,7 @@ void main() {
     group('expected activity (VDI-51)', () {
       Future<void> goToExpectedActivity(WidgetTester tester, FakeApi fake) async {
         await tester.pumpWidget(app(fake));
-        await tap(tester, find.text('EMPEZAR'));
+        await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
         await skipLocation(tester);
@@ -1533,7 +1533,7 @@ void main() {
         expect(find.text('No pudimos guardar esta información'), findsOneWidget);
         expect(find.text('Paso 4 de 5'), findsOneWidget);
 
-        await tap(tester, find.text('REINTENTAR'));
+        await tap(tester, find.text('Reintentar'));
         expect(find.text('Paso 5 de 5'), findsOneWidget);
         expect(fake.activities, hasLength(2));
       });
@@ -1545,7 +1545,7 @@ void main() {
       expect(find.byType(Logo), findsNothing, reason: 'the brand is not repeated in the header on the welcome screen');
       expect(find.text('Ceiba'), findsNothing);
 
-      await tap(tester, find.text('EMPEZAR'));
+      await tap(tester, find.text('Empezar'));
       expect(find.byType(Logo), findsOneWidget);
       expect(find.text('TANGAMANDAPIO'), findsOneWidget);
     });

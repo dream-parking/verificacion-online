@@ -814,7 +814,7 @@ void main() {
         expect(find.textContaining('5 minutos'), findsNothing);
       });
 
-      testWidgets('lists the five steps in order, with «Nuevo» only on the DUI', (tester) async {
+      testWidgets('lists the five steps in order, all with the same number circle and no badge', (tester) async {
         await tester.pumpWidget(app(FakeApi()));
         final steps = [
           ('Datos básicos', 'Tu nombre, DUI y celular.'),
@@ -834,12 +834,17 @@ void main() {
         for (final n in ['1', '2', '3', '4', '5']) {
           expect(find.text(n), findsOneWidget, reason: 'number $n');
         }
-        expect(find.text('NUEVO'), findsOneWidget);
-        expect(
-          tester.getTopLeft(find.text('NUEVO')).dy,
-          closeTo(tester.getTopLeft(find.text('Tu DUI')).dy, 8),
-          reason: 'the badge sits next to «Tu DUI»',
-        );
+        expect(find.textContaining('NUEVO', findRichText: true), findsNothing);
+        expect(find.textContaining('Nuevo'), findsNothing);
+
+        // Every number sits in a circle of the same color.
+        final colors = {
+          for (final n in ['1', '2', '3', '4', '5'])
+            (tester.widget<Container>(find.ancestor(of: find.text(n), matching: find.byType(Container)).first).decoration
+                    as BoxDecoration)
+                .color,
+        };
+        expect(colors, hasLength(1), reason: 'the DUI is not highlighted');
       });
     });
 

@@ -453,14 +453,11 @@ class SectionTitle extends StatelessWidget {
 
 /// Icon + title + description row.
 class IconRow extends StatelessWidget {
-  const IconRow({super.key, required this.leading, required this.title, required this.description, this.badge});
+  const IconRow({super.key, required this.leading, required this.title, required this.description});
 
   final Widget leading;
   final String title;
   final String description;
-
-  /// Small pill next to the title, such as «Nuevo».
-  final String? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -473,38 +470,12 @@ class IconRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (badge == null)
-                Text(title, style: AppText.bodyBold)
-              else
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  children: [Text(title, style: AppText.bodyBold), _Pill(badge!.toUpperCase())],
-                ),
+              Text(title, style: AppText.bodyBold),
               if (description.isNotEmpty) Text(description, style: AppText.bodyMuted),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Small blue pill, such as the «NUEVO» of a step.
-class _Pill extends StatelessWidget {
-  const _Pill(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: const ShapeDecoration(color: AppColors.blueSoft, shape: StadiumBorder()),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 12, height: 1.4, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: AppColors.blue),
-      ),
     );
   }
 }

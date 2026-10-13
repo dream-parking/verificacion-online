@@ -1,8 +1,11 @@
 package com.dreamparking.backend.onboarding.service;
 
+import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -191,7 +194,12 @@ public class OnboardingService {
 		recordEvent(request, RequestEventType.INCOME_REGISTERED, "Ingresos registrados");
 	}
 
-	/** Step 5: saves (or replaces) the expected activity and scores the request's risk (see {@link RiskAssessmentService}). */
+	/**
+	 * Step 5: saves (or replaces) the expected activity and scores the request's risk (see
+	 * {@link RiskAssessmentService}). Besides the main type and the range, the customer may declare other types of
+	 * money, an estimated amount inside the range, how many incoming movements and how much outflow a month: the
+	 * baseline of VDI-3.
+	 */
 	@Transactional
 	public RiskAssessmentResponse registerExpectedActivity(UUID requestId, ExpectedActivityRequest body) {
 		OnboardingRequest request = findInProgress(requestId);
@@ -199,13 +207,47 @@ public class OnboardingService {
 		ExpectedActivity activity = expectedActivities.findById(requestId).orElseGet(ExpectedActivity::new);
 		activity.setRequest(request);
 		activity.setTransactionType(catalogService.activeTransactionType(body.transactionTypeCode()));
+		activity.setExtraTransactionTypeCodes(extraTransactionTypes(body));
 		MonthlyAmountRange range = catalogService.activeMonthlyAmountRange(body.monthlyAmountRangeCode());
 		activity.setMonthlyAmountRange(range);
+		activity.setMonthlyAmountUsd(amountInsideRange(body.monthlyAmountUsd(), range));
+		activity.setMonthlyTransactionCount(
+				body.monthlyTransactionCount() == null ? null : body.monthlyTransactionCount().shortValue());
+		activity.setMonthlyOutflowUsd(body.monthlyOutflowUsd());
 		expectedActivities.save(activity);
 
 		completeStep(request, OnboardingStep.EXPECTED_ACTIVITY);
 		recordEvent(request, RequestEventType.EXPECTED_ACTIVITY_REGISTERED, "Movimiento esperado registrado");
 		return riskAssessmentService.evaluate(request, range);
+	}
+
+	/** Extra types of money: active catalog codes, without repeating the main type or each other. */
+	private Set<String> extraTransactionTypes(ExpectedActivityRequest body) {
+		Set<String> codes = new LinkedHashSet<>();
+		if (body.additionalTransactionTypes() == null) {
+			return codes;
+		}
+		for (ExpectedActivityRequest.AdditionalTransactionType type : body.additionalTransactionTypes()) {
+			String active = catalogService.activeTransactionType(type.code()).getCode();
+			if (active.equals(body.transactionTypeCode()) || !codes.add(active)) {
+				throw new InvalidInputException("additionalTransactionTypes repeats the type " + active);
+			}
+		}
+		return codes;
+	}
+
+	/** The estimated monthly amount has to agree with the chosen range (a null bound is open-ended). */
+	private static BigDecimal amountInsideRange(BigDecimal amount, MonthlyAmountRange range) {
+		if (amount == null) {
+			return null;
+		}
+		boolean belowMin = range.getMinUsd() != null && amount.compareTo(range.getMinUsd()) < 0;
+		boolean aboveMax = range.getMaxUsd() != null && amount.compareTo(range.getMaxUsd()) > 0;
+		if (belowMin || aboveMax) {
+			throw new InvalidInputException("monthlyAmountUsd " + amount.toPlainString()
+					+ " is outside the monthly amount range " + range.getCode());
+		}
+		return amount;
 	}
 
 	/** Review and submit: assigns the SOL-YYYY-NNNNN number, closes the request and scores it with every signal. */

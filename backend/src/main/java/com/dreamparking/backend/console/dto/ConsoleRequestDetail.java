@@ -60,10 +60,15 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			String rangeLabel, Instant registeredAt, Instant updatedAt) {
 	}
 
-	/** Declared expected activity (VDI-24). */
+	/** Declared expected activity (VDI-24), the baseline the account movements are compared against (VDI-3). */
 	@Schema(name = "ConsoleRequestExpectedActivity")
 	public record ExpectedActivity(String transactionTypeCode, String transactionTypeLabel,
-			String monthlyAmountRangeCode, String monthlyAmountRangeLabel, Instant registeredAt, Instant updatedAt) {
+			String monthlyAmountRangeCode, String monthlyAmountRangeLabel,
+			@Schema(description = "Otros tipos de dinero declarados además del principal") List<String> additionalTransactionTypeCodes,
+			@Schema(description = "Monto mensual estimado en USD (null si no lo declaró)") BigDecimal monthlyAmountUsd,
+			@Schema(description = "Depósitos o pagos recibidos al mes (null si no lo declaró)") Short monthlyTransactionCount,
+			@Schema(description = "Salidas de dinero al mes en USD (null si no lo declaró)") BigDecimal monthlyOutflowUsd,
+			Instant registeredAt, Instant updatedAt) {
 	}
 
 	/**

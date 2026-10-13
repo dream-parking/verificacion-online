@@ -151,7 +151,9 @@ public class ConsoleRequestService {
 		var expectedActivity = expectedActivities.findById(requestId)
 			.map(a -> new ConsoleRequestDetail.ExpectedActivity(a.getTransactionType().getCode(),
 					a.getTransactionType().getLabel(), a.getMonthlyAmountRange().getCode(),
-					a.getMonthlyAmountRange().getLabel(), a.getRegisteredAt(), a.getUpdatedAt()))
+					a.getMonthlyAmountRange().getLabel(), List.copyOf(a.getExtraTransactionTypeCodes()),
+					a.getMonthlyAmountUsd(), a.getMonthlyTransactionCount(), a.getMonthlyOutflowUsd(),
+					a.getRegisteredAt(), a.getUpdatedAt()))
 			.orElse(null);
 		var risk = riskAssessments.findCurrent(requestId).orElse(null);
 		var signalsView = signals.findById(requestId)

@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 
 import '../api/catalogs.dart';
 import '../api/onboarding_api.dart';
+import '../identity/document_camera.dart';
+import '../identity/dui_capture.dart';
+import '../identity/identity_document.dart';
 import '../signals/device_fingerprint.dart';
 import '../signals/signals.dart';
 import '../theme.dart';
@@ -12,12 +15,13 @@ import 'application_form.dart';
 import 'privacy_notice.dart';
 import 'widgets.dart';
 
-/// Account opening flow: welcome → privacy → 4 steps → confirmation.
+/// Account opening flow: welcome → privacy → 5 steps → confirmation.
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({
     super.key,
     this.api,
     this.deviceInfo,
+    this.camera = const PlatformDocumentCamera(),
     this.clock = DateTime.now,
   });
 
@@ -26,6 +30,9 @@ class OnboardingFlow extends StatefulWidget {
 
   /// Device reader (VDI-40); tests pass a fake one.
   final DeviceInfoSource? deviceInfo;
+
+  /// Camera that photographs the DUI (VDI-77); tests pass a fake one.
+  final DocumentCamera camera;
 
   /// Current time used to measure timings (VDI-43); tests pass a controlled one.
   final DateTime Function() clock;
@@ -38,22 +45,28 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   static const _next = {
     Screen.welcome: Screen.privacy,
     Screen.privacy: Screen.basicData,
-    Screen.basicData: Screen.income,
+    Screen.basicData: Screen.identityDocument,
+    Screen.identityDocument: Screen.identityConfirmation,
+    Screen.identityConfirmation: Screen.income,
     Screen.income: Screen.expectedActivity,
     Screen.expectedActivity: Screen.review,
   };
   static const _previous = {
     Screen.privacy: Screen.welcome,
     Screen.basicData: Screen.privacy,
-    Screen.income: Screen.basicData,
+    Screen.identityDocument: Screen.basicData,
+    Screen.identityConfirmation: Screen.identityDocument,
+    Screen.income: Screen.identityConfirmation,
     Screen.expectedActivity: Screen.income,
     Screen.review: Screen.expectedActivity,
   };
   static const _stepNumber = {
     Screen.basicData: 1,
-    Screen.income: 2,
-    Screen.expectedActivity: 3,
-    Screen.review: 4,
+    Screen.identityDocument: 2,
+    Screen.identityConfirmation: 2,
+    Screen.income: 3,
+    Screen.expectedActivity: 4,
+    Screen.review: 5,
   };
 
   final _scroll = ScrollController();
@@ -86,6 +99,16 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   String? _saveError;
   var _submitFailed = false;
   var _copied = false;
+
+  // DUI step (VDI-77).
+  /// Photos taken so far; the API gets both together.
+  final _duiPhotos = <DuiSide, Uint8List>{};
+
+  /// Sides the camera asks for now: both at first, or only those the API asked to take again.
+  var _duiToCapture = const [DuiSide.front, DuiSide.back];
+  UnreadablePhotos? _unreadable;
+  String? _duiError;
+  var _uploadingDui = false;
 
   @override
   void dispose() {
@@ -123,6 +146,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     if (_scroll.hasClients) _scroll.jumpTo(0);
     // VDI-43: the step start stays in memory; it is only sent after the notice is accepted.
     _signals.steps.start(s, widget.clock());
+    if (s == Screen.identityDocument) _resetDuiCapture();
     if (_signalsPending) unawaited(_sendSignals());
   }
 
@@ -163,6 +187,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _saveAndContinue(_declareExpectedActivity);
       return;
     }
+    if (_screen == Screen.identityConfirmation) _completeStep(Screen.identityDocument);
     _completeStep(_screen);
     _goTo(_next[_screen]!);
   }
@@ -190,6 +215,71 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         transactionType: _form.transactionType,
         amountRange: _form.amountRange,
       );
+
+  /// Starts the DUI capture from scratch: both photos, nothing pending.
+  void _resetDuiCapture() {
+    setState(() {
+      _duiPhotos.clear();
+      _duiToCapture = const [DuiSide.front, DuiSide.back];
+      _unreadable = null;
+      _duiError = null;
+    });
+  }
+
+  /// VDI-77: the camera took the photos of [sides]; they replace those of the same side and both go to the API.
+  void _onDuiCaptured(Map<DuiSide, Uint8List> sides) {
+    _duiPhotos.addAll(sides);
+    _uploadDui();
+  }
+
+  /// VDI-77: sends both photos. If they can be read, it moves on to confirm the data; if not, it says what to fix.
+  Future<void> _uploadDui() async {
+    setState(() {
+      _uploadingDui = true;
+      _duiError = null;
+      _unreadable = null;
+    });
+    try {
+      final reading = await _api.uploadIdentityDocument(
+        _form.id!,
+        front: _duiPhotos[DuiSide.front]!,
+        back: _duiPhotos[DuiSide.back]!,
+      );
+      if (!mounted) return;
+      setState(() {
+        _uploadingDui = false;
+        _form.identityReading = reading;
+      });
+      _goTo(Screen.identityConfirmation);
+    } on ApiException catch (e) {
+      debugPrint('Could not send the DUI photos: $e');
+      if (!mounted) return;
+      setState(() {
+        _uploadingDui = false;
+        switch (e.status) {
+          case 422:
+            _unreadable = UnreadablePhotos.fromError(e);
+          case 413:
+            _unreadable = const UnreadablePhotos.tooLarge();
+          case 400:
+            _unreadable = const UnreadablePhotos(UnreadableReason.other, Retake.both);
+          case 409:
+            _duiError = 'No pudimos guardar tu DUI. Revisa que tus datos básicos estén completos e inténtalo de nuevo.';
+          default:
+            _duiError = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+        }
+      });
+    }
+  }
+
+  /// The person takes again the photos the API asked for.
+  void _retakeDui() {
+    final unreadable = _unreadable!;
+    setState(() {
+      _duiToCapture = unreadable.sides;
+      _unreadable = null;
+    });
+  }
 
   /// Saves the current step in the API and only moves on if it was saved.
   Future<void> _saveAndContinue(Future<void> Function() save) async {
@@ -235,7 +325,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         : 'Revisa estos datos e inténtalo de nuevo: ${names.join(', ')}.';
   }
 
-  bool get _busy => _submitting || _starting || _saving;
+  bool get _busy => _submitting || _starting || _saving || _uploadingDui;
 
   /// VDI-40: reads the device and sends its fingerprint. It only runs after the notice is accepted.
   /// If it fails it does not interrupt the customer: signals feed the score, they do not block the flow.
@@ -344,6 +434,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     setState(() {
       _form = ApplicationForm();
       _createdRequestId = null;
+      _duiPhotos.clear();
+      _unreadable = null;
+      _duiError = null;
+      _uploadingDui = false;
       _signals = Signals();
       _signalsPending = false;
       _resendSignals = false;
@@ -383,22 +477,28 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   if (_screen != Screen.welcome) _header(previous),
                   if (step != null) StepProgress(step: step),
                   Expanded(
-                    child: SingleChildScrollView(
-                      controller: _scroll,
-                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        child: KeyedSubtree(key: ValueKey(_screen), child: _content()),
-                      ),
-                    ),
+                    // The camera takes all the space; the other screens scroll.
+                    child: _capturingDui
+                        ? _duiCapture()
+                        : SingleChildScrollView(
+                            controller: _scroll,
+                            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: KeyedSubtree(key: ValueKey(_screen), child: _content()),
+                            ),
+                          ),
                   ),
-                  if (_screen != Screen.confirmation) _actionBar(),
+                  // The DUI step has its own buttons: the shutter and "Tomar otra foto".
+                  if (_screen != Screen.confirmation && _screen != Screen.identityDocument) _actionBar(),
                 ],
               ),
               if (_submitting)
                 const _LoadingOverlay(title: 'Enviando tu solicitud…', detail: 'No cierres la aplicación.'),
               if (_saving)
                 const _LoadingOverlay(title: 'Guardando tu información…', detail: 'Un momento, por favor.'),
+              if (_uploadingDui)
+                const _LoadingOverlay(title: 'Revisando tu DUI…', detail: 'Estamos leyendo tus fotos. Puede tardar unos segundos.'),
               if (_starting)
                 const _LoadingOverlay(title: 'Preparando tu solicitud…', detail: 'Esto puede tardar unos segundos.'),
             ],
@@ -450,6 +550,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         Screen.welcome => const _Welcome(),
         Screen.privacy => _privacy(),
         Screen.basicData => _basicData(),
+        Screen.identityDocument => _duiProblem(),
+        Screen.identityConfirmation => _identityConfirmation(),
         Screen.income => _income(),
         Screen.expectedActivity => _expectedActivity(),
         Screen.review => _review(),
@@ -582,7 +684,108 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  // ---------------------------------------------------------------- 4. Income
+  // ---------------------------------------------------------------- 4. DUI
+
+  /// The camera is shown when there is nothing to fix: no unreadable photos and no error.
+  bool get _capturingDui => _screen == Screen.identityDocument && _unreadable == null && _duiError == null;
+
+  Widget _duiCapture() => DuiCaptureView(
+        // A new key per round, so the camera asks only for the sides to take again.
+        key: ValueKey(_duiToCapture),
+        camera: widget.camera,
+        sides: _duiToCapture,
+        onCaptured: _onDuiCaptured,
+      );
+
+  /// Unreadable photos (what happened, how to take them better) or an error sending them.
+  Widget _duiProblem() {
+    final unreadable = _unreadable;
+    if (unreadable == null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+        child: _ConnectionError(title: 'No pudimos revisar tu DUI', message: _duiError ?? '', onRetry: _uploadDui),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ScreenTitle(unreadable.title),
+          const SizedBox(height: 16),
+          for (final side in unreadable.sides)
+            if (_duiPhotos[side] case final photo?)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.memory(
+                    photo,
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: AppColors.errorBg, borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('No pudimos leer tu DUI', style: AppText.heading(18, color: AppColors.errorDark)),
+                const SizedBox(height: 4),
+                Text(unreadable.message, style: AppText.body),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const SectionTitle('Para que salga bien'),
+          const SizedBox(height: 12),
+          for (var i = 0; i < UnreadablePhotos.tips.length; i++) ...[
+            IconRow(leading: NumberBadge(i + 1), title: UnreadablePhotos.tips[i], description: ''),
+            const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 12),
+          PrimaryButton(
+            text: unreadable.sides.length > 1 ? 'Tomar otras fotos' : 'Tomar otra foto',
+            onPressed: _retakeDui,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Temporary until VDI-78: shows what was read; the confirm-or-correct screen replaces it.
+  Widget _identityConfirmation() {
+    final r = _form.identityReading;
+    final failed = r == null || r.status == ReadingStatus.failed;
+    String show(Object? v) => v == null ? 'No se leyó' : '$v';
+    String day(DateTime? d) => d == null ? 'No se leyó' : d.toIso8601String().substring(0, 10);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ScreenTitle('¿Leímos bien tus datos?'),
+          const SizedBox(height: 16),
+          if (failed)
+            const Text('No pudimos leer tus datos. Los escribirás en el siguiente paso.', style: AppText.body)
+          else ...[
+            Text('DUI: ${show(r.dui)}', style: AppText.body),
+            Text('Nombres: ${show(r.firstNames)}', style: AppText.body),
+            Text('Apellidos: ${show(r.lastNames)}', style: AppText.body),
+            Text('Nacimiento: ${day(r.birthDate)}', style: AppText.body),
+            Text('Vencimiento: ${day(r.expiryDate)}', style: AppText.body),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------- 5. Income
 
   Widget _income() {
     final sourceError = _errorFor('incomeSource');
@@ -872,6 +1075,7 @@ class _Welcome extends StatelessWidget {
 
   static const _steps = [
     ('Datos básicos', 'Tu nombre, DUI y celular.'),
+    ('Tu DUI', 'Una foto del frente y otra del reverso.'),
     ('Tus ingresos', 'De dónde viene tu dinero y cuánto ganas.'),
     ('El dinero de tu cuenta', 'Qué dinero esperas mover cada mes.'),
     ('Revisar y enviar', 'Confirmas todo antes de mandarlo.'),

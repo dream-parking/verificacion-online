@@ -4,6 +4,7 @@ import '../identity/identity_document.dart';
 enum Screen {
   welcome,
   privacy,
+  location,
   basicData,
   identityDocument,
   identityConfirmation,

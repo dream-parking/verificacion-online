@@ -12,6 +12,7 @@ import {
   formatDate,
   formatDateTime,
   formatTime,
+  deviceLocationText,
   locationFailureText,
   minSec,
   TIME_NOTE,
@@ -187,6 +188,7 @@ export function RequestDetailView({ id }: { id: string }) {
   const signalList: Pair[] = s
     ? [
         { k: "Señales capturadas", v: s.capturedAt ? formatDateTime(s.capturedAt) : "Sin registro de fecha" },
+        { k: "Ciudad de la solicitud", v: deviceLocationText(s.deviceLocationStatus, s.deviceLocation) },
         { k: "Dirección IP", v: noData(s.ip) },
         ...locationRows,
         { k: "Huella de dispositivo", v: noData(s.deviceFingerprint) },

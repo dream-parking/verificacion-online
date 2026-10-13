@@ -134,7 +134,7 @@ class RiskScoreSignalsApiTests {
 	private void sendSignals(String id, int typingSpeedCpm) throws Exception {
 		send(id, "signals", """
 				{"deviceFingerprint": "fp-%s", "deviceModel": "Galaxy A54", "operatingSystem": "Android",
-				 "countryIso": "SV", "typingSpeedCpm": %d}
+				 "typingSpeedCpm": %d}
 				""".formatted(UUID.randomUUID(), typingSpeedCpm)).andExpect(status().isNoContent());
 		// The signals are read from a database view, so what was just written has to reach the database first
 		// (in production each call is its own transaction).

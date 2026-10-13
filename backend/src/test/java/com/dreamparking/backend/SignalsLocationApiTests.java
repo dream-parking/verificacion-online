@@ -72,6 +72,7 @@ class SignalsLocationApiTests {
 	void storesLatitudeLongitudeAndEverythingTheProviderReturned() throws Exception {
 		when(geolocation.locate(any())).thenReturn(sansalvador());
 		String id = startRequest();
+		acceptNotice(id);
 
 		capture(id, "{\"deviceFingerprint\": \"fp-ubicacion\", \"approximateLocation\": \"lo que diga la app\", \"countryIso\": \"gt\"}",
 				PUBLIC_IP, 204);
@@ -101,8 +102,9 @@ class SignalsLocationApiTests {
 	void failedLookupMarksTheLocationUnavailableAndKeepsTheOtherSignals() throws Exception {
 		when(geolocation.locate(any())).thenThrow(new GeolocationException("provider error: HttpClientErrorException"));
 		String id = startRequest();
+		acceptNotice(id);
 
-		capture(id, "{\"deviceFingerprint\": \"fp-ubicacion\", \"approximateLocation\": \"Santa Ana\", \"typingSpeedCpm\": 150}",
+		capture(id, "{\"deviceFingerprint\": \"fp-ubicacion\", \"approximateLocation\": \"Santa Ana\", \"countryIso\": \"SV\", \"typingSpeedCpm\": 150}",
 				PUBLIC_IP, 204);
 
 		flushAndClear();
@@ -162,6 +164,11 @@ class SignalsLocationApiTests {
 		capture(UUID.randomUUID().toString(), BODY, PUBLIC_IP, 404);
 
 		verify(geolocation, never()).locate(any());
+	}
+
+	private void acceptNotice(String id) throws Exception {
+		mvc.perform(put("/api/onboarding/requests/{id}/privacy-consent", id).contentType(MediaType.APPLICATION_JSON)
+			.content("{\"signalsAccepted\": true}")).andExpect(status().isOk());
 	}
 
 	private void capture(String id, String body, String remoteAddress, int expectedStatus) throws Exception {

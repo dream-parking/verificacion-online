@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.dreamparking.backend.common.exception.InvalidInputException;
+import com.dreamparking.backend.common.exception.InvalidStateException;
 import com.dreamparking.backend.customer.entity.Device;
 import com.dreamparking.backend.customer.repository.DeviceRepository;
 import com.dreamparking.backend.onboarding.dto.CaptureSignalsRequest;
@@ -21,11 +22,14 @@ import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.OnboardingSession;
 import com.dreamparking.backend.onboarding.entity.RequestStep;
 import com.dreamparking.backend.onboarding.entity.RequestStepId;
+import com.dreamparking.backend.onboarding.entity.PrivacyConsent;
 import com.dreamparking.backend.onboarding.entity.SessionGeolocation;
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 import com.dreamparking.backend.onboarding.geo.GeolocationException;
 import com.dreamparking.backend.onboarding.geo.IpGeolocationClient;
 import com.dreamparking.backend.onboarding.repository.OnboardingSessionRepository;
+import com.dreamparking.backend.onboarding.repository.PrivacyConsentRepository;
 import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
 
 /** Stores the device and behavior signals captured while the customer fills in a request (VDI-41, VDI-42, VDI-67). */
@@ -50,17 +54,20 @@ public class SignalsService {
 
 	private final RequestStepRepository steps;
 
+	private final PrivacyConsentRepository consents;
+
 	private final IpGeolocationClient geolocation;
 
 	private final TransactionTemplate transactions;
 
 	public SignalsService(OnboardingService onboardingService, DeviceRepository devices,
-			OnboardingSessionRepository sessions, RequestStepRepository steps, IpGeolocationClient geolocation,
-			TransactionTemplate transactions) {
+			OnboardingSessionRepository sessions, RequestStepRepository steps, PrivacyConsentRepository consents,
+			IpGeolocationClient geolocation, TransactionTemplate transactions) {
 		this.onboardingService = onboardingService;
 		this.devices = devices;
 		this.sessions = sessions;
 		this.steps = steps;
+		this.consents = consents;
 		this.geolocation = geolocation;
 		this.transactions = transactions;
 	}
@@ -69,12 +76,44 @@ public class SignalsService {
 	 * Saves (or replaces) the signals of the request's session; the same device is reused across requests. The
 	 * location comes from the client IP, resolved by an external service: that call runs outside the database
 	 * transaction so a slow provider does not hold a connection of the small pool.
+	 * <p>
+	 * The city and country the phone reports (or that it has none, VDI-72) are only accepted once the customer accepted
+	 * the privacy notice; without it the whole call is rejected and nothing is saved.
 	 */
 	public void capture(UUID requestId, CaptureSignalsRequest body, String clientIp, String userAgent) {
 		InetAddress ip = parse(clientIp);
-		transactions.executeWithoutResult(status -> onboardingService.findInProgress(requestId));
+		LocationStatus reported = reportedLocation(body);
+		transactions.executeWithoutResult(status -> {
+			onboardingService.findInProgress(requestId);
+			if (reported != null && !consents.findById(requestId).map(PrivacyConsent::getSignalsAccepted).orElse(false)) {
+				throw new InvalidStateException("Accept the privacy notice before sending the location");
+			}
+		});
 		SessionGeolocation located = locate(ip);
-		transactions.executeWithoutResult(status -> save(requestId, body, ip, userAgent, located));
+		transactions.executeWithoutResult(status -> save(requestId, body, reported, ip, userAgent, located));
+	}
+
+	/**
+	 * What the phone says about its location: {@code AVAILABLE} when it sends the city and the country (together),
+	 * {@code UNAVAILABLE} when it says it has none (and then sends neither), {@code null} when it says nothing, in which
+	 * case a location saved before stays as it is.
+	 */
+	static LocationStatus reportedLocation(CaptureSignalsRequest body) {
+		boolean city = body.approximateLocation() != null && !body.approximateLocation().isBlank();
+		boolean country = body.countryIso() != null;
+		if (body.locationStatus() == LocationStatus.UNAVAILABLE) {
+			if (city || country) {
+				throw new InvalidInputException("A location that is not available carries no city or country");
+			}
+			return LocationStatus.UNAVAILABLE;
+		}
+		if (city != country) {
+			throw new InvalidInputException("approximateLocation and countryIso are sent together");
+		}
+		if (!city && body.locationStatus() == LocationStatus.AVAILABLE) {
+			throw new InvalidInputException("An available location needs approximateLocation and countryIso");
+		}
+		return city ? LocationStatus.AVAILABLE : null;
 	}
 
 	private SessionGeolocation locate(InetAddress ip) {
@@ -91,8 +130,8 @@ public class SignalsService {
 		}
 	}
 
-	private void save(UUID requestId, CaptureSignalsRequest body, InetAddress ip, String userAgent,
-			SessionGeolocation located) {
+	private void save(UUID requestId, CaptureSignalsRequest body, LocationStatus reported, InetAddress ip,
+			String userAgent, SessionGeolocation located) {
 		OnboardingRequest request = onboardingService.findInProgress(requestId);
 		Instant now = Instant.now();
 
@@ -127,6 +166,12 @@ public class SignalsService {
 				: body.approximateLocation());
 		session.setCountryIso(geo.isAvailable() && geo.getCountryCode() != null ? geo.getCountryCode()
 				: (body.countryIso() == null ? null : body.countryIso().toUpperCase()));
+		if (reported == LocationStatus.AVAILABLE) {
+			session.setDeviceLocation(body.approximateLocation().trim(), body.countryIso(), now);
+		}
+		else if (reported == LocationStatus.UNAVAILABLE) {
+			session.setDeviceLocationUnavailable(now);
+		}
 		session.setTypingSpeedCpm(body.typingSpeedCpm());
 		session.setTypingPace(paceOf(body.typingSpeedCpm()));
 		session.setCapturedAt(now);

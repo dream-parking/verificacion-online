@@ -54,6 +54,7 @@ class SignalsApiTests {
 	@Test
 	void storesSignalsAndShowsThemInTheConsole() throws Exception {
 		String id = startRequest();
+		acceptNotice(id);
 		Instant shown = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 		Instant done = shown.plusSeconds(68);
 
@@ -118,9 +119,10 @@ class SignalsApiTests {
 	void sendingSignalsAgainReplacesThemAndCountsRequestsPerDevice() throws Exception {
 		String first = startRequest();
 		String second = startRequest();
+		acceptNotice(first);
 
-		capture(first, "{\"deviceFingerprint\": \"fp-compartido\", \"approximateLocation\": \"Santa Ana\"}", 204);
-		capture(first, "{\"deviceFingerprint\": \"fp-compartido\", \"approximateLocation\": \"San Miguel\"}", 204);
+		capture(first, "{\"deviceFingerprint\": \"fp-compartido\", \"approximateLocation\": \"Santa Ana\", \"countryIso\": \"SV\"}", 204);
+		capture(first, "{\"deviceFingerprint\": \"fp-compartido\", \"approximateLocation\": \"San Miguel\", \"countryIso\": \"SV\"}", 204);
 		capture(second, "{\"deviceFingerprint\": \"fp-compartido\"}", 204);
 
 		flushAndClear();
@@ -149,6 +151,11 @@ class SignalsApiTests {
 	void signalsOfUnknownOrSubmittedRequestsAreRejected() throws Exception {
 		capture(UUID.randomUUID().toString(), "{\"deviceFingerprint\": \"fp\"}", 404);
 		capture(EntityMappingTests.DEMO_REQUEST.toString(), "{\"deviceFingerprint\": \"fp\"}", 409);
+	}
+
+	private void acceptNotice(String id) throws Exception {
+		mvc.perform(put("/api/onboarding/requests/{id}/privacy-consent", id).contentType(MediaType.APPLICATION_JSON)
+			.content("{\"signalsAccepted\": true}")).andExpect(status().isOk());
 	}
 
 	private void capture(String id, String body, int expectedStatus) throws Exception {

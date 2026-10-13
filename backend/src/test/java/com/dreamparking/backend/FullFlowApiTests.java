@@ -66,7 +66,7 @@ class FullFlowApiTests {
 		// ---- mobile app
 		perform(app, put("/api/onboarding/requests/{id}/signals", requestId).content("""
 				{"deviceFingerprint": "aa11·bb22·cc33", "deviceModel": "Galaxy A54", "operatingSystem": "Android",
-				 "countryIso": "SV", "typingSpeedCpm": 190}
+				 "typingSpeedCpm": 190}
 				"""))
 			.andExpect(status().isNoContent());
 		perform(app, put("/api/onboarding/requests/{id}/privacy-consent", requestId).content("""

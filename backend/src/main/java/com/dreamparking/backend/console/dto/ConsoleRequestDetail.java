@@ -12,6 +12,7 @@ import com.dreamparking.backend.identity.entity.enums.DocumentSide;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.entity.enums.UnreadableReason;
 import com.dreamparking.backend.identity.entity.enums.UnreadableSide;
+import com.dreamparking.backend.onboarding.entity.enums.DeviceLocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
@@ -80,7 +81,10 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			Short typingSpeedCpm, TypingPace typingPace, Boolean nightTime, Long totalDurationSeconds,
 			Long requestsFromSameDevice, LocationStatus locationStatus, BigDecimal latitude, BigDecimal longitude,
 			IpDetails ipDetails,
-			@Schema(description = "Fecha y hora en que la app envió las señales por última vez") Instant capturedAt) {
+			@Schema(description = "Fecha y hora en que la app envió las señales por última vez") Instant capturedAt,
+			@Schema(description = "Permiso de ubicación del teléfono: `DENIED` o `UNAVAILABLE` se muestran como «Ubicación no disponible»; null si la app no lo envió") DeviceLocationStatus deviceLocationStatus,
+			@Schema(description = "Ciudad y país que reportó el teléfono (solo con permiso)", example = "San Salvador, El Salvador") String deviceLocation,
+			@Schema(description = "País que reportó el teléfono, ISO 3166-1 alfa-2", example = "SV") String deviceCountryIso) {
 	}
 
 	/**

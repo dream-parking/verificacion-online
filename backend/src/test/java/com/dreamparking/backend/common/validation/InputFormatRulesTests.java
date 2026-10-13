@@ -37,13 +37,13 @@ class InputFormatRulesTests {
 	private static final String BASE_PACKAGE = "com.dreamparking.backend";
 
 	/** Annotations that say what a text may contain. */
-	private static final Set<Class<? extends Annotation>> FORMATS = Set.of(PersonName.class, FreeText.class,
-			MultilineText.class, SafeText.class, Password.class, Code.class, Dui.class, MobilePhone.class,
+	private static final Set<Class<? extends Annotation>> FORMATS = Set.of(PersonName.class, JobTitle.class,
+			FreeText.class, MultilineText.class, SafeText.class, Password.class, Code.class, Dui.class, MobilePhone.class,
 			EmailAddress.class, Pattern.class);
 
 	/** Formats that do not bound the length on their own and need an {@code @Size(max)} too. */
-	private static final Set<Class<? extends Annotation>> UNBOUNDED = Set.of(PersonName.class, FreeText.class,
-			MultilineText.class, SafeText.class, Password.class, Code.class, EmailAddress.class);
+	private static final Set<Class<? extends Annotation>> UNBOUNDED = Set.of(PersonName.class, JobTitle.class,
+			FreeText.class, MultilineText.class, SafeText.class, Password.class, Code.class, EmailAddress.class);
 
 	@Test
 	void everyTextOfARequestBodyDeclaresItsFormat() throws Exception {

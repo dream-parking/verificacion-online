@@ -97,6 +97,28 @@ void main() {
           'La fecha de vencimiento debe ser posterior a la de nacimiento.');
     });
 
+    test('an expired DUI is rejected, naming the date that was read', () {
+      final f = confirmed()..idExpiryDate = '22/07/2020';
+      expect(f.messages()['idExpiryDate'],
+          'Tu DUI venció el 22/07/2020. Para abrir tu cuenta necesitamos un DUI vigente.');
+      expect(f.isScreenValid(Screen.identityConfirmation), isFalse);
+    });
+
+    test('a DUI that expires today or later is valid; yesterday is expired', () {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      expect((confirmed()..idExpiryDate = formatDateOf(today)).messages()['idExpiryDate'], isEmpty);
+      expect((confirmed()..idExpiryDate = formatDateOf(today.add(const Duration(days: 1)))).messages()['idExpiryDate'],
+          isEmpty);
+      final yesterday = formatDateOf(DateTime(today.year, today.month, today.day - 1));
+      expect((confirmed()..idExpiryDate = yesterday).messages()['idExpiryDate'], contains('venció el $yesterday'));
+    });
+
+    test('a date before the birth date says so, not that the DUI expired', () {
+      expect((confirmed()..idExpiryDate = '11/04/1990').messages()['idExpiryDate'],
+          'La fecha de vencimiento debe ser posterior a la de nacimiento.');
+    });
+
     test('an invalid birth date does not hide the expiry date message', () {
       final m = (confirmed()
             ..idBirthDate = ''
@@ -156,6 +178,21 @@ void main() {
       expect(f.idFirstNames, 'M4ria');
       expect(f.idUnclear, containsAll(['idDui', 'idFirstNames', 'idBirthDate', 'idExpiryDate']));
       expect(f.idUnclear, isNot(contains('idLastNames')));
+    });
+
+    test('an expired date that was read is not marked as unclear: it was read, the DUI is just expired', () {
+      final f = ApplicationForm()
+        ..applyReading(IdentityReading(
+          status: ReadingStatus.read,
+          dui: '01234567-8',
+          firstNames: 'María José',
+          lastNames: 'Pérez López',
+          birthDate: DateTime(1990, 4, 12),
+          expiryDate: DateTime(2020, 6, 1),
+        ));
+      expect(f.idExpiryDate, '01/06/2020');
+      expect(f.idUnclear, isEmpty);
+      expect(f.isScreenValid(Screen.identityConfirmation), isFalse);
     });
 
     test('if the reader failed everything is empty and nothing is marked: the person types it all', () {

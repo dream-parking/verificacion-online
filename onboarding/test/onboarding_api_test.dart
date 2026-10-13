@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:onboarding/api/onboarding_api.dart';
+import 'package:onboarding/identity/identity_document.dart';
 import 'package:onboarding/signals/device_fingerprint.dart';
 import 'package:onboarding/signals/signals.dart';
 
@@ -207,5 +209,156 @@ void main() {
       api.submitRequest('abc'),
       throwsA(isA<ApiException>().having((e) => e.message, 'message', 'Complete the 4 previous steps before submitting')),
     );
+  });
+
+  group('identity document (VDI-77)', () {
+    final front = Uint8List.fromList([0xFF, 0xD8, 0x01]);
+    final back = Uint8List.fromList([0xFF, 0xD8, 0x02]);
+
+    test('sends both photos as multipart and returns what was read', () async {
+      late http.BaseRequest sent;
+      final api = OnboardingApi(
+        baseUrl: 'https://api.test',
+        client: MockClient.streaming((req, body) async {
+          sent = req;
+          final bytes = await body.toBytes();
+          expect(
+            utf8.decode(bytes, allowMalformed: true),
+            allOf(contains('name="front"'), contains('name="back"')),
+          );
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                '{"status":"READ","attempts":1,"dui":"01234567-8","firstNames":"María José","lastNames":"Pérez López",'
+                '"birthDate":"1990-04-12","issueDate":"2021-06-01","expiryDate":"2029-06-01","gender":"F"}',
+              ),
+            ),
+            200,
+          );
+        }),
+      );
+      final reading = await api.uploadIdentityDocument(
+        'abc',
+        front: front,
+        back: back,
+      );
+      expect(sent.method, 'PUT');
+      expect(
+        sent.url.toString(),
+        'https://api.test/api/onboarding/requests/abc/identity-document',
+      );
+      expect(reading.status, ReadingStatus.read);
+      expect(reading.dui, '01234567-8');
+      expect(reading.firstNames, 'María José');
+      expect(reading.birthDate, DateTime(1990, 4, 12));
+      expect(reading.expiryDate, DateTime(2029, 6, 1));
+    });
+
+    test('a field that was not read clearly comes as null', () async {
+      final api = OnboardingApi(
+        baseUrl: 'https://api.test',
+        client: MockClient.streaming((req, body) async {
+          await body.drain<void>();
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                '{"status":"READ","attempts":1,"dui":"01234567-8","firstNames":null}',
+              ),
+            ),
+            200,
+          );
+        }),
+      );
+      final reading = await api.uploadIdentityDocument(
+        'abc',
+        front: front,
+        back: back,
+      );
+      expect(reading.firstNames, isNull);
+      expect(reading.lastNames, isNull);
+      expect(reading.birthDate, isNull);
+    });
+
+    test(
+      'if the reader is unavailable the status is FAILED and nothing was read',
+      () async {
+        final api = OnboardingApi(
+          baseUrl: 'https://api.test',
+          client: MockClient.streaming((req, body) async {
+            await body.drain<void>();
+            return http.StreamedResponse(
+              Stream.value(utf8.encode('{"status":"FAILED","attempts":1}')),
+              200,
+            );
+          }),
+        );
+        final reading = await api.uploadIdentityDocument(
+          'abc',
+          front: front,
+          back: back,
+        );
+        expect(reading.status, ReadingStatus.failed);
+        expect(reading.dui, isNull);
+      },
+    );
+
+    test('a 422 keeps the reason and the side to take again', () async {
+      final api = OnboardingApi(
+        baseUrl: 'https://api.test',
+        client: MockClient.streaming((req, body) async {
+          await body.drain<void>();
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                '{"status":422,"detail":"The identity document photos cannot be read: GLARE",'
+                '"reason":"GLARE","side":"FRONT"}',
+              ),
+            ),
+            422,
+          );
+        }),
+      );
+      await expectLater(
+        api.uploadIdentityDocument('abc', front: front, back: back),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 422)
+              .having((e) => e.reason, 'reason', 'GLARE')
+              .having((e) => e.side, 'side', 'FRONT'),
+        ),
+      );
+    });
+
+    test('a 422 without side leaves it null', () async {
+      final api = OnboardingApi(
+        baseUrl: 'https://api.test',
+        client: MockClient.streaming((req, body) async {
+          await body.drain<void>();
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode('{"status":422,"detail":"x","reason":"OTHER"}'),
+            ),
+            422,
+          );
+        }),
+      );
+      await expectLater(
+        api.uploadIdentityDocument('abc', front: front, back: back),
+        throwsA(isA<ApiException>().having((e) => e.side, 'side', isNull)),
+      );
+    });
+
+    test('without a connection it throws ApiException', () async {
+      final api = OnboardingApi(
+        baseUrl: 'https://api.test',
+        client: MockClient.streaming(
+          (_, _) async => throw http.ClientException('no network'),
+        ),
+      );
+      expect(
+        api.uploadIdentityDocument('abc', front: front, back: back),
+        throwsA(isA<ApiException>()),
+      );
+    });
   });
 }

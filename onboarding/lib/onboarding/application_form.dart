@@ -1,5 +1,17 @@
+import '../identity/identity_document.dart';
+
 /// Flow screens, in order.
-enum Screen { welcome, privacy, basicData, income, expectedActivity, review, confirmation }
+enum Screen {
+  welcome,
+  privacy,
+  basicData,
+  identityDocument,
+  identityConfirmation,
+  income,
+  expectedActivity,
+  review,
+  confirmation,
+}
 
 /// A catalog option (income source, income range, transaction type, amount range).
 class Option {
@@ -80,6 +92,9 @@ class ApplicationForm {
   String lastNames = '';
   String dui = '';
   String phone = '';
+
+  /// What the API read from the DUI photos (VDI-77); the person confirms or corrects it (VDI-78).
+  IdentityReading? identityReading;
   String incomeSource = '';
   String incomeSourceDetail = '';
   String incomeRange = '';

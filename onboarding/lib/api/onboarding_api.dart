@@ -1,14 +1,16 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import '../env.dart';
+import '../identity/identity_document.dart';
 import '../signals/signals.dart';
 import 'catalogs.dart';
 
 /// Error talking to the API: no connection, timeout or an error response.
 class ApiException implements Exception {
-  const ApiException(this.message, {this.status, this.fields = const []});
+  const ApiException(this.message, {this.status, this.fields = const [], this.reason, this.side});
 
   /// Technical detail from the server, in English: for logs only, never shown to the customer.
   final String message;
@@ -16,6 +18,10 @@ class ApiException implements Exception {
 
   /// Fields the API rejected (`errors` of a 400), for example `firstNames`.
   final List<String> fields;
+
+  /// Why the DUI photos could not be read and which ones to take again (`reason` and `side` of a 422).
+  final String? reason;
+  final String? side;
 
   @override
   String toString() => 'ApiException($status): $message';
@@ -113,13 +119,27 @@ class OnboardingApi {
     await _send('PUT', '/api/onboarding/requests/$requestId/signals', body: signals.toJson());
   }
 
+  /// DUI step (VDI-77): sends both photos together (JPEG or PNG, up to 5 MB each) and returns what was read
+  /// so the person can confirm it. If the photos cannot be read it throws an [ApiException] 422 with `reason`
+  /// and `side`; it can be repeated while the request is in progress.
+  Future<IdentityReading> uploadIdentityDocument(String requestId, {required Uint8List front, required Uint8List back}) async {
+    final req = http.MultipartRequest('PUT', _base.resolve('/api/onboarding/requests/$requestId/identity-document'))
+      ..headers['Accept'] = 'application/json'
+      ..files.add(http.MultipartFile.fromBytes('front', front, filename: 'front.jpg'))
+      ..files.add(http.MultipartFile.fromBytes('back', back, filename: 'back.jpg'));
+    return IdentityReading.fromJson(await _deliver(req));
+  }
+
   Future<Map<String, dynamic>> _send(String method, String path, {Object? body}) async {
     final req = http.Request(method, _base.resolve(path))..headers['Accept'] = 'application/json';
     if (body != null) {
       req.headers['Content-Type'] = 'application/json';
       req.body = jsonEncode(body);
     }
+    return _deliver(req);
+  }
 
+  Future<Map<String, dynamic>> _deliver(http.BaseRequest req) async {
     final http.Response res;
     try {
       res = await http.Response.fromStream(await _client.send(req).timeout(_timeout));
@@ -128,10 +148,25 @@ class OnboardingApi {
     }
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw ApiException(_detail(res), status: res.statusCode, fields: _fields(res));
+      final problem = _problem(res);
+      throw ApiException(
+        _detail(res),
+        status: res.statusCode,
+        fields: _fields(res),
+        reason: problem['reason'] as String?,
+        side: problem['side'] as String?,
+      );
     }
     if (res.body.isEmpty) return const {};
     return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  static Map<String, dynamic> _problem(http.Response res) {
+    try {
+      return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    } on FormatException {
+      return const {};
+    }
   }
 
   /// Names of the invalid fields of a validation error (`errors` in the problem+json).

@@ -640,12 +640,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 PrimaryButton(text: 'Permitir ubicación aproximada', onPressed: _busy ? null : _allowLocation),
-                const SizedBox(height: 4),
-                Center(
-                  child: LinkButton(
-                    text: 'Ahora no',
-                    onPressed: () => _decideLocation(const DeviceLocation.denied()),
-                  ),
+                const SizedBox(height: 12),
+                SecondaryButton(
+                  text: 'Ahora no',
+                  onPressed: _busy ? null : () => _decideLocation(const DeviceLocation.denied()),
                 ),
               ],
             )
@@ -1278,21 +1276,39 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 class _LocationPermission extends StatelessWidget {
   const _LocationPermission();
 
+  /// What is kept and what is not; the part in [bold] is highlighted.
   static const _points = [
-    (Icons.location_city_outlined, 'Solo guardamos ciudad y país.'),
-    (Icons.location_off_outlined, 'No guardamos tu dirección ni tus coordenadas.'),
-    (Icons.check_circle_outline, 'Si prefieres no compartirla, puedes completar tu solicitud igual.'),
+    ('Solo guardamos ', 'ciudad y país', '.'),
+    ('No guardamos tu dirección ni tus coordenadas.', '', ''),
+    ('Si prefieres no compartirla, puedes completar tu solicitud igual.', '', ''),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(child: Icon(Icons.place_outlined, size: 64, color: AppColors.brandGreen)),
-          const SizedBox(height: 16),
+          Center(
+            child: Container(
+              key: const Key('location-illustration'),
+              width: 128,
+              height: 128,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.brandSoft),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(Icons.map_outlined, size: 76, color: AppColors.brandGreen.withValues(alpha: 0.35)),
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 18),
+                    child: Icon(Icons.location_on, size: 52, color: AppColors.brandGreen),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
           const ScreenTitle('¿Desde qué ciudad nos escribes?'),
           const SizedBox(height: 12),
           const Text(
@@ -1300,17 +1316,42 @@ class _LocationPermission extends StatelessWidget {
             style: AppText.body,
           ),
           const SizedBox(height: 20),
-          for (final (icon, text) in _points) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Container(
+            key: const Key('location-points'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: AppColors.neutral100, borderRadius: BorderRadius.circular(4)),
+            child: Column(
               children: [
-                Icon(icon, size: 24, color: AppColors.brandGreen),
-                const SizedBox(width: 12),
-                Expanded(child: Text(text, style: AppText.body)),
+                for (var i = 0; i < _points.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Icon(Icons.check, size: 20, color: AppColors.brandGreen),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            style: AppText.body,
+                            children: [
+                              TextSpan(text: _points[i].$1),
+                              if (_points[i].$2.isNotEmpty)
+                                TextSpan(text: _points[i].$2, style: const TextStyle(fontWeight: FontWeight.w800)),
+                              if (_points[i].$3.isNotEmpty) TextSpan(text: _points[i].$3),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
-            const SizedBox(height: 12),
-          ],
+          ),
         ],
       ),
     );

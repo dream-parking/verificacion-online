@@ -6,6 +6,7 @@ import '../onboarding/application_form.dart';
 const apiStepNames = {
   Screen.privacy: 'PRIVACY_NOTICE',
   Screen.basicData: 'BASIC_DATA',
+  Screen.identityDocument: 'IDENTITY_DOCUMENT',
   Screen.income: 'INCOME',
   Screen.expectedActivity: 'EXPECTED_ACTIVITY',
   Screen.review: 'REVIEW',

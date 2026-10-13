@@ -1322,9 +1322,12 @@ class _LocationPermission extends StatelessWidget {
 class _Welcome extends StatelessWidget {
   const _Welcome();
 
+  /// Steps the person goes through; the DUI is the new one and carries the «Nuevo» badge.
+  static const _newStep = 'Tu DUI';
+
   static const _steps = [
     ('Datos básicos', 'Tu nombre, DUI y celular.'),
-    ('Tu DUI', 'Una foto del frente y otra del reverso.'),
+    (_newStep, 'Una foto del frente y otra del reverso.'),
     ('Tus ingresos', 'De dónde viene tu dinero y cuánto ganas.'),
     ('El dinero de tu cuenta', 'Qué dinero esperas mover cada mes.'),
     ('Revisar y enviar', 'Confirmas todo antes de mandarlo.'),
@@ -1357,7 +1360,7 @@ class _Welcome extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Sin filas y sin ir a una agencia. Te toma unos 5 minutos.',
+                'Sin filas y sin ir a una agencia. Ten tu DUI a la mano: te toma unos 7 minutos.',
                 style: TextStyle(fontSize: 18, height: 26 / 18, color: Colors.white),
               ),
               const SizedBox(height: 20),
@@ -1370,7 +1373,7 @@ class _Welcome extends StatelessWidget {
                   children: [
                     const Icon(Icons.schedule, size: 20, color: AppColors.ink),
                     const SizedBox(width: 8),
-                    Text('Unos 5 minutos', style: AppText.heading(16)),
+                    Text('Unos 7 minutos', style: AppText.heading(16)),
                   ],
                 ),
               ),
@@ -1385,7 +1388,12 @@ class _Welcome extends StatelessWidget {
               const SectionTitle('Esto es lo que te vamos a pedir', size: 22),
               const SizedBox(height: 16),
               for (var i = 0; i < _steps.length; i++) ...[
-                IconRow(leading: NumberBadge(i + 1), title: _steps[i].$1, description: _steps[i].$2),
+                IconRow(
+                  leading: NumberBadge(i + 1, soft: _steps[i].$1 != _newStep),
+                  title: _steps[i].$1,
+                  description: _steps[i].$2,
+                  badge: _steps[i].$1 == _newStep ? 'Nuevo' : null,
+                ),
                 const SizedBox(height: 14),
               ],
             ],

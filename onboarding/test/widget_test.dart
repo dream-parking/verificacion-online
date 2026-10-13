@@ -11,6 +11,7 @@ import 'package:onboarding/onboarding/application_form.dart';
 import 'package:onboarding/onboarding/onboarding_flow.dart';
 import 'package:onboarding/onboarding/widgets.dart';
 import 'package:onboarding/signals/device_fingerprint.dart';
+import 'package:onboarding/signals/device_location.dart';
 
 /// Catalog like the one from the Dev API (VDI-46 and VDI-50).
 const devCatalog = {
@@ -169,6 +170,23 @@ class FakeDeviceInfo implements DeviceInfoSource {
   }
 }
 
+/// Fake approximate location: answers [result] and counts how many times it was asked.
+class FakeLocation implements DeviceLocationSource {
+  FakeLocation([this.result = sanSalvador]);
+
+  static const sanSalvador =
+      DeviceLocation(DeviceLocationStatus.available, place: 'San Salvador, El Salvador', countryIso: 'SV');
+
+  final DeviceLocation result;
+  var reads = 0;
+
+  @override
+  Future<DeviceLocation> read() async {
+    reads++;
+    return result;
+  }
+}
+
 void main() {
   group('validation and formatting', () {
     test('DUI and phone masks', () {
@@ -228,6 +246,9 @@ void main() {
       await tap(tester, find.byType(Checkbox).at(1));
     }
 
+    /// Location permission screen (VDI-73): "Ahora no".
+    Future<void> skipLocation(WidgetTester tester) => tap(tester, find.text('Ahora no'));
+
     /// Types valid basic data in the four fields.
     Future<void> fillBasicData(WidgetTester tester) async {
       final fields = find.byType(TextField);
@@ -238,10 +259,12 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Widget app(FakeApi fake, {DeviceInfoSource? device, DateTime Function()? clock}) => OnboardingApp(
+    Widget app(FakeApi fake, {DeviceInfoSource? device, DeviceLocationSource? location, DateTime Function()? clock}) =>
+        OnboardingApp(
           home: OnboardingFlow(
             api: fake.api,
             deviceInfo: device ?? FakeDeviceInfo(),
+            location: location ?? FakeLocation(),
             clock: clock ?? DateTime.now,
           ),
         );
@@ -261,6 +284,10 @@ void main() {
       );
       await acceptNotice(tester);
       await tapContinue(tester);
+
+      // Approximate location: allowed.
+      expect(find.text('¿Desde qué ciudad nos escribes?'), findsOneWidget);
+      await tap(tester, find.text('PERMITIR UBICACIÓN APROXIMADA'));
 
       // Basic data.
       expect(find.text('Paso 1 de 4'), findsOneWidget);
@@ -320,8 +347,10 @@ void main() {
       await acceptNotice(tester);
 
       await tapContinue(tester);
+
       expect(find.text('Paso 1 de 4'), findsNothing, reason: 'it does not move on without the notice recorded');
       await tapContinue(tester);
+      await skipLocation(tester);
 
       expect(find.text('Paso 1 de 4'), findsOneWidget);
       expect(fake.starts, hasLength(1), reason: 'no second request is created');
@@ -334,6 +363,7 @@ void main() {
       await tap(tester, find.text('EMPEZAR'));
       await acceptNotice(tester);
       await tapContinue(tester);
+      await skipLocation(tester);
       await fillBasicData(tester);
 
       await tapContinue(tester);
@@ -351,6 +381,7 @@ void main() {
       await tap(tester, find.text('EMPEZAR'));
       await acceptNotice(tester);
       await tapContinue(tester);
+      await skipLocation(tester);
       await fillBasicData(tester);
 
       await tapContinue(tester);
@@ -366,6 +397,7 @@ void main() {
       await tap(tester, find.text('EMPEZAR'));
       await acceptNotice(tester);
       await tapContinue(tester);
+      await skipLocation(tester);
       await fillBasicData(tester);
       await tapContinue(tester);
       await tap(tester, find.text('Remesas'));
@@ -400,6 +432,7 @@ void main() {
 
         await acceptNotice(tester);
         await tapContinue(tester);
+        await skipLocation(tester);
         expect(fake.starts, hasLength(1));
         expect(fake.starts.single.url.path, '/api/onboarding/requests');
         expect(find.text('Paso 1 de 4'), findsOneWidget);
@@ -418,6 +451,7 @@ void main() {
 
         await tap(tester, find.text('He leído y acepto los términos y condiciones.'));
         await tapContinue(tester);
+        await skipLocation(tester);
         expect(find.text('Paso 1 de 4'), findsOneWidget);
       });
 
@@ -426,6 +460,7 @@ void main() {
         await tap(tester, find.text('EMPEZAR'));
         await acceptNotice(tester);
         await tapContinue(tester);
+        await skipLocation(tester);
         expect(find.textContaining('datos de ejemplo'), findsNothing);
       });
 
@@ -435,7 +470,11 @@ void main() {
         await tap(tester, find.text('EMPEZAR'));
         await acceptNotice(tester);
         await tapContinue(tester);
+        await skipLocation(tester);
 
+        // Basic data → location → privacy.
+        await tap(tester, find.byTooltip('Volver al paso anterior'));
+        expect(find.text('¿Desde qué ciudad nos escribes?'), findsOneWidget);
         await tap(tester, find.byTooltip('Volver al paso anterior'));
         for (final checkbox in tester.widgetList<Checkbox>(find.byType(Checkbox))) {
           expect(checkbox.value, isTrue);
@@ -443,6 +482,7 @@ void main() {
         }
 
         await tapContinue(tester);
+        await skipLocation(tester);
         expect(find.text('Paso 1 de 4'), findsOneWidget);
         expect(fake.starts, hasLength(1));
       });
@@ -458,6 +498,7 @@ void main() {
         expect(find.text('Paso 1 de 4'), findsNothing);
 
         await tap(tester, find.text('REINTENTAR'));
+        await skipLocation(tester);
         expect(find.text('Paso 1 de 4'), findsOneWidget);
         expect(fake.starts, hasLength(2));
       });
@@ -502,12 +543,100 @@ void main() {
         await tap(tester, find.text('EMPEZAR'));
         await acceptNotice(tester);
         await tapContinue(tester);
-        expect(find.text('Paso 1 de 4'), findsOneWidget);
+        expect(find.text('¿Desde qué ciudad nos escribes?'), findsOneWidget);
         expect(fake.signals, hasLength(1));
 
+        await skipLocation(tester);
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+        expect(fake.signals, hasLength(2));
+      });
+    });
+
+    group('approximate location (VDI-73)', () {
+      Future<void> goToLocation(WidgetTester tester, FakeApi fake, FakeLocation location) async {
+        await tester.pumpWidget(app(fake, location: location));
+        await tap(tester, find.text('EMPEZAR'));
+        await acceptNotice(tester);
+        await tapContinue(tester);
+        expect(find.text('¿Desde qué ciudad nos escribes?'), findsOneWidget);
+      }
+
+      Map<String, dynamic> lastSignals(FakeApi fake) => jsonDecode(fake.signals.last.body) as Map<String, dynamic>;
+
+      testWidgets('is asked after the notice, never before', (tester) async {
+        final fake = FakeApi();
+        final location = FakeLocation();
+        await tester.pumpWidget(app(fake, location: location));
+        await tap(tester, find.text('EMPEZAR'));
+        await tapContinue(tester);
+        expect(find.text('¿Desde qué ciudad nos escribes?'), findsNothing);
+        expect(location.reads, 0);
+      });
+
+      testWidgets('with permission it sends only the city and the country', (tester) async {
+        final fake = FakeApi();
+        final location = FakeLocation();
+        await goToLocation(tester, fake, location);
+
+        await tap(tester, find.text('PERMITIR UBICACIÓN APROXIMADA'));
+        expect(location.reads, 1);
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+        final body = lastSignals(fake);
+        expect(body['deviceLocationStatus'], 'AVAILABLE');
+        expect(body['approximateLocation'], 'San Salvador, El Salvador');
+        expect(body['countryIso'], 'SV');
+        expect(body.keys, isNot(contains('latitude')));
+      });
+
+      // CP-41: without permission the request goes on and the location is saved as not available.
+      testWidgets('"Ahora no" goes on and sends the location as not available', (tester) async {
+        final fake = FakeApi();
+        final location = FakeLocation();
+        await goToLocation(tester, fake, location);
+
+        await skipLocation(tester);
+        expect(location.reads, 0, reason: 'the system permission is not asked');
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+        final body = lastSignals(fake);
+        expect(body['deviceLocationStatus'], 'DENIED');
+        expect(body.containsKey('approximateLocation'), isFalse);
+        expect(body.containsKey('countryIso'), isFalse);
+      });
+
+      testWidgets('if the system permission is refused it goes on and sends it as not available', (tester) async {
+        final fake = FakeApi();
+        await goToLocation(tester, fake, FakeLocation(const DeviceLocation.denied()));
+
+        await tap(tester, find.text('PERMITIR UBICACIÓN APROXIMADA'));
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+        expect(lastSignals(fake)['deviceLocationStatus'], 'DENIED');
+      });
+
+      testWidgets('if the phone cannot find the city it goes on and says so', (tester) async {
+        final fake = FakeApi();
+        await goToLocation(tester, fake, FakeLocation(const DeviceLocation.unavailable()));
+
+        await tap(tester, find.text('PERMITIR UBICACIÓN APROXIMADA'));
+        expect(find.text('Paso 1 de 4'), findsOneWidget);
+        expect(lastSignals(fake)['deviceLocationStatus'], 'UNAVAILABLE');
+      });
+
+      testWidgets('the decision is still sent with the last signals, before submitting', (tester) async {
+        final fake = FakeApi();
+        await goToLocation(tester, fake, FakeLocation());
+        await skipLocation(tester);
         await fillBasicData(tester);
         await tapContinue(tester);
-        expect(fake.signals, hasLength(2));
+        await tap(tester, find.text('Remesas'));
+        await tap(tester, find.text('USD 500.01 a 1,000'));
+        await tapContinue(tester);
+        await tap(tester, find.text('Ahorro'));
+        await tap(tester, find.text('USD 200.01 a 500'));
+        await tapContinue(tester);
+        await tap(tester, find.text('ENVIAR SOLICITUD'));
+
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+        expect(lastSignals(fake)['deviceLocationStatus'], 'DENIED');
       });
     });
 
@@ -522,6 +651,7 @@ void main() {
         advance(8000);
         await acceptNotice(tester);
         await tapContinue(tester);
+        await skipLocation(tester);
 
         // Basic data: one failed attempt, then typed letter by letter (one keystroke every 200 ms).
         advance(1000);
@@ -585,6 +715,7 @@ void main() {
         await tap(tester, find.text('EMPEZAR'));
         await acceptNotice(tester);
         await tapContinue(tester);
+        await skipLocation(tester);
         await fillBasicData(tester);
         await tapContinue(tester);
         expect(find.text('Paso 2 de 4'), findsOneWidget);
@@ -642,6 +773,7 @@ void main() {
         await tap(tester, find.text('EMPEZAR'));
         await acceptNotice(tester);
         await tapContinue(tester);
+        await skipLocation(tester);
         await fillBasicData(tester);
         await tapContinue(tester);
       }
@@ -706,6 +838,7 @@ void main() {
         await tap(tester, find.text('EMPEZAR'));
         await acceptNotice(tester);
         await tapContinue(tester);
+        await skipLocation(tester);
         await fillBasicData(tester);
         await tapContinue(tester);
         await tap(tester, find.text('Salario'));

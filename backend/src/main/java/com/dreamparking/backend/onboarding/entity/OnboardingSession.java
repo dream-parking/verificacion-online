@@ -22,6 +22,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.dreamparking.backend.customer.entity.Device;
+import com.dreamparking.backend.onboarding.entity.enums.DeviceLocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 
 /** Session and behavior signals captured while the customer fills in a request. */
@@ -55,6 +56,18 @@ public class OnboardingSession {
 
 	@Embedded
 	private SessionGeolocation geolocation = new SessionGeolocation();
+
+	/** City reported by the phone with the customer's permission (VDI-73); null if the app did not send it. */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "device_location_status", length = 12)
+	private DeviceLocationStatus deviceLocationStatus;
+
+	@Column(name = "device_location", length = 120)
+	private String deviceLocation;
+
+	@JdbcTypeCode(SqlTypes.CHAR)
+	@Column(name = "device_country_iso", length = 2)
+	private String deviceCountryIso;
 
 	@Column(name = "user_agent", columnDefinition = "text")
 	private String userAgent;
@@ -131,6 +144,26 @@ public class OnboardingSession {
 
 	public void setGeolocation(SessionGeolocation geolocation) {
 		this.geolocation = geolocation;
+	}
+
+	public DeviceLocationStatus getDeviceLocationStatus() {
+		return deviceLocationStatus;
+	}
+
+	public String getDeviceLocation() {
+		return deviceLocation;
+	}
+
+	public String getDeviceCountryIso() {
+		return deviceCountryIso;
+	}
+
+	/** The city and country are kept only when the status is {@link DeviceLocationStatus#AVAILABLE}. */
+	public void setDeviceLocation(DeviceLocationStatus status, String location, String countryIso) {
+		boolean available = status == DeviceLocationStatus.AVAILABLE;
+		this.deviceLocationStatus = status;
+		this.deviceLocation = available ? location : null;
+		this.deviceCountryIso = available ? countryIso : null;
 	}
 
 	public String getUserAgent() {

@@ -6,6 +6,7 @@ import {
   formatDateTime,
   formatShortDate,
   formatTime,
+  deviceLocationText,
   locationFailureText,
   minSec,
   usd,
@@ -66,5 +67,24 @@ describe("locationFailureText", () => {
     [undefined, "No se pudo ubicar"],
   ])("%s", (failure, expected) => {
     expect(locationFailureText(failure)).toContain(expected);
+  });
+});
+
+describe("deviceLocationText", () => {
+  it("muestra la ciudad que reportó el teléfono", () => {
+    expect(deviceLocationText("AVAILABLE", "Santa Ana, El Salvador")).toBe("Santa Ana, El Salvador");
+  });
+  it.each([
+    ["DENIED", "no dio permiso"],
+    ["UNAVAILABLE", "no pudo obtenerla"],
+  ] as const)("sin permiso o sin ciudad (%s) es «Ubicación no disponible»", (status, detail) => {
+    const text = deviceLocationText(status, "Santa Ana");
+    expect(text).toContain("Ubicación no disponible");
+    expect(text).toContain(detail);
+    expect(text).not.toContain("Santa Ana");
+  });
+  it("una app anterior no la envía", () => {
+    expect(deviceLocationText(null, null)).toContain("Sin dato");
+    expect(deviceLocationText(undefined, undefined)).toContain("Sin dato");
   });
 });

@@ -26,6 +26,9 @@ class TextFormatsTests {
 	record Name(@PersonName String value) {
 	}
 
+	record Title(@JobTitle String value) {
+	}
+
 	record Text(@FreeText String value) {
 	}
 
@@ -69,9 +72,34 @@ class TextFormatsTests {
 
 	@ParameterizedTest
 	@ValueSource(strings = { "Juan2", "Ana 😀", "Robert'); DROP TABLE customer;--", "<script>alert(1)</script>",
-			"Ana  María", "María-José", "Ana\u200BMaría", "Ana\u0000", "J. Pérez", "Ana\tMaría" })
+			"Ana  María", "María-José", "Ana\u200BMaría", "Ana\u0000", "J. Pérez", "Ana\tMaría", "Иван", "李明",
+			"Ana Ωmega", "Mª José" })
 	void namesRejectDigitsSymbolsEmojisAndInvisibleCharacters(String name) {
 		assertThat(violations(new Name(name))).containsExactly("Solo se permiten letras y espacios");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Analista de fraude y cumplimiento", "Jefa de Riesgo (nivel 2)", "Oficial KYC/AML",
+			"Gerente de Operaciones & TI", "Analista Sr.", "Coordinadora de área - Región Occidental", " Auditor ",
+			"Técnico d'Aubuisson" })
+	void jobTitlesStartWithALetterAndUseLittlePunctuation(String title) {
+		assertThat(violations(new Title(title))).isEmpty();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "12345", "1er Analista", "#1 @ 50% *_+", "¿Analista?", "¡Jefe!", "Analista $$$",
+			"Analista_fraude", "Analista 😀", "<b>Analista</b>", "Аналитик", "经理", "(Analista)", "-Analista",
+			"Analista\u0000", "Analista\nSenior", "Ana\u202Elisis", "“Analista”", "Analista: fraude" })
+	void jobTitlesRejectNumbersAloneSymbolsAndOtherAlphabets(String title) {
+		assertThat(violations(new Title(title))).containsExactly(
+				"Debe empezar con una letra; solo se permiten letras, números, espacios y . , ( ) / & - '");
+	}
+
+	@Test
+	void jobTitleLeavesPresenceToNotBlank() {
+		assertThat(violations(new Title(null))).isEmpty();
+		assertThat(violations(new Title(""))).isEmpty();
+		assertThat(violations(new Title("   "))).isEmpty();
 	}
 
 	@ParameterizedTest

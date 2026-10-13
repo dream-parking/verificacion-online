@@ -79,20 +79,41 @@ class InputValidationApiTests {
 	void consoleUsersRejectNamesAndJobTitlesWithInvalidCharacters() throws Exception {
 		MockMvc admin = auth.mockMvcAs(context, auth.user(ConsoleRole.ADMIN));
 		admin.perform(post("/api/console/users").contentType(JSON).content("""
-				{"email": "nueva@ceiba.example", "fullName": "Иван Петров", "jobTitle": "#1 @ 50%",
+				{"email": "nueva@ceiba.example", "fullName": "Ana2 <b>Rivas</b>", "jobTitle": "Analista & #1 @ 50%",
 				 "role": "FRAUD_ANALYST", "initialPassword": "clave-inicial-123"}
 				"""))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.errors.fullName").value("Solo se permiten letras y espacios"))
-			.andExpect(jsonPath("$.errors.jobTitle").exists());
+			.andExpect(jsonPath("$.errors.fullName")
+				.value("Solo se permiten letras (incluidas tildes y ñ), espacios, apóstrofo (') y guion (-)"))
+			.andExpect(jsonPath("$.errors.jobTitle")
+				.value("Debe empezar con una letra; solo se permiten letras, números, espacios y . , - / ( )"));
 
-		admin.perform(put("/api/console/users/{id}", auth.user(ConsoleRole.FRAUD_ANALYST).getId()).contentType(JSON)
-			.content("""
-					{"fullName": "Ana Rivas", "jobTitle": "12345", "role": "FRAUD_ANALYST", "active": true}
-					"""))
+		String analyst = auth.user(ConsoleRole.FRAUD_ANALYST).getId().toString();
+		admin.perform(put("/api/console/users/{id}", analyst).contentType(JSON).content("""
+				{"fullName": "Ana Rivas 😀", "jobTitle": "Analista: fraude!", "role": "FRAUD_ANALYST", "active": true}
+				"""))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.errors.jobTitle").exists())
-			.andExpect(jsonPath("$.errors.fullName").doesNotExist());
+			.andExpect(jsonPath("$.errors.fullName").exists())
+			.andExpect(jsonPath("$.errors.jobTitle").exists());
+	}
+
+	@Test
+	void consoleUsersAcceptAccentsApostrophesHyphensAndBasicPunctuation() throws Exception {
+		MockMvc admin = auth.mockMvcAs(context, auth.user(ConsoleRole.ADMIN));
+		admin.perform(post("/api/console/users").contentType(JSON).content("""
+				{"email": "nueva@ceiba.example", "fullName": "María-José O'Brien Núñez",
+				 "jobTitle": "Analista Sr. de fraude, KYC/AML - nivel 2 (Región Occidental)",
+				 "role": "FRAUD_ANALYST", "initialPassword": "clave-inicial-123"}
+				"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.fullName").value("María-José O'Brien Núñez"))
+			.andExpect(jsonPath("$.jobTitle").value("Analista Sr. de fraude, KYC/AML - nivel 2 (Región Occidental)"));
+
+		String analyst = auth.user(ConsoleRole.FRAUD_ANALYST).getId().toString();
+		admin.perform(put("/api/console/users/{id}", analyst).contentType(JSON).content("""
+				{"fullName": "Zoë d'Aubuisson", "jobTitle": "Jefa de Riesgo", "role": "FRAUD_ANALYST", "active": true}
+				"""))
+			.andExpect(status().isOk());
 	}
 
 	@Test

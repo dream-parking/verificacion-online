@@ -1115,7 +1115,7 @@
             "example" : "Nuevo Analista",
             "maxLength" : 150,
             "minLength" : 0,
-            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+([ '\\-][A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           },
           "initialPassword" : {
@@ -1129,7 +1129,7 @@
             "example" : "Analista de fraude y cumplimiento",
             "maxLength" : 120,
             "minLength" : 0,
-            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,()/&'\\-]*",
+            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,\\-/()]*",
             "type" : "string"
           },
           "role" : {
@@ -1998,13 +1998,13 @@
           "fullName" : {
             "maxLength" : 150,
             "minLength" : 0,
-            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+([ '\\-][A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           },
           "jobTitle" : {
             "maxLength" : 120,
             "minLength" : 0,
-            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,()/&'\\-]*",
+            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,\\-/()]*",
             "type" : "string"
           },
           "role" : {

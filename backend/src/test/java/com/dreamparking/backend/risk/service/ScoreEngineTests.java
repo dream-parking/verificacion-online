@@ -19,7 +19,9 @@ import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.ocr.DuiReading;
+import com.dreamparking.backend.onboarding.entity.OnboardingSession;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 import com.dreamparking.backend.risk.entity.ScoreModel;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
@@ -63,9 +65,10 @@ class ScoreEngineTests {
 		assertThat(contribution(result, ScoreSignal.TYPING_PACE).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.DEVICE).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.TIME_OF_DAY).points()).isNull();
-		// Not available yet: the city (weight, but nothing to read it from) and the signals with no weight
 		assertThat(contribution(result, ScoreSignal.CITY).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.CITY).maxPoints()).isEqualTo(20);
+		assertThat(contribution(result, ScoreSignal.CITY).observation()).isEqualTo("Ubicación no capturada");
+		// Not available yet: the signals with no weight
 		for (ScoreSignal pending : new ScoreSignal[] { ScoreSignal.RNPN, ScoreSignal.LIVENESS,
 				ScoreSignal.INTERNAL_LISTS }) {
 			assertThat(contribution(result, pending).points()).isNull();
@@ -109,6 +112,44 @@ class ScoreEngineTests {
 		assertThat(contribution(night, ScoreSignal.TIME_OF_DAY).points()).isEqualTo(10);
 		assertThat(contribution(day, ScoreSignal.TIME_OF_DAY).points()).isZero();
 		assertThat(contribution(day, ScoreSignal.TIME_OF_DAY).observation()).isEqualTo("Diurno");
+	}
+
+	@Test
+	void aCityThatMatchesTheIpAddsNothing() {
+		Contribution city = city(OnboardingSession.LocationMatch.SAME_CITY);
+
+		assertThat(city.points()).isZero();
+		assertThat(city.maxPoints()).isEqualTo(20);
+		assertThat(city.observation()).isEqualTo("San Salvador, SV; coincide con la IP");
+	}
+
+	@Test
+	void anotherCityInTheSameCountryAddsHalfAndAnotherCountryTheWholeWeight() {
+		assertThat(city(OnboardingSession.LocationMatch.SAME_COUNTRY).points()).isEqualTo(10);
+		assertThat(city(OnboardingSession.LocationMatch.SAME_COUNTRY).observation()).contains("otra ciudad");
+		assertThat(city(OnboardingSession.LocationMatch.DIFFERENT_COUNTRY).points()).isEqualTo(20);
+		assertThat(city(OnboardingSession.LocationMatch.DIFFERENT_COUNTRY).observation()).contains("otro país");
+	}
+
+	@Test
+	void aCityTheIpCannotConfirmAddsAQuarter() {
+		Contribution city = city(null);
+
+		assertThat(city.points()).isEqualTo(5);
+		assertThat(city.observation()).contains("no se pudo comparar");
+	}
+
+	@Test
+	void aLocationThatIsNotAvailableAddsNothingAndSaysSo() {
+		OnboardingSession session = mock(OnboardingSession.class);
+		when(session.getDeviceLocationStatus()).thenReturn(LocationStatus.UNAVAILABLE);
+
+		Contribution city = contribution(ScoreEngine.score(model, new Inputs(null, null, null, session, TODAY)),
+				ScoreSignal.CITY);
+
+		assertThat(city.points()).isNull();
+		assertThat(city.maxPoints()).isEqualTo(20);
+		assertThat(city.observation()).isEqualTo("Ubicación no disponible");
 	}
 
 	@Test
@@ -217,6 +258,15 @@ class ScoreEngineTests {
 		assertThat(model.levelOf(score)).isEqualTo(level);
 	}
 
+	private Contribution city(OnboardingSession.LocationMatch match) {
+		OnboardingSession session = mock(OnboardingSession.class);
+		when(session.getDeviceLocationStatus()).thenReturn(LocationStatus.AVAILABLE);
+		when(session.getDeviceCity()).thenReturn("San Salvador");
+		when(session.getDeviceCountryIso()).thenReturn("SV");
+		when(session.compareDeviceLocationWithIp()).thenReturn(match);
+		return contribution(ScoreEngine.score(model, new Inputs(null, null, null, session, TODAY)), ScoreSignal.CITY);
+	}
+
 	private int points(IdentityDocument document) {
 		return contribution(ScoreEngine.score(model, inputs(null, document, null)), ScoreSignal.IDENTITY_DOCUMENT)
 			.points();
@@ -227,7 +277,7 @@ class ScoreEngineTests {
 	}
 
 	private static Inputs inputs(MonthlyAmountRange range, IdentityDocument document, RequestSignals signals) {
-		return new Inputs(range, document, signals, TODAY);
+		return new Inputs(range, document, signals, null, TODAY);
 	}
 
 	private static MonthlyAmountRange range(BigDecimal maxUsd) {

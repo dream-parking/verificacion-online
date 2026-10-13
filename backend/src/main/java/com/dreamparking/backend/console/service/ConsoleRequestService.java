@@ -21,6 +21,7 @@ import com.dreamparking.backend.identity.repository.IdentityDocumentImageReposit
 import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
 import com.dreamparking.backend.identity.service.DuiValidator;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
+import com.dreamparking.backend.onboarding.entity.OnboardingSession;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
@@ -28,6 +29,7 @@ import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRep
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
+import com.dreamparking.backend.onboarding.repository.OnboardingSessionRepository;
 import com.dreamparking.backend.onboarding.repository.RequestSignalsRepository;
 import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
@@ -74,6 +76,8 @@ public class ConsoleRequestService {
 
 	private final RequestSignalsRepository signals;
 
+	private final OnboardingSessionRepository sessions;
+
 	private final RequestStepRepository steps;
 
 	private final RequestEventRepository events;
@@ -86,7 +90,7 @@ public class ConsoleRequestService {
 
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
-			ExpectedActivityVersionRepository expectedActivityVersions, RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
+			ExpectedActivityVersionRepository expectedActivityVersions, RequestSignalsRepository signals, OnboardingSessionRepository sessions, RequestStepRepository steps, RequestEventRepository events,
 			RiskAssessmentService riskAssessments, IdentityDocumentRepository identityDocuments,
 			IdentityDocumentImageRepository identityDocumentImages) {
 		this.jdbc = jdbc;
@@ -95,6 +99,7 @@ public class ConsoleRequestService {
 		this.expectedActivities = expectedActivities;
 		this.expectedActivityVersions = expectedActivityVersions;
 		this.signals = signals;
+		this.sessions = sessions;
 		this.steps = steps;
 		this.events = events;
 		this.riskAssessments = riskAssessments;
@@ -167,7 +172,7 @@ public class ConsoleRequestService {
 		var risk = riskAssessments.findCurrent(requestId).orElse(null);
 		var signalsView = signals.findById(requestId)
 			.filter(s -> s.getIp() != null || s.getDeviceFingerprint() != null)
-			.map(ConsoleRequestService::toSignals)
+			.map(s -> toSignals(s, sessions.findFirstByRequestIdOrderByStartedAtDesc(requestId).orElse(null)))
 			.orElse(null);
 		var stepTimes = steps.findByRequestIdOrderByStartedAt(requestId)
 			.stream()
@@ -202,7 +207,7 @@ public class ConsoleRequestService {
 				d.getConfidence(), identityDocumentImages.findSidesByRequestId(d.getRequestId()), d.getProcessedAt());
 	}
 
-	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {
+	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s, OnboardingSession session) {
 		var geo = s.getGeolocation();
 		var ipDetails = geo == null || geo.getLookedUpAt() == null ? null
 				: new ConsoleRequestDetail.IpDetails(geo.getCountry(), geo.getCountryCode(), geo.getRegion(),
@@ -212,7 +217,17 @@ public class ConsoleRequestService {
 				s.getApproximateLocation(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
 				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice(),
 				geo == null ? null : geo.getStatus(), geo == null ? null : geo.getLatitude(),
-				geo == null ? null : geo.getLongitude(), ipDetails, s.getCapturedAt());
+				geo == null ? null : geo.getLongitude(), ipDetails, s.getCapturedAt(), toDeviceLocation(session));
+	}
+
+	private static ConsoleRequestDetail.DeviceLocation toDeviceLocation(OnboardingSession session) {
+		if (session == null || session.getDeviceLocationStatus() == null) {
+			return null;
+		}
+		var match = session.compareDeviceLocationWithIp();
+		return new ConsoleRequestDetail.DeviceLocation(session.getDeviceLocationStatus(), session.getDeviceCity(),
+				session.getDeviceCountryIso(), match == null ? null : match == OnboardingSession.LocationMatch.SAME_CITY,
+				session.getDeviceLocationCapturedAt());
 	}
 
 	private static String escapeLike(String text) {

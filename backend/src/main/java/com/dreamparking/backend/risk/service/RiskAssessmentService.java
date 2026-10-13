@@ -18,6 +18,7 @@ import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestEvent;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
+import com.dreamparking.backend.onboarding.repository.OnboardingSessionRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
 import com.dreamparking.backend.onboarding.repository.RequestSignalsRepository;
 import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
@@ -48,14 +49,17 @@ public class RiskAssessmentService {
 
 	private final RequestSignalsRepository signals;
 
+	private final OnboardingSessionRepository sessions;
+
 	public RiskAssessmentService(ScoreModelRepository models, RiskAssessmentRepository assessments,
 			RequestEventRepository events, IdentityDocumentRepository identityDocuments,
-			RequestSignalsRepository signals) {
+			RequestSignalsRepository signals, OnboardingSessionRepository sessions) {
 		this.models = models;
 		this.assessments = assessments;
 		this.events = events;
 		this.identityDocuments = identityDocuments;
 		this.signals = signals;
+		this.sessions = sessions;
 	}
 
 	/**
@@ -75,7 +79,9 @@ public class RiskAssessmentService {
 			ScoreModel model = models.findInForce()
 				.orElseThrow(() -> new InvalidStateException("There is no score model in force"));
 			var inputs = new ScoreEngine.Inputs(range, identityDocuments.findById(request.getId()).orElse(null),
-					signals.findById(request.getId()).orElse(null), LocalDate.now(EL_SALVADOR));
+					signals.findById(request.getId()).orElse(null),
+					sessions.findFirstByRequestIdOrderByStartedAtDesc(request.getId()).orElse(null),
+					LocalDate.now(EL_SALVADOR));
 			ScoreEngine.Result result = ScoreEngine.score(model, inputs);
 			RiskLevel level = model.levelOf(result.score());
 			assessment.setLevel(level);

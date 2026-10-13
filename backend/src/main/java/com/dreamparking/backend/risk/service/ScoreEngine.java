@@ -9,7 +9,9 @@ import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.service.DuiValidator;
+import com.dreamparking.backend.onboarding.entity.OnboardingSession;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 import com.dreamparking.backend.risk.entity.ScoreModel;
 import com.dreamparking.backend.risk.entity.enums.ScoreSignal;
@@ -23,7 +25,7 @@ import com.dreamparking.backend.risk.entity.enums.ScoreSignal;
 public final class ScoreEngine {
 
 	/** Signals with no way to be read yet; they are listed in the breakdown as not available. */
-	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.CITY, ScoreSignal.RNPN, ScoreSignal.LIVENESS,
+	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.RNPN, ScoreSignal.LIVENESS,
 			ScoreSignal.INTERNAL_LISTS);
 
 	private static final BigDecimal LOW_CONFIDENCE = new BigDecimal("0.70");
@@ -46,7 +48,7 @@ public final class ScoreEngine {
 
 	/** Everything the signals are read from; any part can be null while it has not been captured. */
 	public record Inputs(MonthlyAmountRange amountRange, IdentityDocument document, RequestSignals signals,
-			LocalDate today) {
+			OnboardingSession session, LocalDate today) {
 	}
 
 	public static Result score(ScoreModel model, Inputs inputs) {
@@ -56,10 +58,9 @@ public final class ScoreEngine {
 		contributions.add(typingPace(model, inputs.signals()));
 		contributions.add(device(model, inputs.signals()));
 		contributions.add(timeOfDay(model, inputs.signals()));
+		contributions.add(city(model, inputs.session()));
 		for (ScoreSignal signal : PENDING) {
-			String note = signal == ScoreSignal.CITY ? "Aún no disponible: llega con la ubicación de la solicitud"
-					: "Aún no disponible: llega en otro sprint";
-			contributions.add(new Contribution(signal, null, model.weightOf(signal), note));
+			contributions.add(new Contribution(signal, null, model.weightOf(signal), "Aún no disponible: llega en otro sprint"));
 		}
 		int total = contributions.stream().mapToInt(c -> c.points() == null ? 0 : c.points()).sum();
 		return new Result(Math.min(total, 100), List.copyOf(contributions));
@@ -155,6 +156,33 @@ public final class ScoreEngine {
 		}
 		return night ? contribution(model, ScoreSignal.TIME_OF_DAY, 1.0, "Nocturno: entre las 9 p. m. y las 5 a. m.")
 				: contribution(model, ScoreSignal.TIME_OF_DAY, 0.0, "Diurno");
+	}
+
+	/**
+	 * The city and country the phone reports (VDI-72) against the ones the IP resolves to: the same city adds nothing,
+	 * the same country but another city adds half the weight, another country the whole weight. A location the phone
+	 * reported but the IP cannot confirm adds a quarter. Without a location (not reported, or not available) the
+	 * signal adds nothing.
+	 */
+	private static Contribution city(ScoreModel model, OnboardingSession session) {
+		LocationStatus status = session == null ? null : session.getDeviceLocationStatus();
+		if (status == null) {
+			return unavailable(model, ScoreSignal.CITY, "Ubicación no capturada");
+		}
+		if (status == LocationStatus.UNAVAILABLE) {
+			return unavailable(model, ScoreSignal.CITY, "Ubicación no disponible");
+		}
+		String place = "%s, %s".formatted(session.getDeviceCity(), session.getDeviceCountryIso());
+		OnboardingSession.LocationMatch match = session.compareDeviceLocationWithIp();
+		if (match == null) {
+			return contribution(model, ScoreSignal.CITY, 0.25, place + "; no se pudo comparar con la ubicación de la IP");
+		}
+		return switch (match) {
+			case SAME_CITY -> contribution(model, ScoreSignal.CITY, 0.0, place + "; coincide con la IP");
+			case SAME_COUNTRY -> contribution(model, ScoreSignal.CITY, 0.5,
+					place + "; la IP apunta a otra ciudad del mismo país");
+			case DIFFERENT_COUNTRY -> contribution(model, ScoreSignal.CITY, 1.0, place + "; la IP apunta a otro país");
+		};
 	}
 
 	private static Contribution contribution(ScoreModel model, ScoreSignal signal, double severity, String observation) {

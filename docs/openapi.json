@@ -240,15 +240,15 @@
             "type" : "string"
           },
           "approximateLocation" : {
-            "description" : "Ubicación aproximada reportada por la app",
-            "example" : "San Salvador, El Salvador",
+            "description" : "Ciudad donde está el teléfono, con el permiso de la persona (VDI-72). Solo ciudad: ni coordenadas ni dirección. Va junto con `countryIso` y solo después de aceptar el aviso de privacidad",
+            "example" : "San Salvador",
             "maxLength" : 120,
             "minLength" : 0,
             "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
             "type" : "string"
           },
           "countryIso" : {
-            "description" : "País, ISO 3166-1 alfa-2",
+            "description" : "País, ISO 3166-1 alfa-2. Va junto con `approximateLocation`",
             "example" : "SV",
             "pattern" : "^[A-Za-z]{2}$",
             "type" : "string"
@@ -267,6 +267,11 @@
             "maxLength" : 80,
             "minLength" : 0,
             "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
+            "type" : "string"
+          },
+          "locationStatus" : {
+            "description" : "`UNAVAILABLE` cuando la persona negó el permiso o el teléfono no pudo leer la ubicación (VDI-72): la solicitud sigue y la ubicación queda como «no disponible», distinta de «todavía no capturada». `AVAILABLE` es opcional: se deduce de que vengan la ciudad y el país. Con `UNAVAILABLE` no se envían ni ciudad ni país",
+            "enum" : [ "AVAILABLE", "UNAVAILABLE" ],
             "type" : "string"
           },
           "operatingSystem" : {
@@ -574,6 +579,28 @@
         },
         "type" : "object"
       },
+      "ConsoleRequestDeviceLocation" : {
+        "properties" : {
+          "capturedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "city" : {
+            "type" : "string"
+          },
+          "countryIso" : {
+            "type" : "string"
+          },
+          "matchesIp" : {
+            "type" : "boolean"
+          },
+          "status" : {
+            "enum" : [ "AVAILABLE", "UNAVAILABLE" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ConsoleRequestDuiData" : {
         "properties" : {
           "birthDate" : {
@@ -854,6 +881,10 @@
           },
           "deviceFingerprint" : {
             "type" : "string"
+          },
+          "deviceLocation" : {
+            "$ref" : "#/components/schemas/ConsoleRequestDeviceLocation",
+            "description" : "Ciudad y país que reportó el teléfono (VDI-72); null si la app aún no reportó ubicación"
           },
           "ip" : {
             "type" : "string"

@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import com.dreamparking.backend.common.validation.FreeText;
 import com.dreamparking.backend.common.validation.SafeText;
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 
 /**
@@ -29,8 +30,11 @@ public record CaptureSignalsRequest(
 		@Schema(description = "Modelo del dispositivo", example = "iPhone 15") @Size(max = 80) @SafeText String deviceModel,
 		@Schema(description = "Sistema operativo", example = "iOS") @Size(max = 30) @SafeText String operatingSystem,
 		@Schema(description = "Versión de la app", example = "1.0.0+1") @Size(max = 20) @SafeText String appVersion,
-		@Schema(description = "Ubicación aproximada reportada por la app", example = "San Salvador, El Salvador") @Size(max = 120) @FreeText String approximateLocation,
-		@Schema(description = "País, ISO 3166-1 alfa-2", example = "SV") @Pattern(regexp = "^[A-Za-z]{2}$") String countryIso,
+		@Schema(description = "Ciudad donde está el teléfono, con el permiso de la persona (VDI-72). Solo ciudad: ni coordenadas ni dirección. Va junto con `countryIso` y solo después de aceptar el aviso de privacidad", example = "San Salvador") @Size(max = 120) @FreeText String approximateLocation,
+		@Schema(description = "País, ISO 3166-1 alfa-2. Va junto con `approximateLocation`", example = "SV") @Pattern(regexp = "^[A-Za-z]{2}$") String countryIso,
+		@Schema(description = "`UNAVAILABLE` cuando la persona negó el permiso o el teléfono no pudo leer la ubicación (VDI-72): "
+				+ "la solicitud sigue y la ubicación queda como «no disponible», distinta de «todavía no capturada». "
+				+ "`AVAILABLE` es opcional: se deduce de que vengan la ciudad y el país. Con `UNAVAILABLE` no se envían ni ciudad ni país") LocationStatus locationStatus,
 		@Schema(description = "Ritmo de escritura en caracteres por minuto; el servidor lo clasifica", example = "185") @Min(0) @Max(2000) Short typingSpeedCpm,
 		@Schema(description = "Tiempo por paso del formulario") @Valid @Size(max = 6) List<StepTiming> steps) {
 

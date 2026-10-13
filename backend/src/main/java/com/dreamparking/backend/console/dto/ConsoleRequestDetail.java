@@ -86,7 +86,19 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			Short typingSpeedCpm, TypingPace typingPace, Boolean nightTime, Long totalDurationSeconds,
 			Long requestsFromSameDevice, LocationStatus locationStatus, BigDecimal latitude, BigDecimal longitude,
 			IpDetails ipDetails,
-			@Schema(description = "Fecha y hora en que la app envió las señales por última vez") Instant capturedAt) {
+			@Schema(description = "Fecha y hora en que la app envió las señales por última vez") Instant capturedAt,
+			@Schema(description = "Ciudad y país que reportó el teléfono (VDI-72); null si la app aún no reportó ubicación") DeviceLocation deviceLocation) {
+	}
+
+	/**
+	 * Location the phone reported with the customer's permission (VDI-72). {@code status} {@code UNAVAILABLE} means
+	 * the customer denied the permission or the phone could not read it («Ubicación no disponible»); then {@code city}
+	 * and {@code countryIso} are null. {@code matchesIp} says whether the city is the one resolved from the IP, and is
+	 * null when either is missing. {@code capturedAt} is when the app reported it.
+	 */
+	@Schema(name = "ConsoleRequestDeviceLocation")
+	public record DeviceLocation(LocationStatus status, String city, String countryIso, Boolean matchesIp,
+			Instant capturedAt) {
 	}
 
 	/**

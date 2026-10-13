@@ -173,9 +173,17 @@ class TextFormatsTests {
 	}
 
 	@Test
-	void passwordsOnlyRejectControlCharacters() {
-		assertThat(violations(new Secret("<clave> con ' y \" 😀"))).isEmpty();
+	void passwordsAcceptSymbolsButNotControlCharacters() {
+		assertThat(violations(new Secret("<clave> con ' y \" ©®ñ"))).isEmpty();
 		assertThat(violations(new Secret("clave\u0000larga"))).hasSize(1);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "clave-larga-😀", "😀😀😀😀😀", "clave-👍🏽", "clave-🇸🇻", "clave-1⃣", "clave-©️",
+			"clave-a‍b", "clave-︎", "clave-☺" })
+	void passwordsRejectEmojisAndTheirGlueCharacters(String password) {
+		assertThat(violations(new Secret(password)))
+			.containsExactly("La contraseña no puede tener emojis ni caracteres de control");
 	}
 
 	private static Set<String> violations(Object bean) {

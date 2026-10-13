@@ -17,6 +17,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Synchronize;
 import org.hibernate.type.SqlTypes;
 
+import com.dreamparking.backend.onboarding.entity.enums.DeviceLocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 
 /** Session and device signals of a request, as shown in the console (view). */
@@ -69,6 +70,17 @@ public class RequestSignals {
 
 	@Column(name = "captured_at")
 	private Instant capturedAt;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "device_location_status", length = 12)
+	private DeviceLocationStatus deviceLocationStatus;
+
+	@Column(name = "device_location", length = 120)
+	private String deviceLocation;
+
+	@JdbcTypeCode(SqlTypes.CHAR)
+	@Column(name = "device_country_iso", length = 2)
+	private String deviceCountryIso;
 
 	/** Same columns as {@link OnboardingSession}; all null when the request has no session yet. */
 	@Embedded
@@ -128,6 +140,18 @@ public class RequestSignals {
 
 	public SessionGeolocation getGeolocation() {
 		return geolocation;
+	}
+
+	public DeviceLocationStatus getDeviceLocationStatus() {
+		return deviceLocationStatus;
+	}
+
+	public String getDeviceLocation() {
+		return deviceLocation;
+	}
+
+	public String getDeviceCountryIso() {
+		return deviceCountryIso;
 	}
 
 }

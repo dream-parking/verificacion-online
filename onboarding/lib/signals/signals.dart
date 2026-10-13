@@ -1,5 +1,6 @@
 import '../onboarding/application_form.dart';
 import 'device_fingerprint.dart';
+import 'device_location.dart';
 import 'interaction.dart';
 
 /// Signals captured during the request, in the format of `PUT /api/onboarding/requests/{id}/signals`.
@@ -8,6 +9,9 @@ import 'interaction.dart';
 /// That is why this whole object is always sent, with everything captured so far.
 class Signals {
   DeviceInfo? device;
+
+  /// Approximate location (VDI-73); `null` while the person has not decided on the permission.
+  DeviceLocation? location;
 
   /// Typing of the whole request (`typingSpeedCpm`).
   final typing = TypingRhythm();
@@ -24,6 +28,7 @@ class Signals {
 
   Map<String, Object?> toJson() {
     final d = device;
+    final l = location;
     final cpm = typing.cpm;
     final stepTimings = steps.toJson(typingSpeeds: {
       for (final MapEntry(key: screen, value: rhythm) in _typingByScreen.entries)
@@ -36,6 +41,7 @@ class Signals {
         'operatingSystem': d.operatingSystem,
         'appVersion': d.appVersion,
       },
+      ...?l?.toJson(),
       'typingSpeedCpm': ?cpm, // omitted while there are not enough keystrokes
       if (stepTimings.isNotEmpty) 'steps': stepTimings,
     };

@@ -297,7 +297,7 @@
             "type" : "string"
           },
           "approximateLocation" : {
-            "description" : "Ubicación aproximada reportada por la app",
+            "description" : "Ciudad y país que reporta el teléfono; solo se guarda si `deviceLocationStatus` es `AVAILABLE`",
             "example" : "San Salvador, El Salvador",
             "maxLength" : 120,
             "minLength" : 0,
@@ -305,7 +305,7 @@
             "type" : "string"
           },
           "countryIso" : {
-            "description" : "País, ISO 3166-1 alfa-2",
+            "description" : "País que reporta el teléfono, ISO 3166-1 alfa-2; solo se guarda si `deviceLocationStatus` es `AVAILABLE`",
             "example" : "SV",
             "pattern" : "^[A-Za-z]{2}$",
             "type" : "string"
@@ -316,6 +316,12 @@
             "maxLength" : 64,
             "minLength" : 0,
             "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
+            "type" : "string"
+          },
+          "deviceLocationStatus" : {
+            "description" : "Permiso de ubicación aproximada: `AVAILABLE` (concedido, con ciudad), `DENIED` (la persona no lo dio) o `UNAVAILABLE` (concedido, pero el teléfono no la obtuvo). Se omite si la persona aún no decidió",
+            "enum" : [ "AVAILABLE", "DENIED", "UNAVAILABLE" ],
+            "example" : "DENIED",
             "type" : "string"
           },
           "deviceModel" : {
@@ -891,7 +897,22 @@
           "device" : {
             "type" : "string"
           },
+          "deviceCountryIso" : {
+            "description" : "País que reportó el teléfono, ISO 3166-1 alfa-2",
+            "example" : "SV",
+            "type" : "string"
+          },
           "deviceFingerprint" : {
+            "type" : "string"
+          },
+          "deviceLocation" : {
+            "description" : "Ciudad y país que reportó el teléfono (solo con permiso)",
+            "example" : "San Salvador, El Salvador",
+            "type" : "string"
+          },
+          "deviceLocationStatus" : {
+            "description" : "Permiso de ubicación del teléfono: `DENIED` o `UNAVAILABLE` se muestran como «Ubicación no disponible»; null si la app no lo envió",
+            "enum" : [ "AVAILABLE", "DENIED", "UNAVAILABLE" ],
             "type" : "string"
           },
           "ip" : {

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../env.dart';
 import '../identity/identity_document.dart';
+import '../onboarding/application_form.dart';
 import '../signals/signals.dart';
 import 'catalogs.dart';
 
@@ -128,6 +129,24 @@ class OnboardingApi {
       ..files.add(http.MultipartFile.fromBytes('front', front, filename: 'front.jpg'))
       ..files.add(http.MultipartFile.fromBytes('back', back, filename: 'back.jpg'));
     return IdentityReading.fromJson(await _deliver(req));
+  }
+
+  /// DUI step (VDI-78): the data the person confirmed or corrected on «¿Leímos bien tus datos?». It completes the
+  /// step. The API keeps what was read next to what was confirmed and compares it with the basic data.
+  Future<void> confirmIdentityDocument(String requestId, {
+    required String dui,
+    required String firstNames,
+    required String lastNames,
+    required DateTime birthDate,
+    required DateTime expiryDate,
+  }) async {
+    await _send('PUT', '/api/onboarding/requests/$requestId/identity-document/confirmation', body: {
+      'dui': dui,
+      'firstNames': firstNames,
+      'lastNames': lastNames,
+      'birthDate': dateForApi(birthDate),
+      'expiryDate': dateForApi(expiryDate),
+    });
   }
 
   Future<Map<String, dynamic>> _send(String method, String path, {Object? body}) async {

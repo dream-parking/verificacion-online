@@ -76,6 +76,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   final _phone = TextEditingController();
   final _incomeSourceDetail = TextEditingController();
 
+  // DUI data the person confirms or corrects (VDI-78).
+  final _idDui = TextEditingController();
+  final _idFirstNames = TextEditingController();
+  final _idLastNames = TextEditingController();
+  final _idBirthDate = TextEditingController();
+  final _idExpiryDate = TextEditingController();
+
   late final OnboardingApi _api = widget.api ?? OnboardingApi();
   late final DeviceInfoSource _deviceInfo = widget.deviceInfo ?? PlatformDeviceInfoSource();
   var _form = ApplicationForm();
@@ -110,12 +117,26 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   String? _duiError;
   var _uploadingDui = false;
 
+  /// The person came from the confirmation to repeat a photo: the other one and the data are kept.
+  var _retakingDui = false;
+
   @override
   void dispose() {
-    for (final c in [_scroll, _firstNames, _lastNames, _dui, _phone, _incomeSourceDetail]) {
+    for (final c in [_scroll, _firstNames, _lastNames, _dui, _phone, _incomeSourceDetail, ..._idControllers]) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  List<TextEditingController> get _idControllers => [_idDui, _idFirstNames, _idLastNames, _idBirthDate, _idExpiryDate];
+
+  /// Shows in the DUI fields what the form holds.
+  void _syncIdControllers() {
+    _idDui.text = _form.idDui;
+    _idFirstNames.text = _form.idFirstNames;
+    _idLastNames.text = _form.idLastNames;
+    _idBirthDate.text = _form.idBirthDate;
+    _idExpiryDate.text = _form.idExpiryDate;
   }
 
   @override
@@ -135,10 +156,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
-  void _goTo(Screen s) {
+  void _goTo(Screen s, {bool keepDui = false}) {
     FocusScope.of(context).unfocus();
     setState(() {
       _screen = s;
+      if (s != Screen.identityDocument) _retakingDui = false;
       _submitFailed = false;
       _startError = null;
       _saveError = null;
@@ -146,7 +168,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     if (_scroll.hasClients) _scroll.jumpTo(0);
     // VDI-43: the step start stays in memory; it is only sent after the notice is accepted.
     _signals.steps.start(s, widget.clock());
-    if (s == Screen.identityDocument) _resetDuiCapture();
+    if (s == Screen.identityDocument && !keepDui) _resetDuiCapture();
     if (_signalsPending) unawaited(_sendSignals());
   }
 
@@ -158,11 +180,16 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   /// VDI-43: typing speed in the text fields (only after the notice is accepted).
   void _onTyped(String field, String text) {
-    if (_form.captureAllowed) _signals.recordTyping(_screen, field, text, widget.clock());
+    if (_form.captureAllowed) _signals.recordTyping(_signalStep, field, text, widget.clock());
   }
 
+  /// The DUI capture and its confirmation are one step for the API and the signals.
+  Screen get _signalStep => _signalStepOf(_screen);
+
+  static Screen _signalStepOf(Screen s) => s == Screen.identityConfirmation ? Screen.identityDocument : s;
+
   void _continue() {
-    _signals.steps.attempt(_screen);
+    _signals.steps.attempt(_signalStep);
     if (_screen == Screen.review) {
       _submit();
       return;
@@ -187,7 +214,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _saveAndContinue(_declareExpectedActivity);
       return;
     }
-    if (_screen == Screen.identityConfirmation) _completeStep(Screen.identityDocument);
+    if (_screen == Screen.identityConfirmation) {
+      _saveAndContinue(_confirmIdentity, conflictMessage: 'No pudimos guardar los datos de tu DUI. Vuelve a tomar las fotos e inténtalo de nuevo.');
+      return;
+    }
     _completeStep(_screen);
     _goTo(_next[_screen]!);
   }
@@ -199,6 +229,16 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         lastNames: normalizeName(_form.lastNames),
         dui: _form.dui,
         mobilePhone: _form.phone,
+      );
+
+  /// VDI-78: confirms the DUI data. The dates were already checked, so they always parse.
+  Future<void> _confirmIdentity() => _api.confirmIdentityDocument(
+        _form.id!,
+        dui: _form.idDui,
+        firstNames: normalizeName(_form.idFirstNames),
+        lastNames: normalizeName(_form.idLastNames),
+        birthDate: parseDate(_form.idBirthDate)!,
+        expiryDate: parseDate(_form.idExpiryDate)!,
       );
 
   /// VDI-47: saves the income source and range in the API.
@@ -223,6 +263,16 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _duiToCapture = const [DuiSide.front, DuiSide.back];
       _unreadable = null;
       _duiError = null;
+      _retakingDui = false;
+    });
+  }
+
+  /// VDI-78: «Repetir» on a photo of the confirmation: the camera asks for that side only.
+  void _repeatPhoto(DuiSide side) {
+    _goTo(Screen.identityDocument, keepDui: true);
+    setState(() {
+      _duiToCapture = [side];
+      _retakingDui = true;
     });
   }
 
@@ -249,6 +299,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       setState(() {
         _uploadingDui = false;
         _form.identityReading = reading;
+        _form.applyReading(reading);
+        _syncIdControllers();
+        _retakingDui = false;
       });
       _goTo(Screen.identityConfirmation);
     } on ApiException catch (e) {
@@ -282,7 +335,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   /// Saves the current step in the API and only moves on if it was saved.
-  Future<void> _saveAndContinue(Future<void> Function() save) async {
+  Future<void> _saveAndContinue(Future<void> Function() save, {String? conflictMessage}) async {
     final step = _screen;
     setState(() {
       _saving = true;
@@ -292,14 +345,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       await save();
       if (!mounted) return;
       setState(() => _saving = false);
-      _completeStep(step);
+      _completeStep(_signalStepOf(step));
       _goTo(_next[step]!);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
         _saving = false;
         _saveError = switch (e.status) {
-          409 => 'Tu solicitud ya fue enviada y no se puede modificar.',
+          409 => conflictMessage ?? 'Tu solicitud ya fue enviada y no se puede modificar.',
           400 => _invalidDataMessage(e.fields),
           _ => 'Revisa tu conexión a internet e inténtalo de nuevo.',
         };
@@ -314,6 +367,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       'lastNames': 'apellidos',
       'dui': 'DUI',
       'mobilePhone': 'celular',
+      'birthDate': 'fecha de nacimiento',
+      'expiryDate': 'fecha de vencimiento',
       'sourceDetail': 'origen de tus ingresos',
     };
     final names = [
@@ -428,7 +483,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   void _restart() {
-    for (final c in [_firstNames, _lastNames, _dui, _phone, _incomeSourceDetail]) {
+    for (final c in [_firstNames, _lastNames, _dui, _phone, _incomeSourceDetail, ..._idControllers]) {
       c.clear();
     }
     setState(() {
@@ -438,6 +493,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _unreadable = null;
       _duiError = null;
       _uploadingDui = false;
+      _retakingDui = false;
       _signals = Signals();
       _signalsPending = false;
       _resendSignals = false;
@@ -457,7 +513,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   @override
   Widget build(BuildContext context) {
-    final previous = _previous[_screen];
+    final previous = _previousScreen;
     final step = _stepNumber[_screen];
 
     // On Android the system "back" button goes to the previous step instead of closing the app.
@@ -508,6 +564,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
+  /// Back goes to the previous step; repeating a photo goes back to the confirmation it came from.
+  Screen? get _previousScreen =>
+      _screen == Screen.identityDocument && _retakingDui ? Screen.identityConfirmation : _previous[_screen];
+
   Widget _header(Screen? previous) {
     return SizedBox(
       height: 60,
@@ -534,6 +594,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final text = switch (_screen) {
       Screen.welcome => 'Empezar',
       Screen.review => 'Enviar solicitud',
+      Screen.identityConfirmation => 'Mis datos son correctos',
       _ => 'Continuar',
     };
     return Container(
@@ -758,30 +819,125 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  /// Temporary until VDI-78: shows what was read; the confirm-or-correct screen replaces it.
+  /// VDI-78: «¿Leímos bien tus datos?»: the five data read from the photos, to confirm or correct. What was not
+  /// read clearly is marked; each photo can be repeated.
   Widget _identityConfirmation() {
-    final r = _form.identityReading;
-    final failed = r == null || r.status == ReadingStatus.failed;
-    String show(Object? v) => v == null ? 'No se leyó' : '$v';
-    String day(DateTime? d) => d == null ? 'No se leyó' : d.toIso8601String().substring(0, 10);
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const ScreenTitle('¿Leímos bien tus datos?'),
+          const SizedBox(height: 8),
+          Text(
+            _form.readerFailed
+                ? 'No pudimos leer las fotos de tu DUI. Escribe tus datos tal como aparecen en él.'
+                : 'Los sacamos de las fotos de tu DUI. Corrige lo que no esté bien.',
+            style: AppText.body,
+          ),
           const SizedBox(height: 16),
-          if (failed)
-            const Text('No pudimos leer tus datos. Los escribirás en el siguiente paso.', style: AppText.body)
-          else ...[
-            Text('DUI: ${show(r.dui)}', style: AppText.body),
-            Text('Nombres: ${show(r.firstNames)}', style: AppText.body),
-            Text('Apellidos: ${show(r.lastNames)}', style: AppText.body),
-            Text('Nacimiento: ${day(r.birthDate)}', style: AppText.body),
-            Text('Vencimiento: ${day(r.expiryDate)}', style: AppText.body),
+          Row(
+            children: [
+              Expanded(child: _duiPhotoCard(DuiSide.front, 'Frente')),
+              const SizedBox(width: 12),
+              Expanded(child: _duiPhotoCard(DuiSide.back, 'Reverso')),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _idField('idDui', _idDui, 'Número de DUI', '00000000-0',
+              keyboardType: TextInputType.number, mask: formatDui, set: (v) => _form.idDui = v),
+          const SizedBox(height: 20),
+          _idField('idFirstNames', _idFirstNames, 'Nombres', 'Por ejemplo, Marta Alejandra',
+              limit: maxNameLength, set: (v) => _form.idFirstNames = v),
+          const SizedBox(height: 20),
+          _idField('idLastNames', _idLastNames, 'Apellidos', 'Por ejemplo, Rivas Cruz',
+              limit: maxNameLength, set: (v) => _form.idLastNames = v),
+          const SizedBox(height: 20),
+          _idField('idBirthDate', _idBirthDate, 'Fecha de nacimiento', 'dd/mm/aaaa',
+              keyboardType: TextInputType.number, mask: formatDate, set: (v) => _form.idBirthDate = v),
+          const SizedBox(height: 20),
+          _idField('idExpiryDate', _idExpiryDate, 'Vence el', 'dd/mm/aaaa',
+              keyboardType: TextInputType.number, mask: formatDate, set: (v) => _form.idExpiryDate = v),
+          if (_saveError != null) ...[
+            const SizedBox(height: 16),
+            _ConnectionError(title: 'No pudimos guardar los datos de tu DUI', message: _saveError!, onRetry: _continue),
           ],
         ],
       ),
+    );
+  }
+
+  /// A field of the DUI data; if the reader did not read it clearly, it says so below.
+  Widget _idField(
+    String field,
+    TextEditingController controller,
+    String label,
+    String placeholder, {
+    required void Function(String) set,
+    String Function(String)? mask,
+    TextInputType keyboardType = TextInputType.text,
+    int? limit,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LabeledTextField(
+          controller: controller,
+          label: label,
+          placeholder: placeholder,
+          keyboardType: keyboardType,
+          formatters: [if (mask != null) maskFormatter(mask), if (limit != null) LengthLimitingTextInputFormatter(limit)],
+          error: _errorFor(field),
+          onChanged: (v) {
+            _onTyped(field, v);
+            setState(() {
+              set(v);
+              _form.markEdited(field);
+            });
+          },
+        ),
+        if (_form.idUnclear.contains(field))
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.error_outline, size: 18, color: AppColors.errorDark),
+                SizedBox(width: 6),
+                Expanded(child: Text('No lo leímos con claridad. Revísalo.', style: AppText.error)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Thumbnail of a photo with «Repetir».
+  Widget _duiPhotoCard(DuiSide side, String label) {
+    final photo = _duiPhotos[side];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: AspectRatio(
+            aspectRatio: 1.586,
+            child: photo == null
+                ? const ColoredBox(color: AppColors.neutral200)
+                : Image.memory(photo, fit: BoxFit.cover, errorBuilder: (_, _, _) => const ColoredBox(color: AppColors.neutral200)),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(child: Text(label, style: AppText.bodyBold)),
+            LinkButton(
+              text: 'Repetir',
+              semanticLabel: 'Repetir la foto del ${side == DuiSide.front ? 'frente' : 'reverso'}',
+              onPressed: _busy ? () {} : () => _repeatPhoto(side),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

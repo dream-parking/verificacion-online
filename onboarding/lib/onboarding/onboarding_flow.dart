@@ -234,8 +234,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   /// Saves first names, last names, DUI and mobile number in the API.
   Future<void> _sendBasicData() => _api.sendBasicData(
         _form.id!,
-        firstNames: normalizeName(_form.firstNames),
-        lastNames: normalizeName(_form.lastNames),
+        firstNames: normalizePersonName(_form.firstNames),
+        lastNames: normalizePersonName(_form.lastNames),
         dui: _form.dui,
         mobilePhone: _form.phone,
       );
@@ -244,8 +244,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   Future<void> _confirmIdentity() => _api.confirmIdentityDocument(
         _form.id!,
         dui: _form.idDui,
-        firstNames: normalizeName(_form.idFirstNames),
-        lastNames: normalizeName(_form.idLastNames),
+        firstNames: normalizePersonName(_form.idFirstNames),
+        lastNames: normalizePersonName(_form.idLastNames),
         birthDate: parseDate(_form.idBirthDate)!,
         expiryDate: parseDate(_form.idExpiryDate)!,
       );
@@ -649,7 +649,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 ),
               ],
             )
-          : PrimaryButton(text: text, onPressed: _busy ? null : _continue),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_screen == Screen.basicData) ...const [_SavedNote(), SizedBox(height: 10)],
+                PrimaryButton(text: text, onPressed: _busy ? null : _continue),
+              ],
+            ),
     );
   }
 
@@ -729,6 +736,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             LabeledTextField(
               controller: _firstNames,
               label: 'Nombres',
+              helper: 'Hasta $maxNameLength caracteres.',
               placeholder: 'Por ejemplo, Marta Alejandra',
               autofillHints: const [AutofillHints.givenName],
               error: _errorFor('firstNames'),
@@ -742,6 +750,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             LabeledTextField(
               controller: _lastNames,
               label: 'Apellidos',
+              helper: 'Hasta $maxNameLength caracteres.',
               placeholder: 'Por ejemplo, Rivas Cruz',
               autofillHints: const [AutofillHints.familyName],
               error: _errorFor('lastNames'),
@@ -1464,6 +1473,23 @@ class _SummaryCard extends StatelessWidget {
           Text(line2, style: AppText.bodyMuted),
         ],
       ),
+    );
+  }
+}
+
+/// «Guardamos tu avance en cada paso.», above the button of the first step.
+class _SavedNote extends StatelessWidget {
+  const _SavedNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.save_outlined, size: 18, color: AppColors.muted),
+        SizedBox(width: 6),
+        Flexible(child: Text('Guardamos tu avance en cada paso.', style: AppText.small, textAlign: TextAlign.center)),
+      ],
     );
   }
 }

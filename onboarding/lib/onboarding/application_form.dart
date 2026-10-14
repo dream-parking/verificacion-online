@@ -38,18 +38,26 @@ const transactionTypeDescriptions = {
 /// Longest first or last names the API accepts (`BasicDataRequest`).
 const maxNameLength = 100;
 
-/// Same rule as the API (`Customer.NAME_PATTERN`): letters (accents and ñ included) in words separated by one space.
-final _namePattern = RegExp(r'^\p{L}+( \p{L}+)*$', unicode: true);
+/// Letters (accents and ñ included) in words joined by one space, hyphen or apostrophe, each between two letters:
+/// «Rivas-Cruz», «D'Aubuisson». VDI-88 makes the API accept the same.
+final _namePattern = RegExp(r"^\p{L}+([ '\-]\p{L}+)*$", unicode: true);
 
 /// Trims the name and leaves a single space between words, as the API expects it.
 String normalizeName(String raw) => raw.trim().replaceAll(RegExp(r'\s+'), ' ');
 
-/// Error message for first or last names; [missing] is shown when there is nothing to check yet.
-String _nameMessage(String raw, String missing) {
-  final name = normalizeName(raw);
+/// Trims the name, leaves a single space between words and writes every typographic apostrophe
+/// (the phone keyboards type ’) as the plain one the API expects.
+String normalizePersonName(String raw) => normalizeName(raw.replaceAll(RegExp('[’‘ʼ]'), "'"));
+
+/// Error message for first or last names ([what] is `nombres` or `apellidos`); [missing] is shown when there is
+/// nothing to check yet.
+String _nameMessage(String raw, String missing, String what) {
+  final name = normalizePersonName(raw);
   if (name.length < 2) return missing;
   if (name.length > maxNameLength) return 'Usa como máximo $maxNameLength caracteres.';
-  if (!_namePattern.hasMatch(name)) return 'Usa solo letras y espacios, sin números ni símbolos.';
+  if (!_namePattern.hasMatch(name)) {
+    return "Escribe tus $what solo con letras. También puedes usar espacios, apóstrofo (') o guion (-).";
+  }
   return '';
 }
 
@@ -166,22 +174,22 @@ class ApplicationForm {
   String transactionType = '';
   String amountRange = '';
 
-  String get fullName => normalizeName('$firstNames $lastNames');
+  String get fullName => normalizePersonName('$firstNames $lastNames');
 
   /// Error message per field; empty string when the field is valid.
   Map<String, String> messages() {
     return {
       'accepted': _acceptanceMessage(),
-      'firstNames': _nameMessage(firstNames, 'Escribe tus nombres.'),
-      'lastNames': _nameMessage(lastNames, 'Escribe tus apellidos.'),
+      'firstNames': _nameMessage(firstNames, 'Escribe tus nombres.', 'nombres'),
+      'lastNames': _nameMessage(lastNames, 'Escribe tus apellidos.', 'apellidos'),
       'dui': RegExp(r'^\d{8}-\d$').hasMatch(dui) ? '' : 'Escribe tu DUI con el formato 00000000-0.',
       // Mobile numbers in El Salvador start with 6 or 7 (those starting with 2 are landlines), same as the API.
       'phone': RegExp(r'^[67]\d{3}-\d{4}$').hasMatch(phone)
           ? ''
           : 'Escribe un celular de 8 dígitos que empiece con 6 o 7, por ejemplo 7845-2310.',
       'idDui': RegExp(r'^\d{8}-\d$').hasMatch(idDui) ? '' : 'Escribe tu DUI con el formato 00000000-0.',
-      'idFirstNames': _nameMessage(idFirstNames, 'Escribe tus nombres.'),
-      'idLastNames': _nameMessage(idLastNames, 'Escribe tus apellidos.'),
+      'idFirstNames': _nameMessage(idFirstNames, 'Escribe tus nombres.', 'nombres'),
+      'idLastNames': _nameMessage(idLastNames, 'Escribe tus apellidos.', 'apellidos'),
       'idBirthDate': _birthDateMessage(),
       'idExpiryDate': _expiryDateMessage(),
       'incomeSource': incomeSource.isNotEmpty ? '' : 'Elige de dónde vienen tus ingresos.',

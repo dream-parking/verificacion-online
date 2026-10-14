@@ -733,6 +733,9 @@
           "duiMatchesDeclared" : {
             "type" : "boolean"
           },
+          "everLookedInauthentic" : {
+            "type" : "boolean"
+          },
           "expired" : {
             "type" : "boolean"
           },
@@ -765,6 +768,17 @@
           },
           "read" : {
             "$ref" : "#/components/schemas/ConsoleRequestDuiData"
+          },
+          "rejectedConfirmations" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "rejectionReasons" : {
+            "items" : {
+              "enum" : [ "UNDER_AGE", "EXPIRY_BEFORE_BIRTH", "EXPIRED" ],
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "unreadableReason" : {
             "enum" : [ "BLURRY", "GLARE", "CROPPED", "TOO_DARK", "NOT_A_DUI", "WRONG_SIDES", "OTHER" ],
@@ -994,7 +1008,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },

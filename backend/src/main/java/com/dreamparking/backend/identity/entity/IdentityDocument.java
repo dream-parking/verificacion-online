@@ -5,6 +5,7 @@ import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -26,6 +27,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
+import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.entity.enums.UnreadableReason;
 import com.dreamparking.backend.identity.entity.enums.UnreadableSide;
@@ -35,7 +37,9 @@ import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 /**
  * The request's DUI (VDI-79), one per request: what was read from the last capture and what the customer confirmed
  * or corrected on the confirmation screen ({@link #confirm}). The confirmed data is compared with the basic data the
- * customer typed before, and again whenever the basic data changes ({@link #compareWithDeclared}).
+ * customer typed before, and again whenever the basic data changes ({@link #compareWithDeclared}). A new capture
+ * replaces the reading, but not the history the score uses: {@code attempts}, the rejected confirmations and whether
+ * some capture did not look authentic.
  */
 @Entity
 @Table(name = "identity_document")
@@ -127,6 +131,16 @@ public class IdentityDocument {
 	@Column(name = "corrected_fields", nullable = false)
 	private String[] correctedFields = new String[0];
 
+	@Column(name = "rejected_confirmations", nullable = false)
+	private short rejectedConfirmations;
+
+	@JdbcTypeCode(SqlTypes.ARRAY)
+	@Column(name = "rejection_reasons", nullable = false)
+	private String[] rejectionReasons = new String[0];
+
+	@Column(name = "ever_looked_inauthentic", nullable = false)
+	private boolean everLookedInauthentic;
+
 	@Column(name = "processed_at", nullable = false)
 	private Instant processedAt;
 
@@ -162,6 +176,9 @@ public class IdentityDocument {
 		this.expiryDate = read ? reading.expiryDate() : null;
 		this.gender = read ? reading.gender() : null;
 		this.looksAuthentic = reading == null ? null : reading.looksAuthentic();
+		if (Boolean.FALSE.equals(this.looksAuthentic)) {
+			this.everLookedInauthentic = true;
+		}
 		this.confidence = reading == null ? null : reading.confidence();
 		// New photos: what was confirmed for the previous ones no longer applies.
 		this.confirmedDui = null;
@@ -202,6 +219,14 @@ public class IdentityDocument {
 			addIfCorrected(corrected, "expiryDate", this.expiryDate, expiryDate);
 		}
 		this.correctedFields = corrected.toArray(String[]::new);
+	}
+
+	/** The customer tried to confirm an expired DUI or dates that do not agree; kept even if a later one passes. */
+	public void recordRejectedConfirmation(List<DuiDateProblem> problems) {
+		this.rejectedConfirmations = (short) Math.min(rejectedConfirmations + 1, Short.MAX_VALUE);
+		List<String> reasons = new ArrayList<>(List.of(rejectionReasons));
+		problems.stream().map(Enum::name).filter(r -> !reasons.contains(r)).forEach(reasons::add);
+		this.rejectionReasons = reasons.toArray(String[]::new);
 	}
 
 	/** Compares the confirmed DUI and names with the basic data; unknown until the customer confirms. */
@@ -357,6 +382,18 @@ public class IdentityDocument {
 
 	public List<String> getCorrectedFields() {
 		return List.of(correctedFields);
+	}
+
+	public short getRejectedConfirmations() {
+		return rejectedConfirmations;
+	}
+
+	public List<DuiDateProblem> getRejectionReasons() {
+		return Arrays.stream(rejectionReasons).map(DuiDateProblem::valueOf).toList();
+	}
+
+	public boolean isEverLookedInauthentic() {
+		return everLookedInauthentic;
 	}
 
 	public Instant getProcessedAt() {

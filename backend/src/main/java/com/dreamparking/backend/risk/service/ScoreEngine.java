@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
+import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.service.DuiValidator;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
@@ -27,6 +28,9 @@ public final class ScoreEngine {
 			ScoreSignal.INTERNAL_LISTS);
 
 	private static final BigDecimal LOW_CONFIDENCE = new BigDecimal("0.70");
+
+	/** From this many captures of the DUI photos, each one more adds to the score. */
+	private static final int REPEATED_CAPTURES = 3;
 
 	/** Highest ceiling (USD) of the declared monthly range for each severity step: up to 200, 500 and 1,000. */
 	private static final int[] AMOUNT_CEILINGS = { 200, 500, 1000 };
@@ -88,6 +92,10 @@ public final class ScoreEngine {
 			severity += 0.6;
 			findings.add("el documento no parece auténtico");
 		}
+		else if (document.isEverLookedInauthentic()) {
+			severity += 0.4;
+			findings.add("una captura anterior no parecía auténtica");
+		}
 		if (!DuiValidator.hasValidCheckDigit(document.getConfirmedDui())) {
 			severity += 0.4;
 			findings.add("el dígito verificador del DUI no es válido");
@@ -116,6 +124,18 @@ public final class ScoreEngine {
 		if (corrected > 0) {
 			severity += 0.05 * corrected;
 			findings.add(corrected == 1 ? "1 dato corregido" : corrected + " datos corregidos");
+		}
+		int rejected = document.getRejectedConfirmations();
+		if (rejected > 0) {
+			severity += Math.min(0.2 + 0.1 * (rejected - 1), 0.4);
+			String reasons = String.join(", ", document.getRejectionReasons().stream().map(DuiDateProblem::label).toList());
+			findings.add((rejected == 1 ? "1 confirmación rechazada" : rejected + " confirmaciones rechazadas")
+					+ (reasons.isEmpty() ? "" : " (" + reasons + ")"));
+		}
+		int extraCaptures = Math.min(document.getAttempts() - REPEATED_CAPTURES + 1, 4);
+		if (extraCaptures > 0) {
+			severity += 0.05 * extraCaptures;
+			findings.add("fotos del DUI capturadas %d veces".formatted(document.getAttempts()));
 		}
 		String observation = findings.isEmpty() ? "DUI legible; los datos coinciden con lo escrito"
 				: "DUI confirmado: " + String.join("; ", findings);

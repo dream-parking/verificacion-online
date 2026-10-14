@@ -92,6 +92,7 @@ class RiskScoreSignalsApiTests {
 		send(id, "basic-data", """
 				{"dui": "01234567-8", "firstNames": "Ana Sofía", "lastNames": "Pérez López", "mobilePhone": "7123-4567"}
 				""").andExpect(status().isOk());
+		DuiStep.complete(mvc, id, "01234567-8", "Ana Sofía", "Pérez López");
 		send(id, "income", "{\"sourceCode\": \"SALARIO\", \"rangeCode\": \"HASTA_500\"}")
 			.andExpect(status().isNoContent());
 		send(id, "expected-activity", """

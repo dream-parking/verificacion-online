@@ -263,7 +263,7 @@ class ProfileTrackingApiTests {
 
 	// ---------------------------------------------------------------- helpers
 
-	/** A request with privacy, basic data and income done: the next step is the expected activity. */
+	/** A request with privacy, basic data, DUI and income done: the next step is the expected activity. */
 	private String requestAtExpectedActivity() throws Exception {
 		String requestId = read(perform(post("/api/onboarding/requests")).andExpect(status().isCreated()), "$.id");
 		perform(put("/api/onboarding/requests/{id}/privacy-consent", requestId).content("""
@@ -274,6 +274,7 @@ class ProfileTrackingApiTests {
 				{"dui": "01234567-8", "firstNames": "Ana Sofía", "lastNames": "Pérez López", "mobilePhone": "7123-4567"}
 				"""))
 			.andExpect(status().isOk());
+		DuiStep.complete(app, requestId, "01234567-8", "Ana Sofía", "Pérez López");
 		perform(put("/api/onboarding/requests/{id}/income", requestId).content("""
 				{"sourceCode": "SALARIO", "rangeCode": "HASTA_500"}
 				"""))

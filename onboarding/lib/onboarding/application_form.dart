@@ -134,7 +134,9 @@ class ApplicationForm {
     final m = messages();
     idUnclear.addAll([
       for (final field in idFields)
-        if (!_idEdited.contains(field) && m[field]!.isNotEmpty) field,
+        // An expired date was read fine: the document is the problem, not the reading.
+        if (!_idEdited.contains(field) && (field == 'idExpiryDate' ? _expiryDateFormatMessage() : m[field]!).isNotEmpty)
+          field,
     ]);
   }
 
@@ -197,11 +199,23 @@ class ApplicationForm {
     return birth.isBefore(DateTime(now.year, now.month, now.day)) ? '' : 'La fecha de nacimiento debe ser anterior a hoy.';
   }
 
-  String _expiryDateMessage() {
+  /// Checks of the expiry date that tell the reader got it wrong or the person mistyped it.
+  String _expiryDateFormatMessage() {
     final expiry = parseDate(idExpiryDate);
     if (expiry == null) return 'Escribe la fecha de vencimiento como día/mes/año, por ejemplo 22/07/2031.';
     final birth = parseDate(idBirthDate);
     return birth != null && !expiry.isAfter(birth) ? 'La fecha de vencimiento debe ser posterior a la de nacimiento.' : '';
+  }
+
+  /// A DUI that already expired is not accepted; one that expires today is still valid. The message names the date
+  /// so the person can tell a misread date from an expired document.
+  String _expiryDateMessage() {
+    final problem = _expiryDateFormatMessage();
+    if (problem.isNotEmpty) return problem;
+    final now = DateTime.now();
+    return parseDate(idExpiryDate)!.isBefore(DateTime(now.year, now.month, now.day))
+        ? 'Tu DUI venció el $idExpiryDate. Para abrir tu cuenta necesitamos un DUI vigente.'
+        : '';
   }
 
   /// One message for both checkboxes of the privacy screen, naming what is missing.

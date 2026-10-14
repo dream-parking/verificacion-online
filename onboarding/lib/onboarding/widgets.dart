@@ -362,10 +362,13 @@ class FullLogo extends StatelessWidget {
 
 /// Numbered black circle for step lists.
 class NumberBadge extends StatelessWidget {
-  const NumberBadge(this.n, {super.key, this.size = 32});
+  const NumberBadge(this.n, {super.key, this.size = 32, this.soft = false});
 
   final int n;
   final double size;
+
+  /// Light green circle with a dark number, for the steps that are not highlighted.
+  final bool soft;
 
   @override
   Widget build(BuildContext context) {
@@ -373,8 +376,8 @@ class NumberBadge extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(color: AppColors.ink, shape: BoxShape.circle),
-      child: Text('$n', style: AppText.heading(size >= 32 ? 16 : 14, color: Colors.white)),
+      decoration: BoxDecoration(color: soft ? AppColors.brandSoft : AppColors.ink, shape: BoxShape.circle),
+      child: Text('$n', style: AppText.heading(size >= 32 ? 16 : 14, color: soft ? AppColors.ink : Colors.white)),
     );
   }
 }

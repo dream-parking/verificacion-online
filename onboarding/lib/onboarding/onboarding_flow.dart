@@ -1430,7 +1430,7 @@ class _Welcome extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Sin filas y sin ir a una agencia. Te toma unos 5 minutos.',
+                'Sin filas y sin ir a una agencia. Ten tu DUI a la mano: te toma unos 7 minutos.',
                 style: TextStyle(fontSize: 18, height: 26 / 18, color: Colors.white),
               ),
               const SizedBox(height: 20),
@@ -1443,7 +1443,7 @@ class _Welcome extends StatelessWidget {
                   children: [
                     const Icon(Icons.schedule, size: 20, color: AppColors.ink),
                     const SizedBox(width: 8),
-                    Text('Unos 5 minutos', style: AppText.heading(16)),
+                    Text('Unos 7 minutos', style: AppText.heading(16)),
                   ],
                 ),
               ),
@@ -1458,7 +1458,7 @@ class _Welcome extends StatelessWidget {
               const SectionTitle('Esto es lo que te vamos a pedir', size: 22),
               const SizedBox(height: 16),
               for (var i = 0; i < _steps.length; i++) ...[
-                IconRow(leading: NumberBadge(i + 1), title: _steps[i].$1, description: _steps[i].$2),
+                IconRow(leading: NumberBadge(i + 1, soft: true), title: _steps[i].$1, description: _steps[i].$2),
                 const SizedBox(height: 14),
               ],
             ],

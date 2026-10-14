@@ -313,7 +313,11 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> tapContinue(WidgetTester tester) => tap(tester, find.text('Continuar'));
+    /// Taps the main button of the screen: «Continuar», or «Aceptar y continuar» on the privacy notice.
+    Future<void> tapContinue(WidgetTester tester) {
+      final accept = find.text('Aceptar y continuar');
+      return tap(tester, accept.evaluate().isNotEmpty ? accept : find.text('Continuar'));
+    }
 
     /// Checks the privacy notice and the terms and conditions.
     Future<void> acceptNotice(WidgetTester tester) async {
@@ -839,6 +843,134 @@ void main() {
       });
     });
 
+    group('names with hyphen and apostrophe (VDI-89)', () {
+      Future<void> goToBasicData(WidgetTester tester, FakeApi fake) async {
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('Empezar'));
+        await acceptNotice(tester);
+        await tapContinue(tester);
+        await skipLocation(tester);
+      }
+
+      testWidgets('a compound surname with hyphen and apostrophe is accepted and sent with a plain apostrophe',
+          (tester) async {
+        final fake = FakeApi();
+        await goToBasicData(tester, fake);
+        await fillBasicData(tester);
+        await tester.enterText(find.byType(TextField).at(0), 'María-José');
+        await tester.enterText(find.byType(TextField).at(1), 'Rivas-Cruz  D’Aubuisson');
+        await tapContinue(tester);
+
+        expect(find.textContaining('solo con letras'), findsNothing);
+        final body = jsonDecode(fake.basicData.single.body) as Map<String, dynamic>;
+        expect(body['firstNames'], 'María-José');
+        expect(body['lastNames'], "Rivas-Cruz D'Aubuisson");
+      });
+
+      testWidgets('a symbol is rejected with the message of the design and nothing is sent', (tester) async {
+        final fake = FakeApi();
+        await goToBasicData(tester, fake);
+        await fillBasicData(tester);
+        await tester.enterText(find.byType(TextField).at(0), 'Marta Alej@ndra');
+        await tapContinue(tester);
+
+        expect(
+          find.text("Escribe tus nombres solo con letras. También puedes usar espacios, apóstrofo (') o guion (-)."),
+          findsOneWidget,
+        );
+        expect(fake.basicData, isEmpty);
+      });
+
+      testWidgets('it says up front that names go up to 100 characters, and the hint goes away with an error',
+          (tester) async {
+        await goToBasicData(tester, FakeApi());
+        expect(find.text('Hasta 100 caracteres.'), findsNWidgets(2), reason: 'under nombres and apellidos');
+        expect(find.text('Guardamos tu avance en cada paso.'), findsOneWidget);
+
+        await fillBasicData(tester);
+        await tester.enterText(find.byType(TextField).at(0), 'Ana2');
+        await tapContinue(tester);
+        expect(find.text('Hasta 100 caracteres.'), findsOneWidget, reason: 'the first field shows its error instead');
+      });
+
+      testWidgets('a hyphen at the end is rejected', (tester) async {
+        final fake = FakeApi();
+        await goToBasicData(tester, fake);
+        await fillBasicData(tester);
+        await tester.enterText(find.byType(TextField).at(1), 'Rivas-');
+        await tapContinue(tester);
+        expect(find.textContaining('Escribe tus apellidos solo con letras'), findsOneWidget);
+        expect(fake.basicData, isEmpty);
+      });
+    });
+
+    group('privacy notice (VDI-92)', () {
+      Future<void> goToNotice(WidgetTester tester, FakeApi fake) async {
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('Empezar'));
+      }
+
+      testWidgets('shows the version badge, the four data it collects and the closing text', (tester) async {
+        await goToNotice(tester, FakeApi());
+
+        expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
+        expect(find.text('Aviso aprobado por Legal · versión [X.Y]'), findsOneWidget);
+        expect(find.text('Mientras llenas tu solicitud, recopilamos algunos datos para protegerte contra el fraude:'),
+            findsOneWidget);
+        for (final (title, description) in [
+          ('Tu ubicación aproximada', 'La ciudad desde donde haces la solicitud, no tu dirección exacta.'),
+          ('El tipo de dispositivo', 'Modelo de teléfono y sistema, para reconocer si es el mismo en otra ocasión.'),
+          ('Cómo usas la aplicación', 'Por ejemplo, el tiempo que tardas en cada paso y tu ritmo al escribir.'),
+          ('Las fotos de tu DUI', 'Frente y reverso, guardadas de forma segura en tu expediente.'),
+        ]) {
+          expect(find.text(title), findsOneWidget, reason: title);
+          expect(find.text(description), findsOneWidget, reason: description);
+        }
+        expect(find.text('Leer el aviso de privacidad completo'), findsOneWidget);
+        expect(find.byType(Checkbox), findsNWidgets(2));
+      });
+
+      testWidgets('the button says «Aceptar y continuar» and the date and version are announced', (tester) async {
+        await goToNotice(tester, FakeApi());
+        expect(find.text('Aceptar y continuar'), findsOneWidget);
+        expect(find.text('Continuar'), findsNothing);
+        expect(find.text('Guardamos la fecha y la versión del aviso que aceptas.'), findsOneWidget);
+      });
+
+      testWidgets('without accepting both boxes it does not move on and names what is missing', (tester) async {
+        final fake = FakeApi();
+        await goToNotice(tester, fake);
+        await tap(tester, find.byType(Checkbox).at(0));
+        await tapContinue(tester);
+        expect(find.text('Para continuar necesitamos que aceptes los términos y condiciones.'), findsOneWidget);
+        expect(fake.starts, isEmpty);
+        expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
+      });
+
+      testWidgets('the full notice opens from the link, says it is provisional and closes', (tester) async {
+        await goToNotice(tester, FakeApi());
+        await tap(tester, find.text('Leer el aviso de privacidad completo'));
+
+        expect(find.text('Aviso de privacidad'), findsOneWidget);
+        expect(find.textContaining('texto provisional'), findsOneWidget);
+        expect(find.textContaining('versión [X.Y]'), findsWidgets);
+        expect(find.text('Las fotos de tu DUI'), findsWidgets);
+
+        await tap(tester, find.text('Cerrar'));
+        expect(find.text('Aviso de privacidad'), findsNothing);
+        expect(find.text('Aceptar y continuar'), findsOneWidget);
+      });
+
+      testWidgets('after accepting, the other screens keep «Continuar»', (tester) async {
+        await goToNotice(tester, FakeApi());
+        await acceptNotice(tester);
+        await tapContinue(tester);
+        await skipLocation(tester);
+        expect(find.text('Continuar'), findsOneWidget);
+        expect(find.text('Aceptar y continuar'), findsNothing);
+      });
+    });
+
     group('DUI capture (VDI-77)', () {
       Future<void> goToDui(WidgetTester tester, FakeApi fake, FakeCamera camera) async {
         await tester.pumpWidget(app(fake, camera: camera));
@@ -1249,7 +1381,10 @@ void main() {
         await tap(tester, confirmButton);
 
         expect(find.text('Escribe tu DUI con el formato 00000000-0.'), findsOneWidget);
-        expect(find.text('Usa solo letras y espacios, sin números ni símbolos.'), findsOneWidget);
+        expect(
+          find.text("Escribe tus nombres solo con letras. También puedes usar espacios, apóstrofo (') o guion (-)."),
+          findsOneWidget,
+        );
         expect(find.text('Escribe tus apellidos.'), findsOneWidget);
         expect(find.text('Escribe tu fecha de nacimiento como día/mes/año, por ejemplo 14/03/1991.'), findsOneWidget);
         expect(find.text('La fecha de vencimiento debe ser posterior a la de nacimiento.'), findsNothing,
@@ -1263,6 +1398,31 @@ void main() {
         await type(tester, 3, '01012999');
         await tap(tester, confirmButton);
         expect(find.text('La fecha de nacimiento debe ser anterior a hoy.'), findsOneWidget);
+      });
+
+      testWidgets('an expired DUI is not accepted: the message names the date and the person can correct a misread',
+          (tester) async {
+        final fake = FakeApi(identityResponses: [
+          (200, '{"status":"READ","attempts":1,"dui":"01234567-8","firstNames":"María José","lastNames":"Pérez López",'
+              '"birthDate":"1990-04-12","expiryDate":"2020-06-01"}'),
+        ]);
+        await goToConfirmation(tester, fake);
+
+        expect(field(tester, 4), '01/06/2020');
+        expect(find.text(notClear), findsNothing, reason: 'it was read clearly');
+        expect(find.textContaining('venció'), findsNothing, reason: 'the message appears when trying to continue');
+
+        await tap(tester, confirmButton);
+        expect(find.text('Tu DUI venció el 01/06/2020. Para abrir tu cuenta necesitamos un DUI vigente.'),
+            findsOneWidget);
+        expect(fake.identityConfirmations, isEmpty);
+        expect(find.text('Paso 2 de 5'), findsOneWidget);
+
+        await type(tester, 4, '01062029');
+        expect(find.textContaining('venció'), findsNothing);
+        await tap(tester, confirmButton);
+        expect(jsonDecode(fake.identityConfirmations.single.body)['expiryDate'], '2029-06-01');
+        expect(find.text('Paso 3 de 5'), findsOneWidget);
       });
 
       testWidgets('repeating the front takes only that photo and sends both to be read again', (tester) async {

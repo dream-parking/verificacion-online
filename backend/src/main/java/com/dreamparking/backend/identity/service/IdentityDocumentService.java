@@ -2,7 +2,10 @@ package com.dreamparking.backend.identity.service;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.UUID;
 
@@ -47,6 +50,8 @@ public class IdentityDocumentService {
 
 	static final String PNG = "image/png";
 
+	static final ZoneId EL_SALVADOR = ZoneId.of("America/El_Salvador");
+
 	private final OnboardingService onboardingService;
 
 	private final IdentityDocumentRepository documents;
@@ -59,15 +64,18 @@ public class IdentityDocumentService {
 
 	private final TransactionTemplate transactions;
 
+	private final Clock clock;
+
 	public IdentityDocumentService(OnboardingService onboardingService, IdentityDocumentRepository documents,
 			IdentityDocumentImageRepository images, DuiOcrClient ocr, DocumentCipher cipher,
-			TransactionTemplate transactions) {
+			TransactionTemplate transactions, Clock clock) {
 		this.onboardingService = onboardingService;
 		this.documents = documents;
 		this.images = images;
 		this.ocr = ocr;
 		this.cipher = cipher;
 		this.transactions = transactions;
+		this.clock = clock;
 	}
 
 	/** A decrypted photo for the console. */
@@ -122,11 +130,13 @@ public class IdentityDocumentService {
 	}
 
 	/**
-	 * The customer confirmed or corrected the data read from the DUI: completes the step. The confirmed data is
-	 * compared with the basic data; a difference is a risk signal, not an error.
+	 * The customer confirmed or corrected the data read from the DUI: completes the step. An expired DUI or dates
+	 * that do not agree are rejected ({@link DuiDates}). The confirmed data is compared with the basic data; a
+	 * difference is a risk signal, not an error.
 	 */
 	@Transactional
 	public OnboardingRequestResponse confirm(UUID requestId, ConfirmIdentityDocumentRequest body) {
+		DuiDates.check(body.birthDate(), body.expiryDate(), LocalDate.now(clock.withZone(EL_SALVADOR)));
 		OnboardingRequest request = withBasicData(requestId);
 		IdentityDocument document = documents.findById(requestId)
 			.filter(d -> d.getStatus() != OcrStatus.UNREADABLE)

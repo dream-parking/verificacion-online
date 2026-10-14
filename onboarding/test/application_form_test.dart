@@ -9,17 +9,35 @@ void main() {
   String firstNamesMessage(String value) => (ApplicationForm()..firstNames = value).messages()['firstNames']!;
   String lastNamesMessage(String value) => (ApplicationForm()..lastNames = value).messages()['lastNames']!;
 
-  group('first and last names (VDI-75)', () {
+  const firstNamesRule =
+      "Escribe tus nombres solo con letras. También puedes usar espacios, apóstrofo (') o guion (-).";
+  const lastNamesRule =
+      "Escribe tus apellidos solo con letras. También puedes usar espacios, apóstrofo (') o guion (-).";
+
+  group('first and last names (VDI-75, VDI-89)', () {
     test('accept letters with accents, ñ and spaces', () {
       expect(firstNamesMessage('María José'), isEmpty);
       expect(lastNamesMessage('Núñez Peña'), isEmpty);
     });
 
-    test('reject digits and special characters', () {
-      for (final value in ['Ana2', 'Ana+', 'Ana-María', 'Ana.', '<script>', r'Ana$%#', 'O\'Brien', 'Ana 😀']) {
-        expect(firstNamesMessage(value), 'Usa solo letras y espacios, sin números ni símbolos.', reason: value);
+    test('accept a hyphen or an apostrophe between letters: compound and foreign surnames', () {
+      for (final value in ['Rivas-Cruz', "D'Aubuisson", "Rivas-Cruz D'Aubuisson", 'Ana-María', "O'Brien", 'D’Aubuisson']) {
+        expect(lastNamesMessage(value), isEmpty, reason: value);
+        expect(firstNamesMessage(value), isEmpty, reason: value);
       }
-      expect(lastNamesMessage('Pérez 2#'), 'Usa solo letras y espacios, sin números ni símbolos.');
+    });
+
+    test('reject digits and special characters, with the message of the design', () {
+      for (final value in ['Ana2', 'Ana+', 'Ana.', '<script>', r'Ana$%#', 'Ana 😀', 'Ana_María', 'Ana/María', 'Alej@ndra']) {
+        expect(firstNamesMessage(value), firstNamesRule, reason: value);
+      }
+      expect(lastNamesMessage('Pérez 2#'), lastNamesRule);
+    });
+
+    test('a hyphen or apostrophe must sit between two letters', () {
+      for (final value in ['-Ana', 'Ana-', "'Ana", "Ana'", 'Ana--María', "Ana''María", 'Ana - María', 'Ana -María', "Ana-'María"]) {
+        expect(firstNamesMessage(value), firstNamesRule, reason: value);
+      }
     });
 
     test('reject more than 100 characters', () {
@@ -31,6 +49,12 @@ void main() {
       expect(firstNamesMessage('  '), 'Escribe tus nombres.');
       expect(lastNamesMessage('A'), 'Escribe tus apellidos.');
     });
+  });
+
+  test('normalizePersonName trims, leaves one space between words and writes the apostrophe as the API expects', () {
+    expect(normalizePersonName("  D’Aubuisson   Rivas-Cruz "), "D'Aubuisson Rivas-Cruz");
+    expect(normalizePersonName('ʼAna ‘María'), "'Ana 'María");
+    expect(normalizePersonName('  Marta   Alejandra '), 'Marta Alejandra');
   });
 
   test('normalizeName trims and leaves one space between words', () {

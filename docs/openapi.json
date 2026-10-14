@@ -476,13 +476,13 @@
           "currentPassword" : {
             "maxLength" : 200,
             "minLength" : 0,
-            "pattern" : "[^\\p{Cc}]*",
+            "pattern" : "(?:[©®]|[^\\p{Cc}\\p{IsExtended_Pictographic}\\p{IsEmoji_Modifier}\\x{1F1E6}-\\x{1F1FF}\\u200D\\uFE0E\\uFE0F\\u20E3\\x{E0020}-\\x{E007F}])*",
             "type" : "string"
           },
           "newPassword" : {
             "maxLength" : 200,
             "minLength" : 0,
-            "pattern" : "[^\\p{Cc}]*",
+            "pattern" : "(?:[©®]|[^\\p{Cc}\\p{IsExtended_Pictographic}\\p{IsEmoji_Modifier}\\x{1F1E6}-\\x{1F1FF}\\u200D\\uFE0E\\uFE0F\\u20E3\\x{E0020}-\\x{E007F}])*",
             "type" : "string"
           }
         },
@@ -1115,21 +1115,21 @@
             "example" : "Nuevo Analista",
             "maxLength" : 150,
             "minLength" : 0,
-            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+([ '\\-][A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           },
           "initialPassword" : {
             "description" : "Contraseña inicial, de 10 a 72 caracteres; la persona debe cambiarla al entrar",
             "maxLength" : 200,
             "minLength" : 0,
-            "pattern" : "[^\\p{Cc}]*",
+            "pattern" : "(?:[©®]|[^\\p{Cc}\\p{IsExtended_Pictographic}\\p{IsEmoji_Modifier}\\x{1F1E6}-\\x{1F1FF}\\u200D\\uFE0E\\uFE0F\\u20E3\\x{E0020}-\\x{E007F}])*",
             "type" : "string"
           },
           "jobTitle" : {
             "example" : "Analista de fraude y cumplimiento",
             "maxLength" : 120,
             "minLength" : 0,
-            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,()/&'\\-]*",
+            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,\\-/()]*",
             "type" : "string"
           },
           "role" : {
@@ -1348,7 +1348,7 @@
             "example" : "una-clave-larga-1",
             "maxLength" : 200,
             "minLength" : 0,
-            "pattern" : "[^\\p{Cc}]*",
+            "pattern" : "(?:[©®]|[^\\p{Cc}\\p{IsExtended_Pictographic}\\p{IsEmoji_Modifier}\\x{1F1E6}-\\x{1F1FF}\\u200D\\uFE0E\\uFE0F\\u20E3\\x{E0020}-\\x{E007F}])*",
             "type" : "string"
           }
         },
@@ -1777,7 +1777,7 @@
             "description" : "Contraseña nueva, de 10 a 72 caracteres",
             "maxLength" : 200,
             "minLength" : 0,
-            "pattern" : "[^\\p{Cc}]*",
+            "pattern" : "(?:[©®]|[^\\p{Cc}\\p{IsExtended_Pictographic}\\p{IsEmoji_Modifier}\\x{1F1E6}-\\x{1F1FF}\\u200D\\uFE0E\\uFE0F\\u20E3\\x{E0020}-\\x{E007F}])*",
             "type" : "string"
           }
         },
@@ -1998,13 +1998,13 @@
           "fullName" : {
             "maxLength" : 150,
             "minLength" : 0,
-            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+( [A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
+            "pattern" : "\\s*[A-Za-zÀ-ÖØ-öø-ž]+([ '\\-][A-Za-zÀ-ÖØ-öø-ž]+)*\\s*",
             "type" : "string"
           },
           "jobTitle" : {
             "maxLength" : 120,
             "minLength" : 0,
-            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,()/&'\\-]*",
+            "pattern" : "\\s*|\\s*[A-Za-zÀ-ÖØ-öø-ž][A-Za-zÀ-ÖØ-öø-ž0-9 .,\\-/()]*",
             "type" : "string"
           },
           "role" : {
@@ -4945,7 +4945,7 @@
     },
     "/api/onboarding/requests/{requestId}/identity-document/confirmation" : {
       "put" : {
-        "description" : "Lo que la persona confirma en la pantalla «¿Leímos bien tus datos?». Se guarda junto a lo leído (la consola ve qué se corrigió) y se compara con los datos básicos. Completa el paso del DUI.",
+        "description" : "Lo que la persona confirma en la pantalla «¿Leímos bien tus datos?». Se guarda junto a lo leído (la consola ve qué se corrigió) y se compara con los datos básicos. Completa el paso del DUI. Se rechaza un DUI vencido o con fechas que no concuerdan: la persona debe tener al menos 18 años y el vencimiento debe ser posterior al nacimiento.",
         "operationId" : "identityDocumentConfirm",
         "parameters" : [ {
           "in" : "path",
@@ -4985,7 +4985,7 @@
                 }
               }
             },
-            "description" : "Datos inválidos"
+            "description" : "Datos inválidos, DUI vencido o fechas que no concuerdan; `errors` nombra `birthDate` o `expiryDate`"
           },
           "404" : {
             "content" : {

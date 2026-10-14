@@ -39,10 +39,19 @@ class PasswordPolicyTests {
 
 	@ParameterizedTest
 	@ValueSource(strings = { "clave-larga-😀", "clave-larga-👍🏽", "clave-larga-🇸🇻", "clave-larga-‍",
-			"clave-larga-️", "clave-larga-1⃣" })
+			"clave-larga-️", "clave-larga-1⃣", "clave-larga-︎", "clave-larga-☺", "clave-larga-🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+			"😀😀😀😀😀", "😀😀😀😀😀😀😀😀😀😀", "🔑" })
 	void rejectsEmojisAndTheirGlueCharacters(String password) {
 		assertThatThrownBy(() -> PasswordPolicy.check(password, EMAIL)).isInstanceOf(InvalidInputException.class)
 				.hasMessageContaining("emojis");
+	}
+
+	@Test
+	void countsCharactersNotUtf16Units() {
+		// 𝒜 is outside the basic plane (two UTF-16 units) like an emoji: five of them are five characters.
+		assertThatThrownBy(() -> PasswordPolicy.check("𝒜".repeat(5), EMAIL)).isInstanceOf(InvalidInputException.class)
+				.hasMessageContaining("al menos");
+		assertThatCode(() -> PasswordPolicy.check("𝒜".repeat(10), EMAIL)).doesNotThrowAnyException();
 	}
 
 	@Test

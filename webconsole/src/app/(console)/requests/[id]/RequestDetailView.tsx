@@ -120,6 +120,8 @@ export function RequestDetailView({ id }: { id: string }) {
   const sent = r.status === "COMPLETED" && r.submittedAt;
   const s = r.signals;
 
+  const score = r.risk?.score;
+  const contributions = r.risk?.signals ?? [];
   const rule = r.risk?.ruleCode
     ? `Regla aplicada: ${r.risk.ruleCode}${r.risk.ruleName ? ` · ${r.risk.ruleName}` : ""}`
     : "Ninguna regla aplicada";
@@ -244,39 +246,83 @@ export function RequestDetailView({ id }: { id: string }) {
         </div>
       </div>
 
-      <div className="anim-stagger flex flex-wrap items-stretch gap-5">
-        <Card id="h-basicos" title="Datos básicos" className="flex-[1_1_420px]">
-          <KeyValue items={basic} />
-        </Card>
+      <div className="anim-stagger flex flex-wrap items-start gap-5">
+        <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-5">
+          <Card id="h-basicos" title="Datos básicos">
+            <KeyValue items={basic} />
+          </Card>
 
-        <Card id="h-score" title="Score de riesgo" className="flex-[1_1_420px]">
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <span className={`badge ${risk.cls} px-3.5 py-[5px] text-[15px]`}>{risk.label}</span>
-            <span className="text-sm text-muted">{rule}</span>
-          </div>
-          <p className="m-0 text-base leading-6">{explanationText}</p>
-          {r.risk?.evaluatedAt && (
-            <p className="mt-3 mb-0 text-sm text-muted">Evaluado el {formatDateTime(r.risk.evaluatedAt)}</p>
-          )}
-        </Card>
+          <Card
+            id="h-ing"
+            title="Ingresos declarados"
+            help="Registro con fecha y hora, para el expediente de Conozca a su Cliente."
+          >
+            {incomeData ? <KeyValue items={incomeData} /> : <p className="m-0 text-[15px] text-muted">{NOT_DECLARED}</p>}
+          </Card>
 
-        <Card
-          id="h-ing"
-          title="Ingresos declarados"
-          help="Registro con fecha y hora, para el expediente de Conozca a su Cliente."
-          className="flex-[1_1_420px]"
-        >
-          {incomeData ? <KeyValue items={incomeData} /> : <p className="m-0 text-[15px] text-muted">{NOT_DECLARED}</p>}
-        </Card>
+          <Card
+            id="h-mov"
+            title="Movimiento esperado en la cuenta"
+            help="Qué dinero dice la persona que manejará en la cuenta."
+          >
+            {activity ? <KeyValue items={activity} /> : <p className="m-0 text-[15px] text-muted">{NOT_DECLARED}</p>}
+          </Card>
+        </div>
 
-        <Card
-          id="h-mov"
-          title="Movimiento esperado en la cuenta"
-          help="Qué dinero dice la persona que manejará en la cuenta."
-          className="flex-[1_1_420px]"
-        >
-          {activity ? <KeyValue items={activity} /> : <p className="m-0 text-[15px] text-muted">{NOT_DECLARED}</p>}
-        </Card>
+        <div className="min-w-0 flex-[1_1_420px]">
+          <Card id="h-score" title="Score de riesgo">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              {score != null && (
+                <span className="font-display text-[28px] leading-none font-extrabold">
+                  {score}
+                  <span className="text-base font-semibold text-muted"> / 100</span>
+                </span>
+              )}
+              <span className={`badge ${risk.cls} px-3.5 py-[5px] text-[15px]`}>{risk.label}</span>
+              <span className="text-sm text-muted">
+                {score != null && r.risk?.modelVersion != null ? `Modelo de score v${r.risk.modelVersion}` : rule}
+              </span>
+            </div>
+            <p className="m-0 text-base leading-6">{explanationText}</p>
+            {score != null && contributions.length > 0 && (
+              <div className="mt-4">
+                <h3 className="mt-0 mb-2 text-[15px] font-bold">De dónde sale el score</h3>
+                <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                  {contributions.map((c) => (
+                    <li key={c.signal}>
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <span className="text-[15px] font-semibold">{c.name}</span>
+                        <span className="text-sm whitespace-nowrap">
+                          {c.maxPoints == null ? (
+                            <span className="text-muted">Sin peso aún</span>
+                          ) : c.points == null ? (
+                            <span className="text-muted">No disponible · 0 de {c.maxPoints}</span>
+                          ) : (
+                            <>
+                              <strong>{c.points}</strong> de {c.maxPoints} puntos
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      {c.maxPoints != null && (
+                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line-strong" aria-hidden="true">
+                          <div
+                            className="h-full rounded-full bg-ink-soft"
+                            style={{ width: `${Math.min(100, ((c.points ?? 0) / c.maxPoints) * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                      {c.observation && <p className="mt-1 mb-0 text-sm leading-5 text-muted">{c.observation}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {r.risk?.evaluatedAt && (
+              <p className="mt-3 mb-0 text-sm text-muted">Evaluado el {formatDateTime(r.risk.evaluatedAt)}</p>
+            )}
+          </Card>
+        </div>
       </div>
 
       <Card

@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
 import { LocationMap } from "./LocationMap";
+import { DocumentPhotos } from "./DocumentPhotos";
 import { errorMessage, useLoad } from "@/lib/console/hooks";
 import { apiFetch, type RequestDetail } from "@/lib/console/api";
 import {
@@ -315,6 +316,14 @@ export function RequestDetailView({ id }: { id: string }) {
             <LocationMap latitude={s!.latitude!} longitude={s!.longitude!} place={place} />
           </div>
         )}
+      </Card>
+
+      <Card
+        id="h-dui"
+        title="Fotos del DUI"
+        help="Se descifran al abrir esta pantalla y cada consulta queda en la auditoría de accesos."
+      >
+        <DocumentPhotos requestId={r.id} />
       </Card>
 
       <Card id="h-tl" title="Línea de tiempo" help={TIME_NOTE}>

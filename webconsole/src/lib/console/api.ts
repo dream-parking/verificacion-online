@@ -246,3 +246,22 @@ export async function fetchAllRequests(token: string): Promise<RequestSummary[]>
   );
   return [firstPage, ...rest].flatMap((p) => p.content);
 }
+
+export type DocumentSide = "FRONT" | "BACK";
+
+/** Decrypted DUI photo of a request, as an image Blob (VDI-80). Every call is recorded in the access audit. */
+export async function fetchDocumentPhoto(requestId: string, side: DocumentSide, token: string): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/console/requests/${encodeURIComponent(requestId)}/identity-document/${side}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new ApiError(0, "Sin conexión", "No pudimos conectar con el servidor.");
+  }
+  if (!res.ok) {
+    const problem = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, problem.title ?? res.statusText, problem.detail);
+  }
+  return res.blob();
+}

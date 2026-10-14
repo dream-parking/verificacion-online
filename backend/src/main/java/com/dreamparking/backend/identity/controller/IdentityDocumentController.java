@@ -58,8 +58,11 @@ public class IdentityDocumentController {
 	@ApiResponse(responseCode = "200", description = "Resumen de la solicitud con el paso completado")
 	@Operation(summary = "Paso 3: confirma o corrige los datos leídos del DUI",
 			description = "Lo que la persona confirma en la pantalla «¿Leímos bien tus datos?». Se guarda junto a lo leído (la "
-					+ "consola ve qué se corrigió) y se compara con los datos básicos. Completa el paso del DUI.")
-	@ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content)
+					+ "consola ve qué se corrigió) y se compara con los datos básicos. Completa el paso del DUI. Se rechaza un "
+					+ "DUI vencido o con fechas que no concuerdan: la persona debe tener al menos 18 años y el vencimiento "
+					+ "debe ser posterior al nacimiento.")
+	@ApiResponse(responseCode = "400", description = "Datos inválidos, DUI vencido o fechas que no concuerdan; "
+			+ "`errors` nombra `birthDate` o `expiryDate`", content = @Content)
 	@ApiResponse(responseCode = "404", description = "La solicitud no existe", content = @Content)
 	@ApiResponse(responseCode = "409", description = "Faltan los datos básicos o las fotos legibles del DUI, o la solicitud ya no está en progreso", content = @Content)
 	@PutMapping("/confirmation")

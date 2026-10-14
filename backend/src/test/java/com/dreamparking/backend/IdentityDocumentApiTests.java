@@ -316,6 +316,32 @@ class IdentityDocumentApiTests {
 	}
 
 	@Test
+	void rejectsAnExpiredDuiOrDatesThatDoNotAgreeAndTheStepDoesNotAdvance() throws Exception {
+		when(ocr.read(any(), any())).thenReturn(marta());
+		String id = withBasicData();
+		upload(id, FRONT, BACK).andExpect(status().isOk());
+		LocalDate today = LocalDate.now();
+
+		confirm(id, confirmation("1991-03-14", today.minusDays(2).toString())).andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors.expiryDate").value("El DUI está vencido"));
+		confirm(id, confirmation(today.minusYears(17).toString(), "2031-07-22")).andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors.birthDate").exists());
+		confirm(id, confirmation("1991-03-14", "1990-01-01")).andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errors.expiryDate")
+				.value("La fecha de vencimiento debe ser posterior a la de nacimiento"));
+		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.completedSteps").value(2));
+
+		confirm(id, CONFIRMATION).andExpect(status().isOk());
+	}
+
+	private static String confirmation(String birthDate, String expiryDate) {
+		return """
+				{"dui": "04567891-2", "firstNames": "Marta Alejandra", "lastNames": "Rivas Cruz",
+				 "birthDate": "%s", "expiryDate": "%s"}
+				""".formatted(birthDate, expiryDate);
+	}
+
+	@Test
 	void rejectsFilesThatAreNotJpegOrPngWithoutCallingTheProvider() throws Exception {
 		String id = withBasicData();
 

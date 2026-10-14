@@ -189,7 +189,8 @@ public class ConsoleRequestService {
 				d.getCorrectedFields(), d.getDuiMatchesDeclared(), d.getNamesMatchDeclared(),
 				dui == null ? null : DuiValidator.hasValidCheckDigit(dui),
 				d.effectiveExpiryDate() == null ? null : d.isExpired(LocalDate.now(EL_SALVADOR)), d.getLooksAuthentic(),
-				d.getConfidence(), identityDocumentImages.findSidesByRequestId(d.getRequestId()), d.getProcessedAt());
+				d.getConfidence(), identityDocumentImages.findSidesByRequestId(d.getRequestId()), d.getProcessedAt(),
+				d.getRejectedConfirmations(), d.getRejectionReasons(), d.isEverLookedInauthentic());
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {

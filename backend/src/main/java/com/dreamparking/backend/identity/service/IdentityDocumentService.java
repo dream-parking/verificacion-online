@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.dreamparking.backend.common.exception.InvalidFieldsException;
 import com.dreamparking.backend.common.exception.InvalidInputException;
 import com.dreamparking.backend.common.exception.InvalidStateException;
 import com.dreamparking.backend.common.exception.NotFoundException;
@@ -23,6 +25,7 @@ import com.dreamparking.backend.identity.dto.IdentityDocumentResponse;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
 import com.dreamparking.backend.identity.entity.IdentityDocumentImage;
 import com.dreamparking.backend.identity.entity.enums.DocumentSide;
+import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.ocr.DocumentPhoto;
 import com.dreamparking.backend.identity.ocr.DuiOcrClient;
@@ -130,24 +133,43 @@ public class IdentityDocumentService {
 	}
 
 	/**
-	 * The customer confirmed or corrected the data read from the DUI: completes the step. An expired DUI or dates
-	 * that do not agree are rejected ({@link DuiDates}). The confirmed data is compared with the basic data; a
-	 * difference is a risk signal, not an error.
+	 * The customer confirmed or corrected the data read from the DUI: completes the step. The confirmed data is
+	 * compared with the basic data; a difference is a risk signal, not an error.
+	 * @throws InvalidFieldsException when the DUI is expired or its dates do not agree ({@link DuiDates}); the
+	 * rejection is recorded before, so it stays on file and counts in the score
 	 */
-	@Transactional
 	public OnboardingRequestResponse confirm(UUID requestId, ConfirmIdentityDocumentRequest body) {
-		DuiDates.check(body.birthDate(), body.expiryDate(), LocalDate.now(clock.withZone(EL_SALVADOR)));
+		List<DuiDateProblem> problems = DuiDates.problems(body.birthDate(), body.expiryDate(),
+				LocalDate.now(clock.withZone(EL_SALVADOR)));
+		if (!problems.isEmpty()) {
+			transactions.executeWithoutResult(status -> recordRejected(requestId, problems));
+			throw DuiDates.rejection(problems);
+		}
+		return transactions.execute(status -> {
+			OnboardingRequest request = withBasicData(requestId);
+			IdentityDocument document = readableDocument(requestId);
+			Instant now = Instant.now();
+			document.confirm(body.dui(), body.firstNames().trim().replaceAll("\\s+", " "),
+					body.lastNames().trim().replaceAll("\\s+", " "), body.birthDate(), body.expiryDate(), now);
+			document.compareWithDeclared(request.getDui(), request.getFirstNames(), request.getLastNames());
+			onboardingService.completeIdentityDocument(request);
+			request.setLastActivityAt(now);
+			return OnboardingRequestResponse.of(request);
+		});
+	}
+
+	private void recordRejected(UUID requestId, List<DuiDateProblem> problems) {
 		OnboardingRequest request = withBasicData(requestId);
-		IdentityDocument document = documents.findById(requestId)
+		readableDocument(requestId).recordRejectedConfirmation(problems);
+		onboardingService.recordIdentityDocumentRejected(request, problems);
+		request.setLastActivityAt(Instant.now());
+	}
+
+	/** Data can only be confirmed once there are readable photos (or the reader was not available). */
+	private IdentityDocument readableDocument(UUID requestId) {
+		return documents.findById(requestId)
 			.filter(d -> d.getStatus() != OcrStatus.UNREADABLE)
 			.orElseThrow(() -> new InvalidStateException("Capture readable photos of the identity document first"));
-		Instant now = Instant.now();
-		document.confirm(body.dui(), body.firstNames().trim().replaceAll("\\s+", " "),
-				body.lastNames().trim().replaceAll("\\s+", " "), body.birthDate(), body.expiryDate(), now);
-		document.compareWithDeclared(request.getDui(), request.getFirstNames(), request.getLastNames());
-		onboardingService.completeIdentityDocument(request);
-		request.setLastActivityAt(now);
-		return OnboardingRequestResponse.of(request);
 	}
 
 	/** The DUI step comes after the basic data, which it is compared with. */

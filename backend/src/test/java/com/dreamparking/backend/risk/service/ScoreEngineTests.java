@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
+import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.ocr.DuiReading;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
@@ -153,6 +155,54 @@ class ScoreEngineTests {
 		assertThat(points(lowConfidence)).isEqualTo(2);
 		assertThat(points(corrected)).isEqualTo(1);
 		assertThat(points(typed)).isEqualTo(5);
+	}
+
+	@Test
+	void rejectedConfirmationsAddPointsAndNameTheirReasons() {
+		IdentityDocument once = confirmed(OcrStatus.READ, reading(VALID_DUI, true, "0.95"), VALID_DUI, "Ana", "Pérez");
+		once.recordRejectedConfirmation(List.of(DuiDateProblem.EXPIRED));
+		IdentityDocument twice = confirmed(OcrStatus.READ, reading(VALID_DUI, true, "0.95"), VALID_DUI, "Ana", "Pérez");
+		twice.recordRejectedConfirmation(List.of(DuiDateProblem.EXPIRED));
+		twice.recordRejectedConfirmation(List.of(DuiDateProblem.UNDER_AGE, DuiDateProblem.EXPIRED));
+		IdentityDocument many = confirmed(OcrStatus.READ, reading(VALID_DUI, true, "0.95"), VALID_DUI, "Ana", "Pérez");
+		for (int i = 0; i < 6; i++) {
+			many.recordRejectedConfirmation(List.of(DuiDateProblem.EXPIRED));
+		}
+
+		assertThat(points(once)).isEqualTo(4);
+		assertThat(points(twice)).isEqualTo(6);
+		assertThat(points(many)).isEqualTo(8);
+		assertThat(contribution(ScoreEngine.score(model, inputs(null, twice, null)), ScoreSignal.IDENTITY_DOCUMENT)
+			.observation()).contains("2 confirmaciones rechazadas (DUI vencido, menor de 18 años)");
+	}
+
+	@Test
+	void aCaptureThatDidNotLookAuthenticCountsEvenIfALaterOneDid() {
+		IdentityDocument document = new IdentityDocument(null);
+		document.recordReading(OcrStatus.READ, reading(VALID_DUI, false, "0.95"), null, "model", Instant.now());
+		document.recordReading(OcrStatus.READ, reading(VALID_DUI, true, "0.95"), null, "model", Instant.now());
+		document.confirm(VALID_DUI, "Ana", "Pérez", LocalDate.of(1990, 1, 1), LocalDate.of(2031, 1, 1), Instant.now());
+		document.compareWithDeclared(VALID_DUI, "Ana", "Pérez");
+
+		Contribution contribution = contribution(ScoreEngine.score(model, inputs(null, document, null)),
+				ScoreSignal.IDENTITY_DOCUMENT);
+
+		assertThat(contribution.points()).isEqualTo(8);
+		assertThat(contribution.observation()).contains("una captura anterior no parecía auténtica")
+			.doesNotContain("el documento no parece auténtico");
+	}
+
+	@ParameterizedTest
+	@CsvSource({ "1, 0", "2, 0", "3, 1", "5, 3", "6, 4", "10, 4" })
+	void fromTheThirdCaptureEachOneAddsAPoint(int captures, int points) {
+		IdentityDocument document = new IdentityDocument(null);
+		for (int i = 0; i < captures; i++) {
+			document.recordReading(OcrStatus.READ, reading(VALID_DUI, true, "0.95"), null, "model", Instant.now());
+		}
+		document.confirm(VALID_DUI, "Ana", "Pérez", LocalDate.of(1990, 1, 1), LocalDate.of(2031, 1, 1), Instant.now());
+		document.compareWithDeclared(VALID_DUI, "Ana", "Pérez");
+
+		assertThat(points(document)).isEqualTo(points);
 	}
 
 	@Test

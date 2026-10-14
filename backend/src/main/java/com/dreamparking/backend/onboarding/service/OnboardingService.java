@@ -47,7 +47,7 @@ import com.dreamparking.backend.risk.service.RiskAssessmentService;
  * Steps of the mobile onboarding flow: privacy notice → basic data → identity document (DUI) → income → expected
  * activity → submit. Steps can be saved again while the request is in progress; {@code completedSteps} only advances
  * in order, and the request can only be submitted once the five steps are done. The DUI step is captured and
- * confirmed through {@code IdentityDocumentService}; until the app has those screens it can be made optional
+ * confirmed through {@code IdentityDocumentService}. It is required; only tests or local runs make it optional
  * ({@code app.onboarding.identity-document-required=false}), and then the income step skips it. The time spent on each step is measured by
  * the app and stored by {@link SignalsService}: this service only tracks the progress.
  */

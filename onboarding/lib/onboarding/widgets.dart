@@ -431,14 +431,15 @@ class ColorHeader extends StatelessWidget {
 
 /// Screen title (h1).
 class ScreenTitle extends StatelessWidget {
-  const ScreenTitle(this.text, {super.key, this.size = 28});
+  const ScreenTitle(this.text, {super.key, this.size = 28, this.color = AppColors.ink});
 
   final String text;
   final double size;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(header: true, child: Text(text, style: AppText.heading(size, height: 1.15)));
+    return Semantics(header: true, child: Text(text, style: AppText.heading(size, color: color, height: 1.15)));
   }
 }
 

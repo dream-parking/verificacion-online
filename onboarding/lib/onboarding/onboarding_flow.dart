@@ -544,6 +544,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   Widget build(BuildContext context) {
     final previous = _previousScreen;
     final step = _stepNumber[_screen];
+    final capturing = _capturingDui;
 
     // On Android the system "back" button goes to the previous step instead of closing the app.
     return PopScope(
@@ -551,7 +552,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && previous != null && !_busy) _goTo(previous);
       },
-      child: Scaffold(
+      // The camera screen is dark and takes the whole screen: the status bar blends in with light icons.
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarIconBrightness: capturing ? Brightness.light : Brightness.dark,
+          statusBarBrightness: capturing ? Brightness.dark : Brightness.light,
+        ),
+        child: Scaffold(
+        backgroundColor: capturing ? DuiCaptureView.background : null,
         body: SafeArea(
           bottom: false,
           child: Stack(
@@ -559,8 +567,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               Column(
                 children: [
                   // On the welcome screen the brand is shown large (full logo), not in the header.
-                  if (_screen != Screen.welcome) _header(previous),
-                  if (step != null) StepProgress(step: step),
+                  if (_screen != Screen.welcome && !capturing) _header(previous),
+                  if (step != null && !capturing) StepProgress(step: step),
                   Expanded(
                     // The camera takes all the space; the other screens scroll.
                     child: _capturingDui
@@ -591,6 +599,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -866,6 +875,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         camera: widget.camera,
         sides: _duiToCapture,
         onCaptured: _onDuiCaptured,
+        onBack: _busy || _previousScreen == null ? null : () => _goTo(_previousScreen!),
       );
 
   /// Unreadable photos (what happened, how to take them better) or an error sending them.

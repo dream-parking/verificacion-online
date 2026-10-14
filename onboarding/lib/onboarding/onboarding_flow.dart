@@ -234,8 +234,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   /// Saves first names, last names, DUI and mobile number in the API.
   Future<void> _sendBasicData() => _api.sendBasicData(
         _form.id!,
-        firstNames: normalizeName(_form.firstNames),
-        lastNames: normalizeName(_form.lastNames),
+        firstNames: normalizePersonName(_form.firstNames),
+        lastNames: normalizePersonName(_form.lastNames),
         dui: _form.dui,
         mobilePhone: _form.phone,
       );
@@ -244,8 +244,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   Future<void> _confirmIdentity() => _api.confirmIdentityDocument(
         _form.id!,
         dui: _form.idDui,
-        firstNames: normalizeName(_form.idFirstNames),
-        lastNames: normalizeName(_form.idLastNames),
+        firstNames: normalizePersonName(_form.idFirstNames),
+        lastNames: normalizePersonName(_form.idLastNames),
         birthDate: parseDate(_form.idBirthDate)!,
         expiryDate: parseDate(_form.idExpiryDate)!,
       );
@@ -625,6 +625,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final text = switch (_screen) {
       Screen.welcome => 'Empezar',
       Screen.review => 'Enviar solicitud',
+      Screen.privacy => PrivacyNotice.acceptButton,
       Screen.identityConfirmation => 'Mis datos son correctos',
       _ => 'Continuar',
     };
@@ -649,7 +650,18 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 ),
               ],
             )
-          : PrimaryButton(text: text, onPressed: _busy ? null : _continue),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_screen == Screen.basicData) ...const [_SavedNote(), SizedBox(height: 10)],
+                PrimaryButton(text: text, onPressed: _busy ? null : _continue),
+                if (_screen == Screen.privacy) ...const [
+                  SizedBox(height: 10),
+                  Text(PrivacyNotice.recordedNote, style: AppText.small, textAlign: TextAlign.center),
+                ],
+              ],
+            ),
     );
   }
 
@@ -677,19 +689,22 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         children: [
           const ScreenTitle(PrivacyNotice.title),
           const SizedBox(height: 12),
+          const _VersionBadge(),
+          const SizedBox(height: 16),
           const Text(PrivacyNotice.intro, style: AppText.body),
           const SizedBox(height: 20),
-          for (final (icon, title, description) in PrivacyNotice.signals) ...[
+          for (final item in PrivacyNotice.signals) ...[
             IconRow(
-              leading: Icon(icon, size: 32, color: AppColors.brandGreen),
-              title: title,
-              description: description,
+              leading: _NoticeIcon(item),
+              title: item.title,
+              description: item.description,
             ),
             const SizedBox(height: 16),
           ],
+          LinkButton(text: PrivacyNotice.readFullNotice, onPressed: _showFullNotice),
           const SizedBox(height: 8),
-          const Text(PrivacyNotice.closing, style: AppText.body),
-          const SizedBox(height: 16),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 8),
           // Once the request exists, the consent is already recorded: it cannot be unchecked.
           _AcceptanceCheckbox(
             text: PrivacyNotice.acceptance,
@@ -715,6 +730,52 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
+  /// The full notice, in a sheet over the screen. Provisional text until Legal approves it.
+  void _showFullNotice() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        builder: (context, scroll) => Column(
+          children: [
+            Expanded(
+              child: ListView(
+                controller: scroll,
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                children: [
+                  const ScreenTitle(PrivacyNotice.fullTitle, size: 24),
+                  const SizedBox(height: 12),
+                  const _VersionBadge(),
+                  const SizedBox(height: 16),
+                  const InfoBox(highlight: 'Texto provisional.', text: PrivacyNotice.fullProvisional),
+                  const SizedBox(height: 16),
+                  const Text(PrivacyNotice.intro, style: AppText.body),
+                  const SizedBox(height: 16),
+                  for (final item in PrivacyNotice.signals) ...[
+                    IconRow(leading: _NoticeIcon(item), title: item.title, description: item.description),
+                    const SizedBox(height: 14),
+                  ],
+                  const Text(PrivacyNotice.fullPurpose, style: AppText.body),
+                  const SizedBox(height: 8),
+                  const Text(PrivacyNotice.closing, style: AppText.body),
+                ],
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(24, 8, 24, 16 + MediaQuery.paddingOf(context).bottom),
+              child: PrimaryButton(text: 'Cerrar', onPressed: () => Navigator.of(context).pop()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------- 3. Basic data
 
   Widget _basicData() {
@@ -729,6 +790,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             LabeledTextField(
               controller: _firstNames,
               label: 'Nombres',
+              helper: 'Hasta $maxNameLength caracteres.',
               placeholder: 'Por ejemplo, Marta Alejandra',
               autofillHints: const [AutofillHints.givenName],
               error: _errorFor('firstNames'),
@@ -742,6 +804,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             LabeledTextField(
               controller: _lastNames,
               label: 'Apellidos',
+              helper: 'Hasta $maxNameLength caracteres.',
               placeholder: 'Por ejemplo, Rivas Cruz',
               autofillHints: const [AutofillHints.familyName],
               error: _errorFor('lastNames'),
@@ -1464,6 +1527,69 @@ class _SummaryCard extends StatelessWidget {
           Text(line2, style: AppText.bodyMuted),
         ],
       ),
+    );
+  }
+}
+
+/// «Guardamos tu avance en cada paso.», above the button of the first step.
+class _SavedNote extends StatelessWidget {
+  const _SavedNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.save_outlined, size: 18, color: AppColors.muted),
+        SizedBox(width: 6),
+        Flexible(child: Text('Guardamos tu avance en cada paso.', style: AppText.small, textAlign: TextAlign.center)),
+      ],
+    );
+  }
+}
+
+/// «Aviso aprobado por Legal · versión [X.Y]» (provisional until Legal approves the notice).
+class _VersionBadge extends StatelessWidget {
+  const _VersionBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: const ShapeDecoration(color: AppColors.brandSoft, shape: StadiumBorder()),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.verified_user_outlined, size: 18, color: AppColors.brandGreen),
+            SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                PrivacyNotice.badge,
+                style: TextStyle(fontSize: 14, height: 1.3, fontWeight: FontWeight.w700, color: AppColors.brandGreen),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Round icon of a data item of the notice; the DUI photos use the blue tint.
+class _NoticeIcon extends StatelessWidget {
+  const _NoticeIcon(this.item);
+
+  final NoticeItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: item.document ? AppColors.blueSoft : AppColors.brandSoft),
+      child: Icon(item.icon, size: 24, color: item.document ? AppColors.blue : AppColors.brandGreen),
     );
   }
 }

@@ -143,6 +143,7 @@ class LabeledTextField extends StatelessWidget {
     required this.placeholder,
     required this.error,
     this.label,
+    this.helper,
     this.keyboardType = TextInputType.text,
     this.autofillHints,
     this.formatters = const [],
@@ -151,6 +152,9 @@ class LabeledTextField extends StatelessWidget {
 
   final TextEditingController controller;
   final String? label;
+
+  /// Short hint under the field; it gives way to the error when there is one.
+  final String? helper;
   final String placeholder;
   final String error;
   final TextInputType keyboardType;
@@ -184,7 +188,10 @@ class LabeledTextField extends StatelessWidget {
             focusedBorder: hasError ? line(AppColors.error, 2) : line(AppColors.blue, 2),
           ),
         ),
-        if (hasError) ErrorText(error),
+        if (hasError)
+          ErrorText(error)
+        else if (helper != null)
+          Padding(padding: const EdgeInsets.only(top: 6), child: Text(helper!, style: AppText.small)),
       ],
     );
   }

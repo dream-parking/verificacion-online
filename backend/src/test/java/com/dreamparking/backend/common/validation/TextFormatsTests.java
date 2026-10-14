@@ -26,6 +26,9 @@ class TextFormatsTests {
 	record Name(@PersonName String value) {
 	}
 
+	record User(@UserName String value) {
+	}
+
 	record Title(@JobTitle String value) {
 	}
 
@@ -80,8 +83,8 @@ class TextFormatsTests {
 
 	@ParameterizedTest
 	@ValueSource(strings = { "Analista de fraude y cumplimiento", "Jefa de Riesgo (nivel 2)", "Oficial KYC/AML",
-			"Gerente de Operaciones & TI", "Analista Sr.", "Coordinadora de área - Región Occidental", " Auditor ",
-			"Técnico d'Aubuisson" })
+			"Gerente de Operaciones, TI", "Analista Sr.", "Coordinadora de área - Región Occidental", " Auditor ",
+			"Técnico en Ñandutí 3" })
 	void jobTitlesStartWithALetterAndUseLittlePunctuation(String title) {
 		assertThat(violations(new Title(title))).isEmpty();
 	}
@@ -89,10 +92,26 @@ class TextFormatsTests {
 	@ParameterizedTest
 	@ValueSource(strings = { "12345", "1er Analista", "#1 @ 50% *_+", "¿Analista?", "¡Jefe!", "Analista $$$",
 			"Analista_fraude", "Analista 😀", "<b>Analista</b>", "Аналитик", "经理", "(Analista)", "-Analista",
+			"Operaciones & TI", "Técnico d'Aubuisson", "Analista; fraude",
 			"Analista\u0000", "Analista\nSenior", "Ana\u202Elisis", "“Analista”", "Analista: fraude" })
 	void jobTitlesRejectNumbersAloneSymbolsAndOtherAlphabets(String title) {
 		assertThat(violations(new Title(title))).containsExactly(
-				"Debe empezar con una letra; solo se permiten letras, números, espacios y . , ( ) / & - '");
+				"Debe empezar con una letra; solo se permiten letras, números, espacios y . , - / ( )");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Marta Alejandra", "José Ñúñez", "María-José Rivas", "Ana O'Brien", "Zoë d'Aubuisson",
+			" Ana Pérez " })
+	void userNamesAreLettersWithSpacesApostrophesAndHyphens(String name) {
+		assertThat(violations(new User(name))).isEmpty();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Juan2", "Ana 😀", "Robert'); DROP TABLE users;--", "<b>Ana</b>", "Ana  María", "Ana--José",
+			"'Ana", "Ana-", "Ana - José", "J. Pérez", "Ana_María", "Иван", "李明", "Mª José", "Ana’s" })
+	void userNamesRejectDigitsSymbolsAndOtherAlphabets(String name) {
+		assertThat(violations(new User(name)))
+			.containsExactly("Solo se permiten letras (incluidas tildes y ñ), espacios, apóstrofo (') y guion (-)");
 	}
 
 	@Test
@@ -173,9 +192,17 @@ class TextFormatsTests {
 	}
 
 	@Test
-	void passwordsOnlyRejectControlCharacters() {
-		assertThat(violations(new Secret("<clave> con ' y \" 😀"))).isEmpty();
+	void passwordsAcceptSymbolsButNotControlCharacters() {
+		assertThat(violations(new Secret("<clave> con ' y \" ©®ñ"))).isEmpty();
 		assertThat(violations(new Secret("clave\u0000larga"))).hasSize(1);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "clave-larga-😀", "😀😀😀😀😀", "clave-👍🏽", "clave-🇸🇻", "clave-1⃣", "clave-©️",
+			"clave-a‍b", "clave-︎", "clave-☺" })
+	void passwordsRejectEmojisAndTheirGlueCharacters(String password) {
+		assertThat(violations(new Secret(password)))
+			.containsExactly("La contraseña no puede tener emojis ni caracteres de control");
 	}
 
 	private static Set<String> violations(Object bean) {

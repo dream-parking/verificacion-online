@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -21,6 +22,7 @@ import com.dreamparking.backend.common.exception.InvalidStateException;
 import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.customer.entity.Customer;
 import com.dreamparking.backend.customer.service.CustomerService;
+import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
 import com.dreamparking.backend.onboarding.dto.BasicDataRequest;
@@ -158,6 +160,14 @@ public class OnboardingService {
 		};
 		recordEvent(request, RequestEventType.IDENTITY_DOCUMENT_CAPTURED, description,
 				Map.of("ocrStatus", ocrStatus.name()));
+	}
+
+	/** The customer tried to confirm an expired DUI or dates that do not agree; the step does not advance. */
+	@Transactional
+	public void recordIdentityDocumentRejected(OnboardingRequest request, List<DuiDateProblem> problems) {
+		recordEvent(request, RequestEventType.IDENTITY_DOCUMENT_REJECTED,
+				"Confirmación del DUI rechazada: " + String.join("; ", problems.stream().map(DuiDateProblem::label).toList()),
+				Map.of("reasons", problems.stream().map(Enum::name).toList()));
 	}
 
 	/** Step 3: the customer confirmed or corrected the data read from the DUI. */

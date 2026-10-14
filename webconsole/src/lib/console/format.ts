@@ -1,6 +1,15 @@
 // Labels and formats the console shows from the API data.
 
-import type { Criticality, AlertStatus, RequestStatus, RiskLevel, Step, ScoreRule, Role } from "./api";
+import type {
+  Criticality,
+  AlertStatus,
+  DeviceLocationStatus,
+  RequestStatus,
+  RiskLevel,
+  Step,
+  ScoreRule,
+  Role,
+} from "./api";
 
 export type Badge = { cls: string; label: string };
 
@@ -44,6 +53,7 @@ export const canTakeAlerts = (role: Role) => role === "FRAUD_ANALYST" || role ==
 export const STEPS: { step: Step; name: string }[] = [
   { step: "PRIVACY_NOTICE", name: "Aviso de privacidad" },
   { step: "BASIC_DATA", name: "Datos básicos" },
+  { step: "IDENTITY_DOCUMENT", name: "DUI" },
   { step: "INCOME", name: "Ingresos" },
   { step: "EXPECTED_ACTIVITY", name: "Movimiento esperado" },
   { step: "REVIEW", name: "Revisión" },
@@ -73,6 +83,26 @@ export function locationFailureText(failure: string | null | undefined): string 
     return "El proveedor de ubicación no respondió o alcanzó su límite de consultas. Se puede reintentar más tarde.";
   }
   return "No se pudo ubicar esta dirección IP.";
+}
+
+/**
+ * "Ciudad de la solicitud" (VDI-73): the city the phone reported. Without permission, or when the phone could not
+ * find it, the console shows «Ubicación no disponible» and the request goes on.
+ */
+export function deviceLocationText(
+  status: DeviceLocationStatus | null | undefined,
+  location: string | null | undefined,
+): string {
+  switch (status) {
+    case "AVAILABLE":
+      return location || "Ubicación sin nombre";
+    case "DENIED":
+      return "Ubicación no disponible · la persona no dio permiso";
+    case "UNAVAILABLE":
+      return "Ubicación no disponible · el teléfono no pudo obtenerla";
+    default:
+      return "Sin dato · la app no la envió";
+  }
 }
 
 // ---- Dates: always in El Salvador time (UTC−6, no daylight saving) and in 12-hour format

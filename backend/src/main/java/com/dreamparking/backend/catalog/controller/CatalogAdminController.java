@@ -3,6 +3,8 @@ package com.dreamparking.backend.catalog.controller;
 import java.util.List;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,6 +33,7 @@ import com.dreamparking.backend.catalog.dto.PublishPrivacyNoticeRequest;
 import com.dreamparking.backend.catalog.dto.UpdateCatalogEntryRequest;
 import com.dreamparking.backend.catalog.service.CatalogAdminService;
 import com.dreamparking.backend.catalog.service.PrivacyNoticeService;
+import com.dreamparking.backend.common.validation.Code;
 import com.dreamparking.backend.security.AuthenticatedUser;
 
 /** Maintenance of the onboarding catalogs and the privacy notice. Administrators only. */
@@ -41,6 +44,9 @@ import com.dreamparking.backend.security.AuthenticatedUser;
 public class CatalogAdminController {
 
 	private static final String CATALOGS = "income-sources, income-ranges, monthly-amount-ranges o transaction-types";
+
+	/** Shape of a catalog slug; which slugs exist is {@link CatalogKind#fromSlug}'s business (404 otherwise). */
+	private static final String SLUG = "[a-z-]{1,40}";
 
 	private final CatalogAdminService catalogAdminService;
 
@@ -56,7 +62,7 @@ public class CatalogAdminController {
 	@ApiResponse(responseCode = "403", description = "Solo administradores", content = @Content)
 	@ApiResponse(responseCode = "404", description = "El catálogo no existe", content = @Content)
 	@GetMapping("/catalogs/{catalog}")
-	public List<CatalogEntryResponse> list(@PathVariable @Parameter(schema = @Schema(allowableValues = {
+	public List<CatalogEntryResponse> list(@PathVariable @Pattern(regexp = SLUG) @Parameter(schema = @Schema(allowableValues = {
 			"income-sources", "income-ranges", "monthly-amount-ranges", "transaction-types" })) String catalog) {
 		return catalogAdminService.list(CatalogKind.fromSlug(catalog));
 	}
@@ -70,7 +76,8 @@ public class CatalogAdminController {
 	@ApiResponse(responseCode = "409", description = "El código ya existe o el rango se solapa con otro", content = @Content)
 	@PostMapping("/catalogs/{catalog}")
 	@ResponseStatus(HttpStatus.CREATED)
-	public CatalogEntryResponse create(@PathVariable String catalog, @Valid @RequestBody CreateCatalogEntryRequest body,
+	public CatalogEntryResponse create(@PathVariable @Pattern(regexp = SLUG) String catalog,
+			@Valid @RequestBody CreateCatalogEntryRequest body,
 			@Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser admin) {
 		return catalogAdminService.create(CatalogKind.fromSlug(catalog), body, admin.id());
 	}
@@ -84,7 +91,8 @@ public class CatalogAdminController {
 	@ApiResponse(responseCode = "404", description = "El catálogo o la entrada no existen", content = @Content)
 	@ApiResponse(responseCode = "409", description = "Rango en uso, solapado, o sería la última entrada activa", content = @Content)
 	@PutMapping("/catalogs/{catalog}/{code}")
-	public CatalogEntryResponse update(@PathVariable String catalog, @PathVariable String code,
+	public CatalogEntryResponse update(@PathVariable @Pattern(regexp = SLUG) String catalog,
+			@PathVariable @Size(max = 30) @Code String code,
 			@Valid @RequestBody UpdateCatalogEntryRequest body,
 			@Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser admin) {
 		return catalogAdminService.update(CatalogKind.fromSlug(catalog), code, body, admin.id());

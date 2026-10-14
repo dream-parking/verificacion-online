@@ -33,7 +33,7 @@ class PrimaryButton extends StatelessWidget {
             TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.3),
           ),
         ),
-        child: Text(text.toUpperCase(), textAlign: TextAlign.center),
+        child: Text(text, textAlign: TextAlign.center),
       ),
     );
   }
@@ -65,7 +65,7 @@ class SecondaryButton extends StatelessWidget {
           ),
           textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         ),
-        child: Text(text.toUpperCase(), textAlign: TextAlign.center),
+        child: Text(text, textAlign: TextAlign.center),
       ),
     );
   }
@@ -143,6 +143,7 @@ class LabeledTextField extends StatelessWidget {
     required this.placeholder,
     required this.error,
     this.label,
+    this.helper,
     this.keyboardType = TextInputType.text,
     this.autofillHints,
     this.formatters = const [],
@@ -151,6 +152,9 @@ class LabeledTextField extends StatelessWidget {
 
   final TextEditingController controller;
   final String? label;
+
+  /// Short hint under the field; it gives way to the error when there is one.
+  final String? helper;
   final String placeholder;
   final String error;
   final TextInputType keyboardType;
@@ -184,7 +188,10 @@ class LabeledTextField extends StatelessWidget {
             focusedBorder: hasError ? line(AppColors.error, 2) : line(AppColors.blue, 2),
           ),
         ),
-        if (hasError) ErrorText(error),
+        if (hasError)
+          ErrorText(error)
+        else if (helper != null)
+          Padding(padding: const EdgeInsets.only(top: 6), child: Text(helper!, style: AppText.small)),
       ],
     );
   }
@@ -263,9 +270,9 @@ class OptionCard extends StatelessWidget {
   }
 }
 
-/// Segmented "Paso N de 4" progress bar.
+/// Segmented "Paso N de 5" progress bar.
 class StepProgress extends StatelessWidget {
-  const StepProgress({super.key, required this.step, this.total = 4});
+  const StepProgress({super.key, required this.step, this.total = 5});
 
   final int step;
   final int total;
@@ -355,10 +362,13 @@ class FullLogo extends StatelessWidget {
 
 /// Numbered black circle for step lists.
 class NumberBadge extends StatelessWidget {
-  const NumberBadge(this.n, {super.key, this.size = 32});
+  const NumberBadge(this.n, {super.key, this.size = 32, this.soft = false});
 
   final int n;
   final double size;
+
+  /// Light green circle with a dark number, for the steps that are not highlighted.
+  final bool soft;
 
   @override
   Widget build(BuildContext context) {
@@ -366,8 +376,8 @@ class NumberBadge extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(color: AppColors.ink, shape: BoxShape.circle),
-      child: Text('$n', style: AppText.heading(size >= 32 ? 16 : 14, color: Colors.white)),
+      decoration: BoxDecoration(color: soft ? AppColors.brandSoft : AppColors.ink, shape: BoxShape.circle),
+      child: Text('$n', style: AppText.heading(size >= 32 ? 16 : 14, color: soft ? AppColors.ink : Colors.white)),
     );
   }
 }
@@ -424,14 +434,15 @@ class ColorHeader extends StatelessWidget {
 
 /// Screen title (h1).
 class ScreenTitle extends StatelessWidget {
-  const ScreenTitle(this.text, {super.key, this.size = 28});
+  const ScreenTitle(this.text, {super.key, this.size = 28, this.color = AppColors.ink});
 
   final String text;
   final double size;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(header: true, child: Text(text, style: AppText.heading(size, height: 1.15)));
+    return Semantics(header: true, child: Text(text, style: AppText.heading(size, color: color, height: 1.15)));
   }
 }
 

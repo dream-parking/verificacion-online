@@ -12,6 +12,7 @@ import {
   formatDate,
   formatDateTime,
   formatTime,
+  deviceLocationText,
   locationFailureText,
   minSec,
   TIME_NOTE,
@@ -187,6 +188,7 @@ export function RequestDetailView({ id }: { id: string }) {
   const signalList: Pair[] = s
     ? [
         { k: "Señales capturadas", v: s.capturedAt ? formatDateTime(s.capturedAt) : "Sin registro de fecha" },
+        { k: "Ciudad de la solicitud", v: deviceLocationText(s.deviceLocationStatus, s.deviceLocation) },
         { k: "Dirección IP", v: noData(s.ip) },
         ...locationRows,
         { k: "Huella de dispositivo", v: noData(s.deviceFingerprint) },
@@ -235,7 +237,7 @@ export function RequestDetailView({ id }: { id: string }) {
         </div>
         <div className="flex flex-wrap gap-2.5">
           <span className={`badge ${status.cls}`}>
-            {r.status === "IN_PROGRESS" ? `${status.label} (${r.completedSteps} de 5 etapas)` : status.label}
+            {r.status === "IN_PROGRESS" ? `${status.label} (${r.completedSteps} de ${STEPS.length} etapas)` : status.label}
           </span>
           <span className={`badge ${risk.cls}`}>{risk.label}</span>
         </div>

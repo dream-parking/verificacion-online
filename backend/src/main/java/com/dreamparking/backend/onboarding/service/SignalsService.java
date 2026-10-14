@@ -121,12 +121,15 @@ public class SignalsService {
 		if (!keepKnownLocation) {
 			session.setGeolocation(located);
 		}
-		// What the server resolved wins over what the app says; the app's text is the fallback.
+		// VDI-73: the city the phone reports is kept apart from the IP location, and only with permission.
+		String countryIso = body.countryIso() == null ? null : body.countryIso().toUpperCase();
+		session.setDeviceLocation(body.deviceLocationStatus(), body.approximateLocation(), countryIso);
+		// What the server resolved wins over what the app says; the app's city is the fallback.
 		SessionGeolocation geo = session.getGeolocation();
 		session.setApproximateLocation(geo.isAvailable() && geo.describe() != null ? geo.describe()
-				: body.approximateLocation());
+				: session.getDeviceLocation());
 		session.setCountryIso(geo.isAvailable() && geo.getCountryCode() != null ? geo.getCountryCode()
-				: (body.countryIso() == null ? null : body.countryIso().toUpperCase()));
+				: session.getDeviceCountryIso());
 		session.setTypingSpeedCpm(body.typingSpeedCpm());
 		session.setTypingPace(paceOf(body.typingSpeedCpm()));
 		session.setCapturedAt(now);

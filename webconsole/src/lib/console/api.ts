@@ -14,12 +14,15 @@ export const API_URL =
 
 // ---- Contract types
 
+/** Location permission on the phone (VDI-73): granted with a city, declined, or granted without a city. */
+export type DeviceLocationStatus = "AVAILABLE" | "DENIED" | "UNAVAILABLE";
+
 export type Role = "KYC_LEAD" | "FRAUD_ANALYST" | "ADMIN";
 export type RiskLevel = "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
 export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ABANDONED";
 export type Criticality = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type AlertStatus = "UNASSIGNED" | "ASSIGNED" | "IN_REVIEW" | "CLOSED";
-export type Step = "PRIVACY_NOTICE" | "BASIC_DATA" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
+export type Step = "PRIVACY_NOTICE" | "BASIC_DATA" | "IDENTITY_DOCUMENT" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
 
 export type ConsoleUser = {
   id: string;
@@ -121,6 +124,11 @@ export type RequestDetail = {
     ipDetails?: IpDetails | null;
     /** When the app last sent the signals (VDI-70). Missing in responses of older API versions. */
     capturedAt?: string | null;
+    /** Location permission on the phone (VDI-73). Null when the app did not send it; missing in older API versions. */
+    deviceLocationStatus?: DeviceLocationStatus | null;
+    /** "City, Country" reported by the phone, only with permission. */
+    deviceLocation?: string | null;
+    deviceCountryIso?: string | null;
     deviceFingerprint: string | null;
     device: string | null;
     nightTime: boolean | null;

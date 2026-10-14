@@ -32,7 +32,7 @@ class OnboardingApiTests {
 	MockMvc mvc;
 
 	@Test
-	void lowMonthlyRangeScoresLowRisk() throws Exception {
+	void theDeclaredAmountScoresWithTheModel() throws Exception {
 		String id = startRequest();
 
 		mvc.perform(put("/api/onboarding/requests/{id}/expected-activity", id)
@@ -42,9 +42,15 @@ class OnboardingApiTests {
 					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.level").value("LOW"))
-			.andExpect(jsonPath("$.ruleCode").value("R-01"))
-			.andExpect(jsonPath("$.explanation")
-				.value("Monto mensual declarado en el rango «USD 200.01 a 500», que no supera el umbral de USD 500, riesgo bajo."));
+			.andExpect(jsonPath("$.score").value(4))
+			.andExpect(jsonPath("$.modelVersion").value(1))
+			.andExpect(jsonPath("$.ruleCode").isEmpty())
+			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].points").value(4))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].maxPoints").value(25))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].observation")
+				.value("Monto mensual declarado: USD 200.01 a 500"))
+			.andExpect(jsonPath("$.explanation").value(
+					"Score 4 de 100, riesgo bajo (Modelo de score v1): suman sobre todo monto declarado (4)."));
 
 		mvc.perform(get("/api/onboarding/requests/{id}", id))
 			.andExpect(jsonPath("$.riskLevel").value("LOW"))
@@ -52,7 +58,7 @@ class OnboardingApiTests {
 	}
 
 	@Test
-	void rangeAboveTheThresholdStaysPendingAndReplacesPreviousScore() throws Exception {
+	void aNewRangeReplacesThePreviousScore() throws Exception {
 		String id = startRequest();
 		registerRange(id, "HASTA_200");
 
@@ -62,12 +68,11 @@ class OnboardingApiTests {
 					{"transactionTypeCode": "AHORRO", "monthlyAmountRangeCode": "500_1000"}
 					"""))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.level").value("PENDING_REVIEW"))
-			.andExpect(jsonPath("$.ruleCode").isEmpty());
+			.andExpect(jsonPath("$.score").value(8));
 
 		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.level").value("PENDING_REVIEW"))
+			.andExpect(jsonPath("$.score").value(8))
 			.andExpect(jsonPath("$.evaluatedValue").value(1000));
 	}
 

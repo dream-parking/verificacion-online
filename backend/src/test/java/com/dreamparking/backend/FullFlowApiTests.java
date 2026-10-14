@@ -77,6 +77,7 @@ class FullFlowApiTests {
 				{"dui": "01234567-8", "firstNames": "Ana Sofía", "lastNames": "Pérez López", "mobilePhone": "7123-4567"}
 				"""))
 			.andExpect(jsonPath("$.completedSteps").value(2));
+		DuiStep.complete(app, requestId, "01234567-8", "Ana Sofía", "Pérez López");
 		perform(app, put("/api/onboarding/requests/{id}/income", requestId).content("""
 				{"sourceCode": "SALARIO", "rangeCode": "HASTA_500"}
 				"""))
@@ -88,7 +89,7 @@ class FullFlowApiTests {
 		perform(app, post("/api/onboarding/requests/{id}/submit", requestId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("COMPLETED"))
-			.andExpect(jsonPath("$.completedSteps").value(5))
+			.andExpect(jsonPath("$.completedSteps").value(6))
 			.andExpect(jsonPath("$.number").value(matchesPattern("SOL-\\d{4}-\\d{5}")));
 
 		// ---- console: the detail has the whole file

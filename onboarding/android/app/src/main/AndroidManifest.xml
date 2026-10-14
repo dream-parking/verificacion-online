@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- The app talks to the onboarding API (also in the release APK). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- VDI-73: approximate location only (city), asked after the privacy notice; it can be declined. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="${appLabel}"
         android:name="${applicationName}"

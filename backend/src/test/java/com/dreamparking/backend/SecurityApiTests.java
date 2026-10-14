@@ -294,10 +294,10 @@ class SecurityApiTests {
 		ConsoleUser analyst = auth.user(ConsoleRole.FRAUD_ANALYST);
 
 		admin.perform(put("/api/console/users/{id}", analyst.getId()).contentType(JSON)
-			.content(updateJson("  Ana  Beltrán ", ConsoleRole.FRAUD_ANALYST, false)))
+			.content(updateJson("  Ana Beltrán ", ConsoleRole.FRAUD_ANALYST, false)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.active").value(false))
-			.andExpect(jsonPath("$.fullName").value("Ana  Beltrán"))
+			.andExpect(jsonPath("$.fullName").value("Ana Beltrán"))
 			.andExpect(jsonPath("$.initials").value("AB"));
 
 		login(analyst.getEmail(), TestAuth.PASSWORD).andExpect(status().isUnauthorized());

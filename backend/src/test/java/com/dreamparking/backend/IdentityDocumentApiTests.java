@@ -316,7 +316,7 @@ class IdentityDocumentApiTests {
 	}
 
 	@Test
-	void rejectsAnExpiredDuiOrDatesThatDoNotAgreeAndTheStepDoesNotAdvance() throws Exception {
+	void rejectsAnExpiredDuiOrDatesThatDoNotAgreeAndKeepsTheRejections() throws Exception {
 		when(ocr.read(any(), any())).thenReturn(marta());
 		String id = withBasicData();
 		upload(id, FRONT, BACK).andExpect(status().isOk());
@@ -332,6 +332,16 @@ class IdentityDocumentApiTests {
 		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.completedSteps").value(2));
 
 		confirm(id, CONFIRMATION).andExpect(status().isOk());
+
+		// The rejections stay on file after the confirmation that passed, and the console sees them.
+		flushAndClear();
+		mvc.perform(get("/api/console/requests/{id}", id))
+			.andExpect(jsonPath("$.identityDocument.rejectedConfirmations").value(3))
+			.andExpect(jsonPath("$.identityDocument.rejectionReasons")
+				.value(contains("EXPIRED", "UNDER_AGE", "EXPIRY_BEFORE_BIRTH")))
+			.andExpect(jsonPath("$.identityDocument.everLookedInauthentic").value(false))
+			.andExpect(jsonPath("$.timeline[?(@.type == 'IDENTITY_DOCUMENT_REJECTED')].description")
+				.value(hasItem("Confirmación del DUI rechazada: DUI vencido")));
 	}
 
 	private static String confirmation(String birthDate, String expiryDate) {

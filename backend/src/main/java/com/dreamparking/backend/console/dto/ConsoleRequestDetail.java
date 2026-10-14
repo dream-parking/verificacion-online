@@ -9,6 +9,7 @@ import java.util.UUID;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import com.dreamparking.backend.identity.entity.enums.DocumentSide;
+import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.entity.enums.UnreadableReason;
 import com.dreamparking.backend.identity.entity.enums.UnreadableSide;
@@ -40,13 +41,16 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 	 * customer corrected, and how the confirmed data compares with the basic data. The photos are downloaded one by
 	 * one from {@code /identity-document/{side}}; {@code photos} lists the sides on file. {@code confirmed} is null
 	 * until the customer confirms. {@code checkDigitValid} and {@code expired} use the confirmed data, else the read one.
+	 * {@code rejectedConfirmations}, {@code rejectionReasons} and {@code everLookedInauthentic} cover every attempt of
+	 * the request, not only the last capture, and count in the score.
 	 */
 	@Schema(name = "ConsoleRequestIdentityDocument")
 	public record IdentityDocument(OcrStatus ocrStatus, String ocrModel, short attempts,
 			UnreadableReason unreadableReason, UnreadableSide unreadableSide, String failure, DuiData read,
 			DuiData confirmed, Instant confirmedAt, List<String> correctedFields, Boolean duiMatchesDeclared,
 			Boolean namesMatchDeclared, Boolean checkDigitValid, Boolean expired, Boolean looksAuthentic,
-			BigDecimal confidence, List<DocumentSide> photos, Instant processedAt) {
+			BigDecimal confidence, List<DocumentSide> photos, Instant processedAt,
+			short rejectedConfirmations, List<DuiDateProblem> rejectionReasons, boolean everLookedInauthentic) {
 	}
 
 	/** Data of a DUI, as read or as confirmed. Fields not read are null. */

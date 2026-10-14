@@ -1230,6 +1230,31 @@ void main() {
         expect(find.text('La fecha de nacimiento debe ser anterior a hoy.'), findsOneWidget);
       });
 
+      testWidgets('an expired DUI is not accepted: the message names the date and the person can correct a misread',
+          (tester) async {
+        final fake = FakeApi(identityResponses: [
+          (200, '{"status":"READ","attempts":1,"dui":"01234567-8","firstNames":"María José","lastNames":"Pérez López",'
+              '"birthDate":"1990-04-12","expiryDate":"2020-06-01"}'),
+        ]);
+        await goToConfirmation(tester, fake);
+
+        expect(field(tester, 4), '01/06/2020');
+        expect(find.text(notClear), findsNothing, reason: 'it was read clearly');
+        expect(find.textContaining('venció'), findsNothing, reason: 'the message appears when trying to continue');
+
+        await tap(tester, confirmButton);
+        expect(find.text('Tu DUI venció el 01/06/2020. Para abrir tu cuenta necesitamos un DUI vigente.'),
+            findsOneWidget);
+        expect(fake.identityConfirmations, isEmpty);
+        expect(find.text('Paso 2 de 5'), findsOneWidget);
+
+        await type(tester, 4, '01062029');
+        expect(find.textContaining('venció'), findsNothing);
+        await tap(tester, confirmButton);
+        expect(jsonDecode(fake.identityConfirmations.single.body)['expiryDate'], '2029-06-01');
+        expect(find.text('Paso 3 de 5'), findsOneWidget);
+      });
+
       testWidgets('repeating the front takes only that photo and sends both to be read again', (tester) async {
         final fake = FakeApi();
         final camera = FakeCamera();

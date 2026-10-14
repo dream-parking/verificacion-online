@@ -1005,7 +1005,7 @@ void main() {
         for (final tip in UnreadablePhotos.tips) {
           expect(find.text(tip), findsOneWidget);
         }
-        await tap(tester, find.text('ENTENDIDO'));
+        await tap(tester, find.text('Entendido'));
         expect(find.text('Para que salga bien'), findsNothing);
         expect(shutter, findsOneWidget);
       });

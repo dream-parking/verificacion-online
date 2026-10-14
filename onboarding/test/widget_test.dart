@@ -313,7 +313,11 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> tapContinue(WidgetTester tester) => tap(tester, find.text('CONTINUAR'));
+    /// Taps the main button of the screen: «Continuar», or «Aceptar y continuar» on the privacy notice.
+    Future<void> tapContinue(WidgetTester tester) {
+      final accept = find.text('ACEPTAR Y CONTINUAR');
+      return tap(tester, accept.evaluate().isNotEmpty ? accept : find.text('CONTINUAR'));
+    }
 
     /// Checks the privacy notice and the terms and conditions.
     Future<void> acceptNotice(WidgetTester tester) async {
@@ -862,6 +866,73 @@ void main() {
         await tapContinue(tester);
         expect(find.textContaining('Escribe tus apellidos solo con letras'), findsOneWidget);
         expect(fake.basicData, isEmpty);
+      });
+    });
+
+    group('privacy notice (VDI-92)', () {
+      Future<void> goToNotice(WidgetTester tester, FakeApi fake) async {
+        await tester.pumpWidget(app(fake));
+        await tap(tester, find.text('EMPEZAR'));
+      }
+
+      testWidgets('shows the version badge, the four data it collects and the closing text', (tester) async {
+        await goToNotice(tester, FakeApi());
+
+        expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
+        expect(find.text('Aviso aprobado por Legal · versión [X.Y]'), findsOneWidget);
+        expect(find.text('Mientras llenas tu solicitud, recopilamos algunos datos para protegerte contra el fraude:'),
+            findsOneWidget);
+        for (final (title, description) in [
+          ('Tu ubicación aproximada', 'La ciudad desde donde haces la solicitud, no tu dirección exacta.'),
+          ('El tipo de dispositivo', 'Modelo de teléfono y sistema, para reconocer si es el mismo en otra ocasión.'),
+          ('Cómo usas la aplicación', 'Por ejemplo, el tiempo que tardas en cada paso y tu ritmo al escribir.'),
+          ('Las fotos de tu DUI', 'Frente y reverso, guardadas de forma segura en tu expediente.'),
+        ]) {
+          expect(find.text(title), findsOneWidget, reason: title);
+          expect(find.text(description), findsOneWidget, reason: description);
+        }
+        expect(find.text('Leer el aviso de privacidad completo'), findsOneWidget);
+        expect(find.byType(Checkbox), findsNWidgets(2));
+      });
+
+      testWidgets('the button says «Aceptar y continuar» and the date and version are announced', (tester) async {
+        await goToNotice(tester, FakeApi());
+        expect(find.text('ACEPTAR Y CONTINUAR'), findsOneWidget);
+        expect(find.text('CONTINUAR'), findsNothing);
+        expect(find.text('Guardamos la fecha y la versión del aviso que aceptas.'), findsOneWidget);
+      });
+
+      testWidgets('without accepting both boxes it does not move on and names what is missing', (tester) async {
+        final fake = FakeApi();
+        await goToNotice(tester, fake);
+        await tap(tester, find.byType(Checkbox).at(0));
+        await tapContinue(tester);
+        expect(find.text('Para continuar necesitamos que aceptes los términos y condiciones.'), findsOneWidget);
+        expect(fake.starts, isEmpty);
+        expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
+      });
+
+      testWidgets('the full notice opens from the link, says it is provisional and closes', (tester) async {
+        await goToNotice(tester, FakeApi());
+        await tap(tester, find.text('Leer el aviso de privacidad completo'));
+
+        expect(find.text('Aviso de privacidad'), findsOneWidget);
+        expect(find.textContaining('texto provisional'), findsOneWidget);
+        expect(find.textContaining('versión [X.Y]'), findsWidgets);
+        expect(find.text('Las fotos de tu DUI'), findsWidgets);
+
+        await tap(tester, find.text('CERRAR'));
+        expect(find.text('Aviso de privacidad'), findsNothing);
+        expect(find.text('ACEPTAR Y CONTINUAR'), findsOneWidget);
+      });
+
+      testWidgets('after accepting, the other screens keep «Continuar»', (tester) async {
+        await goToNotice(tester, FakeApi());
+        await acceptNotice(tester);
+        await tapContinue(tester);
+        await skipLocation(tester);
+        expect(find.text('CONTINUAR'), findsOneWidget);
+        expect(find.text('ACEPTAR Y CONTINUAR'), findsNothing);
       });
     });
 

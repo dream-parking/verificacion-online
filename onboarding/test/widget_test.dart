@@ -676,6 +676,41 @@ void main() {
 
       Map<String, dynamic> lastSignals(FakeApi fake) => jsonDecode(fake.signals.last.body) as Map<String, dynamic>;
 
+      testWidgets('looks like the design: illustration, grey box with three points, two buttons', (tester) async {
+        await goToLocation(tester, FakeApi(), FakeLocation());
+
+        expect(find.byKey(const Key('location-illustration')), findsOneWidget);
+        expect(find.text('Saber tu ciudad nos ayuda a detectar si alguien intenta abrir una cuenta a tu nombre desde otro lugar.'),
+            findsOneWidget);
+        final box = find.byKey(const Key('location-points'));
+        expect(box, findsOneWidget);
+        for (final text in [
+          'Solo guardamos ciudad y país.',
+          'No guardamos tu dirección ni tus coordenadas.',
+          'Si prefieres no compartirla, puedes completar tu solicitud igual.',
+        ]) {
+          expect(find.descendant(of: box, matching: find.text(text, findRichText: true)), findsOneWidget, reason: text);
+        }
+        expect(find.descendant(of: box, matching: find.byIcon(Icons.check)), findsNWidgets(3));
+
+        expect(find.widgetWithText(FilledButton, 'Permitir ubicación aproximada'), findsOneWidget);
+        expect(find.widgetWithText(OutlinedButton, 'Ahora no'), findsOneWidget, reason: '«Ahora no» is an outlined button');
+      });
+
+      testWidgets('«ciudad y país» goes in bold', (tester) async {
+        await goToLocation(tester, FakeApi(), FakeLocation());
+        final rich = tester.widget<RichText>(find.descendant(
+          of: find.byKey(const Key('location-points')),
+          matching: find.byWidgetPredicate((w) => w is RichText && w.text.toPlainText() == 'Solo guardamos ciudad y país.'),
+        ));
+        final bold = <String>[];
+        rich.text.visitChildren((span) {
+          if (span is TextSpan && span.style?.fontWeight == FontWeight.w800) bold.add(span.text ?? '');
+          return true;
+        });
+        expect(bold, ['ciudad y país']);
+      });
+
       testWidgets('is asked after the notice, never before', (tester) async {
         final fake = FakeApi();
         final location = FakeLocation();

@@ -57,12 +57,27 @@ export type RequestSummary = {
   transactionTypeLabel: string | null;
   monthlyAmountRangeLabel: string | null;
   riskLevel: RiskLevel;
+  /** Score from 0 to 100 (VDI-84). Null without assessment or in the ones made by rule R-01; missing in older API versions. */
+  score?: number | null;
   status: RequestStatus;
   completedSteps: number;
 };
 
+/** What a signal added to the score. `points` is null when the signal was not available; `maxPoints` when it has no weight yet. */
+export type SignalContribution = {
+  signal: string;
+  name: string;
+  points: number | null;
+  maxPoints: number | null;
+  observation: string | null;
+};
+
 export type Assessment = {
   level: RiskLevel;
+  /** Score from 0 to 100, the model version and what each signal added. Null / empty in assessments made by rule R-01. */
+  score?: number | null;
+  modelVersion?: number | null;
+  signals?: SignalContribution[] | null;
   ruleCode: string | null;
   ruleName: string | null;
   ruleThreshold: number | null;

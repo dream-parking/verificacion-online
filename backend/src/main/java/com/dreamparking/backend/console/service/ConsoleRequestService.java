@@ -123,10 +123,12 @@ public class ConsoleRequestService {
 		List<ConsoleRequestListItem> content = jdbc.query(LIST_PAGE, params, (rs, row) -> {
 			total[0] = rs.getLong("total");
 			OffsetDateTime date = rs.getObject("activity_date", OffsetDateTime.class);
+			int score = rs.getInt("score");
 			return new ConsoleRequestListItem(rs.getObject("id", UUID.class), rs.getString("number"),
 					rs.getString("name"), date == null ? null : date.toInstant(), rs.getString("transaction_type_label"),
 					rs.getString("monthly_amount_range_label"), RiskLevel.valueOf(rs.getString("risk_level")),
-					RequestStatus.valueOf(rs.getString("status")), rs.getShort("completed_steps"));
+					rs.wasNull() ? null : score, RequestStatus.valueOf(rs.getString("status")),
+					rs.getShort("completed_steps"));
 		});
 		if (total[0] < 0) {
 			// Past the last page (or nothing matches): the window count came with no row.

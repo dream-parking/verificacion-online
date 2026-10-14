@@ -952,6 +952,50 @@ void main() {
       });
     });
 
+    group('welcome (VDI-22)', () {
+      testWidgets('says 7 minutes and asks to have the DUI at hand', (tester) async {
+        await tester.pumpWidget(app(FakeApi()));
+        expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
+        expect(find.text('Sin filas y sin ir a una agencia. Ten tu DUI a la mano: te toma unos 7 minutos.'),
+            findsOneWidget);
+        expect(find.text('Unos 7 minutos'), findsOneWidget);
+        expect(find.textContaining('5 minutos'), findsNothing);
+      });
+
+      testWidgets('lists the five steps in order, all with the same number circle and no badge', (tester) async {
+        await tester.pumpWidget(app(FakeApi()));
+        final steps = [
+          ('Datos básicos', 'Tu nombre, DUI y celular.'),
+          ('Tu DUI', 'Una foto del frente y otra del reverso.'),
+          ('Tus ingresos', 'De dónde viene tu dinero y cuánto ganas.'),
+          ('El dinero de tu cuenta', 'Qué dinero esperas mover cada mes.'),
+          ('Revisar y enviar', 'Confirmas todo antes de mandarlo.'),
+        ];
+        double? previousTop;
+        for (final (title, description) in steps) {
+          await tester.ensureVisible(find.text(title));
+          expect(find.text(description), findsOneWidget, reason: title);
+          final top = tester.getTopLeft(find.text(title)).dy;
+          if (previousTop != null) expect(top, greaterThan(previousTop), reason: '$title comes after the previous step');
+          previousTop = top;
+        }
+        for (final n in ['1', '2', '3', '4', '5']) {
+          expect(find.text(n), findsOneWidget, reason: 'number $n');
+        }
+        expect(find.textContaining('NUEVO', findRichText: true), findsNothing);
+        expect(find.textContaining('Nuevo'), findsNothing);
+
+        // Every number sits in a circle of the same color.
+        final colors = {
+          for (final n in ['1', '2', '3', '4', '5'])
+            (tester.widget<Container>(find.ancestor(of: find.text(n), matching: find.byType(Container)).first).decoration
+                    as BoxDecoration)
+                .color,
+        };
+        expect(colors, hasLength(1), reason: 'the DUI is not highlighted');
+      });
+    });
+
     group('DUI capture (VDI-77)', () {
       Future<void> goToDui(WidgetTester tester, FakeApi fake, FakeCamera camera) async {
         await tester.pumpWidget(app(fake, camera: camera));

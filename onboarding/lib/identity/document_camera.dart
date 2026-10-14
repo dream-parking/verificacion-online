@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+
+import 'frame_quality.dart';
 
 /// The camera could not be opened. [permissionDenied] tells the person to allow it in the settings.
 class CameraUnavailable implements Exception {
@@ -12,10 +16,14 @@ class CameraUnavailable implements Exception {
   String toString() => 'CameraUnavailable(permissionDenied: $permissionDenied)';
 }
 
-/// An open camera: live preview and photo. Tests pass a fake one.
+/// An open camera: live preview, what the live image says, and photo. Tests pass a fake one.
 abstract class CameraSession {
   /// Live image of the camera, to be shown behind the frame.
   Widget get preview;
+
+  /// Light and steadiness of the live image, a few times per second while the camera is open. It can stay silent
+  /// if the phone cannot analyze the image: the photo can be taken anyway.
+  Stream<FrameHint> get hints;
 
   /// Takes a photo and returns its JPEG bytes.
   Future<Uint8List> takePhoto();
@@ -33,11 +41,7 @@ abstract class DocumentCamera {
 class PlatformDocumentCamera implements DocumentCamera {
   const PlatformDocumentCamera();
 
-  static const _deniedCodes = {
-    'CameraAccessDenied',
-    'CameraAccessDeniedWithoutPrompt',
-    'CameraAccessRestricted',
-  };
+  static const _deniedCodes = {'CameraAccessDenied', 'CameraAccessDeniedWithoutPrompt', 'CameraAccessRestricted'};
 
   @override
   Future<CameraSession> open() async {
@@ -45,23 +49,23 @@ class PlatformDocumentCamera implements DocumentCamera {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) throw const CameraUnavailable();
-      final rear = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
-        orElse: () => cameras.first,
-      );
-      // No audio: the DUI is a photo, so the microphone is never requested.
+      final rear = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.back, orElse: () => cameras.first);
+      // No audio: the DUI is a photo, so the microphone is never requested. The live frames come as YUV on
+      // Android and BGRA on iOS, where the brightness is cheap to read.
       controller = CameraController(
         rear,
         ResolutionPreset.high,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
+        imageFormatGroup: defaultTargetPlatform == TargetPlatform.android ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
       );
       await controller.initialize();
     } on CameraException catch (e) {
       debugPrint('Could not open the camera: ${e.code}');
       throw CameraUnavailable(permissionDenied: _deniedCodes.contains(e.code));
     }
-    return _PlatformSession(controller);
+    final session = _PlatformSession(controller);
+    await session.startAnalysis();
+    return session;
   }
 }
 
@@ -69,14 +73,52 @@ class _PlatformSession implements CameraSession {
   _PlatformSession(this._controller);
 
   final CameraController _controller;
+  final _hints = StreamController<FrameHint>.broadcast();
+  final _monitor = FrameQualityMonitor();
+  var _lastFrame = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// The live frames are looked at a few times per second: enough to follow the person and cheap for the phone.
+  static const _frameInterval = Duration(milliseconds: 250);
+
+  /// Starts reading the live frames. If the phone cannot, there are no hints and the photo works the same.
+  Future<void> startAnalysis() async {
+    try {
+      await _controller.startImageStream(_onFrame);
+    } on Exception catch (e) {
+      debugPrint('Could not analyze the live image: $e');
+    }
+  }
+
+  void _onFrame(CameraImage image) {
+    final now = DateTime.now();
+    if (now.difference(_lastFrame) < _frameInterval || _hints.isClosed) return;
+    _lastFrame = now;
+    final plane = image.planes.first;
+    final grid = image.format.group == ImageFormatGroup.bgra8888
+        ? LumaGrid.fromBgra(plane.bytes, width: image.width, height: image.height, rowStride: plane.bytesPerRow)
+        : LumaGrid.fromYPlane(plane.bytes, width: image.width, height: image.height, rowStride: plane.bytesPerRow);
+    _hints.add(_monitor.add(grid));
+  }
 
   @override
   Widget get preview => CameraPreview(_controller);
 
   @override
-  Future<Uint8List> takePhoto() async =>
-      (await _controller.takePicture()).readAsBytes();
+  Stream<FrameHint> get hints => _hints.stream;
 
   @override
-  Future<void> dispose() => _controller.dispose();
+  Future<Uint8List> takePhoto() async => (await _controller.takePicture()).readAsBytes();
+
+  @override
+  Future<void> dispose() async {
+    await _hints.close();
+    if (_controller.value.isStreamingImages) {
+      try {
+        await _controller.stopImageStream();
+      } on Exception catch (e) {
+        debugPrint('Could not stop the image stream: $e');
+      }
+    }
+    await _controller.dispose();
+  }
 }

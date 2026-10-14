@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -8,6 +9,7 @@ import 'package:http/testing.dart';
 
 import 'package:onboarding/api/onboarding_api.dart';
 import 'package:onboarding/identity/document_camera.dart';
+import 'package:onboarding/identity/frame_quality.dart';
 import 'package:onboarding/identity/identity_document.dart';
 import 'package:onboarding/main.dart';
 import 'package:onboarding/onboarding/application_form.dart';
@@ -67,6 +69,12 @@ class FakeCamera implements DocumentCamera {
   var photos = 0;
   var disposed = 0;
 
+  /// The session that is open now, to push live-image hints into it.
+  FakeCameraSession? current;
+
+  /// What the live image says (VDI-77): the camera screen shows it.
+  void hint(FrameHint hint) => current!.controller.add(hint);
+
   @override
   Future<CameraSession> open() async {
     opens++;
@@ -75,14 +83,19 @@ class FakeCamera implements DocumentCamera {
       failTimes--;
       throw const CameraUnavailable();
     }
-    return _FakeSession(this);
+    return current = FakeCameraSession(this);
   }
 }
 
-class _FakeSession implements CameraSession {
-  _FakeSession(this._camera);
+class FakeCameraSession implements CameraSession {
+  FakeCameraSession(this._camera);
 
   final FakeCamera _camera;
+
+  final controller = StreamController<FrameHint>.broadcast();
+
+  @override
+  Stream<FrameHint> get hints => controller.stream;
 
   @override
   Widget get preview => const ColoredBox(color: Colors.grey);
@@ -91,7 +104,10 @@ class _FakeSession implements CameraSession {
   Future<Uint8List> takePhoto() async => Uint8List.fromList([0xFF, 0xD8, ++_camera.photos]);
 
   @override
-  Future<void> dispose() async => _camera.disposed++;
+  Future<void> dispose() async {
+    _camera.disposed++;
+    await controller.close();
+  }
 }
 
 /// Fake API: answers the catalog and every request step, and records the calls.
@@ -958,7 +974,7 @@ void main() {
         final camera = FakeCamera();
         await goToDui(tester, FakeApi(), camera);
 
-        expect(find.text('Paso 2 de 5'), findsOneWidget);
+        expect(find.text('Paso 2 de 5 · Tu DUI'), findsOneWidget);
         expect(find.text('Coloca el frente de tu DUI dentro del marco'), findsOneWidget);
         for (final tip in ['Buena luz', 'Sin reflejos', 'Se ven las 4 esquinas']) {
           expect(find.text(tip), findsOneWidget);
@@ -970,6 +986,70 @@ void main() {
         await tap(tester, shutter);
         expect(find.text('Ahora coloca el reverso de tu DUI dentro del marco'), findsOneWidget);
         expect(camera.photos, 1);
+      });
+
+      testWidgets('the camera screen has its own dark header with back and help, and the two sides', (tester) async {
+        await goToDui(tester, FakeApi(), FakeCamera());
+        expect(find.byTooltip('Volver al paso anterior'), findsOneWidget);
+        expect(find.byTooltip('Ayuda para tomar la foto'), findsOneWidget);
+        expect(find.text('1 · Frente'), findsOneWidget);
+        expect(find.text('2 · Reverso'), findsOneWidget);
+        expect(find.byType(StepProgress), findsNothing, reason: 'the camera has its own two-segment progress');
+        expect(find.byType(Logo), findsNothing, reason: 'the camera takes the whole screen');
+      });
+
+      testWidgets('the help opens the tips to take the photo and closes', (tester) async {
+        await goToDui(tester, FakeApi(), FakeCamera());
+        await tap(tester, find.byTooltip('Ayuda para tomar la foto'));
+        expect(find.text('Para que salga bien'), findsOneWidget);
+        for (final tip in UnreadablePhotos.tips) {
+          expect(find.text(tip), findsOneWidget);
+        }
+        await tap(tester, find.text('ENTENDIDO'));
+        expect(find.text('Para que salga bien'), findsNothing);
+        expect(shutter, findsOneWidget);
+      });
+
+      testWidgets('the live hint follows the image: lit and steady, too dark, moving', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+
+        expect(find.text('Mantén el teléfono quieto'), findsOneWidget, reason: 'before it knows anything');
+        camera.hint(FrameHint.good);
+        await tester.pumpAndSettle();
+        expect(find.text('Bien, mantén el teléfono quieto'), findsOneWidget);
+
+        camera.hint(FrameHint.tooDark);
+        await tester.pumpAndSettle();
+        expect(find.text('Hay poca luz. Busca un lugar más iluminado.'), findsOneWidget);
+        expect(find.text('Bien, mantén el teléfono quieto'), findsNothing);
+
+        camera.hint(FrameHint.moving);
+        await tester.pumpAndSettle();
+        expect(find.text('Mueve menos el teléfono.'), findsOneWidget);
+
+        camera.hint(FrameHint.good);
+        await tester.pumpAndSettle();
+        expect(find.text('Bien, mantén el teléfono quieto'), findsOneWidget);
+      });
+
+      testWidgets('a bad hint never blocks the photo: the person can still take it', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+        camera.hint(FrameHint.tooDark);
+        await tester.pumpAndSettle();
+        await tap(tester, shutter);
+        expect(camera.photos, 1);
+        expect(find.text('Ahora coloca el reverso de tu DUI dentro del marco'), findsOneWidget);
+      });
+
+      testWidgets('the hint starts over for the second photo', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+        camera.hint(FrameHint.good);
+        await tester.pumpAndSettle();
+        await tap(tester, shutter);
+        expect(find.text('Mantén el teléfono quieto'), findsOneWidget, reason: 'the other side has not been seen yet');
       });
 
       testWidgets('nothing is sent until both photos are taken', (tester) async {

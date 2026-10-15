@@ -49,6 +49,10 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
   var _taking = false;
   var _disposed = false;
 
+  /// Where the person tapped to focus, while the ring is shown.
+  Offset? _focusRing;
+  Timer? _focusRingTimer;
+
   DuiSide get _side => widget.sides[_photos.length];
 
   @override
@@ -74,8 +78,20 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
     }
   }
 
+  /// Focuses where the person tapped and shows a ring for a moment.
+  void _focusAt(CameraSession session, Offset local, Size area) {
+    if (area.isEmpty) return;
+    unawaited(session.focusAt(Offset((local.dx / area.width).clamp(0.0, 1.0), (local.dy / area.height).clamp(0.0, 1.0))));
+    _focusRingTimer?.cancel();
+    setState(() => _focusRing = local);
+    _focusRingTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _focusRing = null);
+    });
+  }
+
   @override
   void dispose() {
+    _focusRingTimer?.cancel();
     _disposed = true;
     _hints?.cancel();
     _session?.dispose();
@@ -171,12 +187,20 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
           ),
         ),
         Expanded(
-          child: Stack(
-            children: [
-              Positioned.fill(child: _FullPreview(child: session.preview)),
-              const Positioned.fill(child: _FrameOverlay()),
-              Positioned(left: 16, right: 16, bottom: 12, child: Center(child: _StatusPill(_hint))),
-            ],
+          child: LayoutBuilder(
+            builder: (context, c) => GestureDetector(
+              key: const Key('camera-preview'),
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (d) => _focusAt(session, d.localPosition, c.biggest),
+              child: Stack(
+                children: [
+                  Positioned.fill(child: session.preview),
+                  const Positioned.fill(child: _FrameOverlay()),
+                  if (_focusRing != null) _FocusRing(key: const Key('focus-ring'), at: _focusRing!),
+                  Positioned(left: 16, right: 16, bottom: 12, child: Center(child: _StatusPill(_hint))),
+                ],
+              ),
+            ),
           ),
         ),
         const Padding(
@@ -277,18 +301,25 @@ class _SideProgress extends StatelessWidget {
   }
 }
 
-/// The preview covers the whole area without stretching.
-class _FullPreview extends StatelessWidget {
-  const _FullPreview({required this.child});
+/// Ring where the person tapped to focus.
+class _FocusRing extends StatelessWidget {
+  const _FocusRing({super.key, required this.at});
 
-  final Widget child;
+  final Offset at;
+
+  static const _size = 72.0;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(width: 300, height: 400, child: child),
+    return Positioned(
+      left: at.dx - _size / 2,
+      top: at.dy - _size / 2,
+      child: IgnorePointer(
+        child: Container(
+          width: _size,
+          height: _size,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.brand, width: 2)),
+        ),
       ),
     );
   }

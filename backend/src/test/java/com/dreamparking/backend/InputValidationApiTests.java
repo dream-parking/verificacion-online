@@ -51,8 +51,8 @@ class InputValidationApiTests {
 				 "mobilePhone": "7123-4567"}
 				"""))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.errors.firstNames").value(PersonName.MESSAGE))
-			.andExpect(jsonPath("$.errors.lastNames").value(PersonName.MESSAGE))
+			.andExpect(jsonPath("$.errors.firstNames").value(PersonName.RULE_MESSAGE))
+			.andExpect(jsonPath("$.errors.lastNames").value(PersonName.RULE_MESSAGE))
 			.andExpect(jsonPath("$.errors.dui").doesNotExist());
 	}
 

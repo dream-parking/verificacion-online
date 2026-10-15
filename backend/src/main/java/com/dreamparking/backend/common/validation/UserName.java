@@ -33,7 +33,7 @@ public @interface UserName {
 
 	String REGEXP = PersonName.REGEXP;
 
-	String message() default PersonName.MESSAGE;
+	String message() default PersonName.RULE_MESSAGE;
 
 	Class<?>[] groups() default {};
 

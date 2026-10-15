@@ -44,9 +44,9 @@ public @interface PersonName {
 
 	String REGEXP = "\\s*[" + LETTERS + "]+([ '\\-][" + LETTERS + "]+)*\\s*";
 
-	String MESSAGE = "Solo se permiten letras (incluidas tildes y ñ), espacios, apóstrofo (') y guion (-)";
+	String RULE_MESSAGE = "Solo se permiten letras (incluidas tildes y ñ), espacios, apóstrofo (') y guion (-)";
 
-	String message() default MESSAGE;
+	String message() default RULE_MESSAGE;
 
 	Class<?>[] groups() default {};
 

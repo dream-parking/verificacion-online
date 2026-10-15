@@ -79,7 +79,7 @@ class TextFormatsTests {
 			"Ana  María", "Ana\u200BMaría", "Ana\u0000", "J. Pérez", "Ana\tMaría", "Иван", "李明", "Ana Ωmega",
 			"Mª José", "-Ana", "Ana-", "'Ana", "Ana'", "Ana--José", "D''Aubuisson", "Ana -José", "Ana’s" })
 	void namesRejectDigitsSymbolsEmojisAndMisplacedPunctuation(String name) {
-		assertThat(violations(new Name(name))).containsExactly(PersonName.MESSAGE);
+		assertThat(violations(new Name(name))).containsExactly(PersonName.RULE_MESSAGE);
 	}
 
 	@ParameterizedTest

@@ -128,7 +128,12 @@ class _PlatformSession implements CameraSession {
     final grid = image.format.group == ImageFormatGroup.bgra8888
         ? LumaGrid.fromBgra(plane.bytes, width: image.width, height: image.height, rowStride: plane.bytesPerRow)
         : LumaGrid.fromYPlane(plane.bytes, width: image.width, height: image.height, rowStride: plane.bytesPerRow);
-    _hints.add(_monitor.add(grid));
+    final ev = sceneEv(
+      aperture: image.lensAperture,
+      exposureNanoseconds: image.sensorExposureTime,
+      iso: image.sensorSensitivity,
+    );
+    _hints.add(_monitor.add(grid, sceneEv: ev));
   }
 
   @override

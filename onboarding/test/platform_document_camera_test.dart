@@ -115,7 +115,10 @@ class FakeCameraPlatform extends CameraPlatform with MockPlatformInterfaceMixin 
 }
 
 /// A frame of the live image where every pixel of the Y plane has the same [luma].
-CameraImageData frame(int luma) => CameraImageData(
+CameraImageData frame(int luma, {double? iso, int? exposureNs, double? aperture}) => CameraImageData(
+      lensAperture: aperture,
+      sensorExposureTime: exposureNs,
+      sensorSensitivity: iso,
       format: const CameraImageFormat(ImageFormatGroup.yuv420, raw: 35),
       width: 64,
       height: 48,
@@ -244,6 +247,33 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 280));
       }
       expect(hints.last, FrameHint.good);
+    });
+
+    Future<List<FrameHint>> hintsFor(CameraImageData Function() make) async {
+      final session = await open();
+      final hints = <FrameHint>[];
+      session.hints.listen(hints.add);
+      for (var i = 0; i < 4; i++) {
+        platform.frames.add(make());
+        await Future<void>.delayed(const Duration(milliseconds: 280));
+      }
+      return hints;
+    }
+
+    test('with the exposure of the iPhone, a dark scene is blocked even if the image looks bright', () async {
+      final hints = await hintsFor(() => frame(125, iso: 1096, exposureNs: 21300000, aperture: 1.78));
+      expect(hints.last, FrameHint.veryDark);
+    });
+
+    test('with the exposure of the iPhone, a lit scene is good', () async {
+      final hints = await hintsFor(() => frame(152, iso: 67, exposureNs: 13000000, aperture: 1.78));
+      expect(hints.last, FrameHint.good);
+    });
+
+    test('with the exposure of the iPhone, a dim scene warns without blocking', () async {
+      final hints = await hintsFor(() => frame(133, iso: 320, exposureNs: 21300000, aperture: 1.78));
+      expect(hints.last, FrameHint.tooDark);
+      expect(hints.last.blocksShutter, isFalse);
     });
 
     test('frames that come too fast are skipped to spare the phone', () async {

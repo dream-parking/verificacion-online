@@ -27,9 +27,17 @@ void main() {
     test('each state has its own message, the good one first reassures', () {
       expect(FrameHint.good.message, 'Bien, mantén el teléfono quieto');
       expect(FrameHint.tooDark.message, 'Hay poca luz. Busca un lugar más iluminado.');
+      expect(FrameHint.veryDark.message, 'Está demasiado oscuro para tomar la foto. Busca un lugar con más luz.');
       expect(FrameHint.moving.message, 'Mueve menos el teléfono.');
       expect(FrameHint.analyzing.message, 'Mantén el teléfono quieto');
       expect(FrameHint.values.map((h) => h.message).toSet(), hasLength(FrameHint.values.length));
+    });
+
+    test('only a very dark image blocks the shutter: the other hints warn but never stop the photo', () {
+      expect(FrameHint.veryDark.blocksShutter, isTrue);
+      for (final h in FrameHint.values.where((h) => h != FrameHint.veryDark)) {
+        expect(h.blocksShutter, isFalse, reason: '$h');
+      }
     });
 
     test('only the good state is a confirmation', () {
@@ -54,12 +62,44 @@ void main() {
       expect(m.add(stripes()), FrameHint.good);
     });
 
-    test('a dark scene is reported as too dark even if it is steady', () {
+    test('a dim scene is reported as too dark even if it is steady, but it is not blocked', () {
       final m = FrameQualityMonitor();
-      final dark = flat(20);
-      m.add(dark);
-      m.add(dark);
-      expect(m.add(dark), FrameHint.tooDark);
+      final dim = flat(40);
+      m.add(dim);
+      m.add(dim);
+      expect(m.add(dim), FrameHint.tooDark);
+      expect(m.hint.blocksShutter, isFalse);
+    });
+
+    test('a scene that is almost black is very dark: the photo cannot be taken', () {
+      final m = FrameQualityMonitor();
+      final black = flat(10);
+      m.add(black);
+      m.add(black);
+      expect(m.add(black), FrameHint.veryDark);
+      expect(m.hint.blocksShutter, isTrue);
+    });
+
+    test('the limit between dim and very dark is where the monitor says', () {
+      expect(FrameQualityMonitor().veryDarkMean, lessThan(FrameQualityMonitor().darkMean));
+      for (final (luma, expected) in [(24, FrameHint.veryDark), (26, FrameHint.tooDark), (54, FrameHint.tooDark), (56, FrameHint.good)]) {
+        final m = FrameQualityMonitor();
+        m.add(flat(luma));
+        m.add(flat(luma));
+        expect(m.add(flat(luma)), expected, reason: 'luma $luma');
+      }
+    });
+
+    test('it recovers once there is light again', () {
+      final m = FrameQualityMonitor();
+      for (var i = 0; i < 3; i++) {
+        m.add(flat(10));
+      }
+      expect(m.hint, FrameHint.veryDark);
+      for (var i = 0; i < 4; i++) {
+        m.add(flat(150));
+      }
+      expect(m.hint, FrameHint.good);
     });
 
     test('a scene that changes from frame to frame is reported as moving', () {
@@ -73,7 +113,7 @@ void main() {
     test('too dark wins over moving: first fix the light', () {
       final m = FrameQualityMonitor();
       for (var i = 0; i < 5; i++) {
-        m.add(flat(i.isEven ? 10 : 40));
+        m.add(flat(i.isEven ? 30 : 45));
       }
       expect(m.hint, FrameHint.tooDark);
     });

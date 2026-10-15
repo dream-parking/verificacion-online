@@ -126,6 +126,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   String? _duiError;
   var _uploadingDui = false;
 
+  /// Differences between the basic data and the DUI that the person already accepted («Continuar de todos modos»).
+  String? _acceptedDifference;
+
+  /// The person came back to correct the basic data after the warning: when saved, it returns to the confirmation.
+  var _correctingBasicData = false;
+
   /// The person came from the confirmation to repeat a photo: the other one and the data are kept.
   var _retakingDui = false;
 
@@ -170,6 +176,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     setState(() {
       _screen = s;
       if (s != Screen.identityDocument) _retakingDui = false;
+      if (s != Screen.basicData && s != Screen.identityConfirmation) _correctingBasicData = false;
       _submitFailed = false;
       _startError = null;
       _saveError = null;
@@ -224,6 +231,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       return;
     }
     if (_screen == Screen.identityConfirmation) {
+      // The data is valid; if it is another person than the one who filled the form, the person is told first.
+      final differences = _form.identityMismatches();
+      if (differences.isNotEmpty && _acceptedDifference != _form.identityDifferenceSignature) {
+        _warnIdentityMismatch(differences);
+        return;
+      }
       _saveAndContinue(_confirmIdentity, conflictMessage: 'No pudimos guardar los datos de tu DUI. Vuelve a tomar las fotos e inténtalo de nuevo.');
       return;
     }
@@ -274,6 +287,26 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _duiError = null;
       _retakingDui = false;
     });
+  }
+
+  /// The basic data and the DUI do not say the same: it warns and lets the person correct the basic data or go on.
+  Future<void> _warnIdentityMismatch(List<IdentityMismatch> differences) async {
+    final choice = await showModalBottomSheet<_MismatchChoice>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (context) => _MismatchWarning(differences: differences),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case _MismatchChoice.correct:
+        _correctingBasicData = true;
+        _goTo(Screen.basicData);
+      case _MismatchChoice.goOn:
+        _acceptedDifference = _form.identityDifferenceSignature;
+        _continue();
+    }
   }
 
   /// VDI-78: «Repetir» on a photo of the confirmation: the camera asks for that side only.
@@ -345,6 +378,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   /// Saves the current step in the API and only moves on if it was saved.
   Future<void> _saveAndContinue(Future<void> Function() save, {String? conflictMessage}) async {
+    final returnToConfirmation = _correctingBasicData && _screen == Screen.basicData;
     final step = _screen;
     setState(() {
       _saving = true;
@@ -355,7 +389,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       if (!mounted) return;
       setState(() => _saving = false);
       _completeStep(_signalStepOf(step));
-      _goTo(_next[step]!);
+      _correctingBasicData = false;
+      _goTo(returnToConfirmation ? Screen.identityConfirmation : _next[step]!);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -1595,6 +1630,58 @@ class _SavedNote extends StatelessWidget {
         SizedBox(width: 6),
         Flexible(child: Text('Guardamos tu avance en cada paso.', style: AppText.small, textAlign: TextAlign.center)),
       ],
+    );
+  }
+}
+
+enum _MismatchChoice { correct, goOn }
+
+/// Warning that the basic data and the DUI do not match: what was written against what the DUI says.
+class _MismatchWarning extends StatelessWidget {
+  const _MismatchWarning({required this.differences});
+
+  final List<IdentityMismatch> differences;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const ScreenTitle('Tus datos no coinciden con tu DUI', size: 24),
+            const SizedBox(height: 12),
+            const Text('Lo que escribiste al inicio es distinto de lo que dice tu DUI.', style: AppText.body),
+            const SizedBox(height: 16),
+            for (final d in differences) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: AppColors.neutral100, borderRadius: BorderRadius.circular(8)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(d.label, style: AppText.bodyBold),
+                    Text('Escribiste: ${d.declared}', style: AppText.body),
+                    Text('Tu DUI dice: ${d.read}', style: AppText.body),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            const SizedBox(height: 4),
+            const Text(
+              'Si tu DUI es el correcto, corrige tus datos. Si continúas así, la diferencia quedará registrada.',
+              style: AppText.bodyMuted,
+            ),
+            const SizedBox(height: 20),
+            PrimaryButton(text: 'Corregir mis datos', onPressed: () => Navigator.of(context).pop(_MismatchChoice.correct)),
+            const SizedBox(height: 10),
+            SecondaryButton(text: 'Continuar de todos modos', onPressed: () => Navigator.of(context).pop(_MismatchChoice.goOn)),
+          ],
+        ),
+      ),
     );
   }
 }

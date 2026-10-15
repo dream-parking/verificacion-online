@@ -11,6 +11,9 @@ enum FrameHint {
   /// Not enough light to read the DUI.
   tooDark('Hay poca luz. Busca un lugar más iluminado.'),
 
+  /// Almost no light: a photo would come out black, so the shutter is off until there is light.
+  veryDark('Está demasiado oscuro para tomar la foto. Busca un lugar con más luz.'),
+
   /// The image changes from one frame to the next: the phone is moving, so the photo would come out blurred.
   moving('Mueve menos el teléfono.');
 
@@ -19,6 +22,9 @@ enum FrameHint {
   final String message;
 
   bool get isGood => this == FrameHint.good;
+
+  /// Only a very dark image stops the photo; every other hint warns and lets the person decide.
+  bool get blocksShutter => this == FrameHint.veryDark;
 }
 
 /// Brightness of the middle of a frame, in a small fixed grid: cheap to compute on every frame and enough to tell
@@ -90,10 +96,13 @@ class LumaGrid {
 ///
 /// The thresholds are a starting point to be tuned on real phones.
 class FrameQualityMonitor {
-  FrameQualityMonitor({this.darkMean = 55, this.movingDifference = 8, this.confirmations = 2});
+  FrameQualityMonitor({this.darkMean = 55, this.veryDarkMean = 25, this.movingDifference = 8, this.confirmations = 2});
 
-  /// Mean luma under which there is not enough light.
+  /// Mean luma under which there is not enough light: the person is warned.
   final double darkMean;
+
+  /// Mean luma under which the image is almost black: the shutter is off.
+  final double veryDarkMean;
 
   /// Mean change between consecutive frames over which the phone is moving.
   final double movingDifference;
@@ -110,7 +119,9 @@ class FrameQualityMonitor {
     _previous = grid;
     if (previous == null) return hint;
 
-    final raw = grid.mean < darkMean
+    final raw = grid.mean < veryDarkMean
+        ? FrameHint.veryDark
+        : grid.mean < darkMean
         ? FrameHint.tooDark
         : grid.differenceTo(previous) > movingDifference
             ? FrameHint.moving

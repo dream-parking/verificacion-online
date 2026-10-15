@@ -1165,6 +1165,50 @@ void main() {
         expect(camera.photos, 1);
       });
 
+      testWidgets('when it is very dark the shutter is off, it says why, and no photo is taken', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+
+        camera.hint(FrameHint.veryDark);
+        await tester.pumpAndSettle();
+        expect(find.text('Está demasiado oscuro para tomar la foto. Busca un lugar con más luz.'), findsOneWidget);
+
+        await tester.tap(shutter);
+        await tester.pump();
+        expect(camera.photos, 0, reason: 'the shutter does nothing in the dark');
+        expect(find.text('Coloca el frente de tu DUI dentro del marco'), findsOneWidget);
+      });
+
+      testWidgets('the shutter says it is not available while it is too dark, for screen readers', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+        final handle = tester.ensureSemantics();
+        camera.hint(FrameHint.veryDark);
+        await tester.pumpAndSettle();
+        expect(tester.getSemantics(shutter), matchesSemantics(label: 'Tomar foto. No disponible: hay muy poca luz.', isButton: true, hasTapAction: false));
+        handle.dispose();
+      });
+
+      testWidgets('the shutter works again as soon as there is light', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+        camera.hint(FrameHint.veryDark);
+        await tester.pumpAndSettle();
+        camera.hint(FrameHint.good);
+        await tester.pumpAndSettle();
+        await tap(tester, shutter);
+        expect(camera.photos, 1);
+      });
+
+      testWidgets('dim light only warns: the photo can be taken', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+        camera.hint(FrameHint.tooDark);
+        await tester.pumpAndSettle();
+        await tap(tester, shutter);
+        expect(camera.photos, 1);
+      });
+
       testWidgets('a bad hint never blocks the photo: the person can still take it', (tester) async {
         final camera = FakeCamera();
         await goToDui(tester, FakeApi(), camera);

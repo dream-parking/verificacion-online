@@ -31,9 +31,9 @@ import jakarta.validation.constraints.Pattern;
 @Retention(RUNTIME)
 public @interface UserName {
 
-	String REGEXP = "\\s*[" + PersonName.LETTERS + "]+([ '\\-][" + PersonName.LETTERS + "]+)*\\s*";
+	String REGEXP = PersonName.REGEXP;
 
-	String message() default "Solo se permiten letras (incluidas tildes y ñ), espacios, apóstrofo (') y guion (-)";
+	String message() default PersonName.MESSAGE;
 
 	Class<?>[] groups() default {};
 

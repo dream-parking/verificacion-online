@@ -68,17 +68,18 @@ class TextFormatsTests {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = { "Marta Alejandra", "José Ñúñez", "Ana", " Rivas Cruz ", "Zoë Müller" })
-	void namesAreLettersAndSingleSpaces(String name) {
+	@ValueSource(strings = { "Marta Alejandra", "José Ñúñez", "Ana", " Rivas Cruz ", "Zoë Müller", "María-José",
+			"Rivas-Cruz", "D'Aubuisson", "Ana O'Brien" })
+	void namesAreLettersJoinedBySpacesApostrophesAndHyphens(String name) {
 		assertThat(violations(new Name(name))).isEmpty();
 	}
 
 	@ParameterizedTest
 	@ValueSource(strings = { "Juan2", "Ana 😀", "Robert'); DROP TABLE customer;--", "<script>alert(1)</script>",
-			"Ana  María", "María-José", "Ana\u200BMaría", "Ana\u0000", "J. Pérez", "Ana\tMaría", "Иван", "李明",
-			"Ana Ωmega", "Mª José" })
-	void namesRejectDigitsSymbolsEmojisAndInvisibleCharacters(String name) {
-		assertThat(violations(new Name(name))).containsExactly("Solo se permiten letras y espacios");
+			"Ana  María", "Ana\u200BMaría", "Ana\u0000", "J. Pérez", "Ana\tMaría", "Иван", "李明", "Ana Ωmega",
+			"Mª José", "-Ana", "Ana-", "'Ana", "Ana'", "Ana--José", "D''Aubuisson", "Ana -José", "Ana’s" })
+	void namesRejectDigitsSymbolsEmojisAndMisplacedPunctuation(String name) {
+		assertThat(violations(new Name(name))).containsExactly(PersonName.MESSAGE);
 	}
 
 	@ParameterizedTest

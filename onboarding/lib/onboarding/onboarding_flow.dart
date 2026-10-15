@@ -622,15 +622,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 ],
               ),
               if (_submitting)
-                const _LoadingOverlay(title: 'Enviando tu solicitud…', detail: 'No cierres la aplicación.'),
+                const LoadingOverlay(title: 'Enviando tu solicitud…', detail: 'No cierres la aplicación.'),
               if (_saving)
-                const _LoadingOverlay(title: 'Guardando tu información…', detail: 'Un momento, por favor.'),
+                const LoadingOverlay(title: 'Guardando tu información…', detail: 'Un momento, por favor.'),
               if (_uploadingDui)
-                const _LoadingOverlay(title: 'Revisando tu DUI…', detail: 'Estamos leyendo tus fotos. Puede tardar unos segundos.'),
+                const LoadingOverlay(title: 'Revisando tu DUI…', detail: 'Estamos leyendo tus fotos. Puede tardar unos segundos.'),
               if (_starting)
-                const _LoadingOverlay(title: 'Preparando tu solicitud…', detail: 'Esto puede tardar unos segundos.'),
+                const LoadingOverlay(title: 'Preparando tu solicitud…', detail: 'Esto puede tardar unos segundos.'),
               if (_locating)
-                const _LoadingOverlay(title: 'Buscando tu ciudad…', detail: 'Esto puede tardar unos segundos.'),
+                const LoadingOverlay(title: 'Buscando tu ciudad…', detail: 'Esto puede tardar unos segundos.'),
             ],
           ),
         ),
@@ -1766,40 +1766,3 @@ class _ConnectionError extends StatelessWidget {
   }
 }
 
-class _LoadingOverlay extends StatelessWidget {
-  const _LoadingOverlay({required this.title, required this.detail});
-
-  final String title;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: ColoredBox(
-        color: Colors.white.withValues(alpha: 0.92),
-        child: Semantics(
-          liveRegion: true,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(
-                width: 48,
-                height: 48,
-                child: CircularProgressIndicator(
-                  strokeWidth: 5,
-                  color: AppColors.brandGreen,
-                  backgroundColor: AppColors.border,
-                  strokeCap: StrokeCap.round,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(title, style: AppText.heading(20)),
-              const SizedBox(height: 16),
-              Text(detail, style: AppText.bodyMuted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

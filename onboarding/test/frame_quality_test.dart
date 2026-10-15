@@ -259,4 +259,108 @@ void main() {
       expect(flat(130).differenceTo(flat(100)), 30);
     });
   });
+
+  group('scene light from the exposure of the camera', () {
+    // The three scenes of the iPhone 15 Pro Max (aperture f/1.78): the brightness of the image hides the dark because the
+    // phone raises the ISO, but the exposure tells the truth.
+    const aperture = 1.78;
+
+    test('the light is computed from aperture, exposure time and ISO', () {
+      expect(sceneEv(aperture: aperture, exposureNanoseconds: 13000000, iso: 67), closeTo(8.5, 0.1));
+      expect(sceneEv(aperture: aperture, exposureNanoseconds: 21300000, iso: 320), closeTo(5.5, 0.1));
+      expect(sceneEv(aperture: aperture, exposureNanoseconds: 21300000, iso: 1096), closeTo(3.8, 0.1));
+    });
+
+    test('a darker scene always gives a lower number', () {
+      final bright = sceneEv(aperture: aperture, exposureNanoseconds: 13000000, iso: 67)!;
+      final dim = sceneEv(aperture: aperture, exposureNanoseconds: 21300000, iso: 320)!;
+      final dark = sceneEv(aperture: aperture, exposureNanoseconds: 21300000, iso: 1096)!;
+      expect(bright, greaterThan(dim));
+      expect(dim, greaterThan(dark));
+    });
+
+    test('without the data, or with impossible values, there is no number', () {
+      expect(sceneEv(aperture: null, exposureNanoseconds: 1000000, iso: 100), isNull);
+      expect(sceneEv(aperture: aperture, exposureNanoseconds: null, iso: 100), isNull);
+      expect(sceneEv(aperture: aperture, exposureNanoseconds: 1000000, iso: null), isNull);
+      expect(sceneEv(aperture: aperture, exposureNanoseconds: 0, iso: 100), isNull);
+      expect(sceneEv(aperture: aperture, exposureNanoseconds: 1000000, iso: 0), isNull);
+      expect(sceneEv(aperture: 0, exposureNanoseconds: 1000000, iso: 100), isNull);
+      expect(sceneEv(aperture: aperture, exposureNanoseconds: -5, iso: 100), isNull);
+    });
+
+    test('the limits are the ones measured: block under 4.5, warn under 6.5', () {
+      final m = FrameQualityMonitor();
+      expect(m.veryDarkEv, 4.5);
+      expect(m.darkEv, 6.5);
+      expect(m.veryDarkEv, lessThan(m.darkEv));
+    });
+
+    FrameHint after(List<double> evs, {int luma = 130, FrameQualityMonitor? monitor}) {
+      final m = monitor ?? FrameQualityMonitor();
+      for (final ev in evs) {
+        m.add(flat(luma), sceneEv: ev);
+      }
+      return m.hint;
+    }
+
+    test('the dark scene is blocked even though the image is bright: the phone raised the ISO', () {
+      expect(after([3.8, 3.8, 3.8], luma: 125), FrameHint.veryDark);
+    });
+
+    test('the dim scene only warns, and the bright one is good', () {
+      expect(after([5.5, 5.5, 5.5], luma: 133), FrameHint.tooDark);
+      expect(after([8.5, 8.5, 8.5], luma: 152), FrameHint.good);
+    });
+
+    test('the limits are exact: 4.4 blocks, 4.6 warns, 6.4 warns, 6.6 is good', () {
+      expect(after([4.4, 4.4, 4.4]), FrameHint.veryDark);
+      expect(after([4.6, 4.6, 4.6]), FrameHint.tooDark);
+      expect(after([6.4, 6.4, 6.4]), FrameHint.tooDark);
+      expect(after([6.6, 6.6, 6.6]), FrameHint.good);
+    });
+
+    test('once blocked it needs a little more light to let go, so it does not flicker', () {
+      final m = FrameQualityMonitor();
+      expect(after([3.8, 3.8, 3.8], monitor: m), FrameHint.veryDark);
+      final seen = <FrameHint>{};
+      for (final ev in [4.7, 4.3, 4.8, 4.4, 4.9]) {
+        seen.add(m.add(flat(130), sceneEv: ev));
+      }
+      expect(seen, {FrameHint.veryDark}, reason: 'it hovers around the limit and stays blocked');
+      expect(after([5.6, 5.6, 5.6], monitor: m), FrameHint.tooDark);
+    });
+
+    test('with the exposure the brightness of the image is not used for the light', () {
+      expect(after([8.5, 8.5, 8.5], luma: 10), FrameHint.good, reason: 'a dark image but a bright scene');
+    });
+
+    test('without the exposure it falls back to the brightness of the image', () {
+      final m = FrameQualityMonitor();
+      for (var i = 0; i < 3; i++) {
+        m.add(flat(10));
+      }
+      expect(m.hint, FrameHint.veryDark);
+    });
+  });
+
+  group('movement', () {
+    test('a hand-held phone with the 2x zoom does not trigger «Mueve menos» for ordinary jitter', () {
+      expect(FrameQualityMonitor().movingDifference, 18);
+      final m = FrameQualityMonitor();
+      m.add(flat(120));
+      for (var i = 0; i < 5; i++) {
+        m.add(flat(i.isEven ? 134 : 120)); // a change of 14 between frames
+      }
+      expect(m.hint, FrameHint.good);
+    });
+
+    test('a real movement is still reported', () {
+      final m = FrameQualityMonitor();
+      for (var i = 0; i < 4; i++) {
+        m.add(stripes(shift: i * 4));
+      }
+      expect(m.hint, FrameHint.moving);
+    });
+  });
 }

@@ -76,13 +76,25 @@ class PlatformDocumentCamera implements DocumentCamera {
 
   /// Zoom and focus for photographing a document. Whatever the phone cannot do is skipped: the camera still works.
   static Future<void> _prepare(CameraController controller) async {
-    try {
+    // The flash off: in the dark the phone would fire it on its own (automatic by default) and put a glare on the DUI.
+    // The Product Owner decided that the answer to the dark is to block the shutter, not to light the document.
+    await _tryTo('flash', () => controller.setFlashMode(FlashMode.off));
+    await _tryTo('zoom', () async {
       final zoom = initialZoom(await controller.getMinZoomLevel(), await controller.getMaxZoomLevel());
       await controller.setZoomLevel(zoom);
+    });
+    await _tryTo('focus', () async {
       await controller.setFocusMode(FocusMode.auto);
       await controller.setFocusPoint(const Offset(0.5, 0.5));
+    });
+  }
+
+  /// One setting at a time: a phone that cannot do one of them must not lose the others.
+  static Future<void> _tryTo(String what, Future<void> Function() action) async {
+    try {
+      await action();
     } on CameraException catch (e) {
-      debugPrint('Could not set the zoom and the focus: ${e.code}');
+      debugPrint('Could not set the $what: ${e.code}');
     }
   }
 }
@@ -100,6 +112,7 @@ class _PlatformSession implements CameraSession {
 
   /// Starts reading the live frames. If the phone cannot, there are no hints and the photo works the same.
   Future<void> startAnalysis() async {
+    if (!_controller.supportsImageStreaming()) return;
     try {
       await _controller.startImageStream(_onFrame);
     } on Exception catch (e) {

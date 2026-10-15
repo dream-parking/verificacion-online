@@ -53,7 +53,11 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
   Offset? _focusRing;
   Timer? _focusRingTimer;
 
-  DuiSide get _side => widget.sides[_photos.length];
+  /// All the photos asked for were taken: the screen waits (behind the «Revisando tu DUI…» message) for the answer.
+  bool get _allTaken => _photos.length >= widget.sides.length;
+
+  /// The side being photographed; once everything is taken it stays on the last one instead of going out of range.
+  DuiSide get _side => widget.sides[_allTaken ? widget.sides.length - 1 : _photos.length];
 
   @override
   void initState() {
@@ -100,7 +104,7 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
 
   Future<void> _take() async {
     final session = _session;
-    if (session == null || _taking || _hint.blocksShutter) return;
+    if (session == null || _taking || _allTaken || _hint.blocksShutter) return;
     setState(() => _taking = true);
     try {
       final photo = await session.takePhoto();

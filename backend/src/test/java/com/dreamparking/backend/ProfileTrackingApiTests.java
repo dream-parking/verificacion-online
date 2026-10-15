@@ -85,6 +85,60 @@ class ProfileTrackingApiTests {
 	}
 
 	@Test
+	void eachChangeBeforeSubmittingIsANewVersionAndTheOldOnesStay() throws Exception {
+		String requestId = requestAtExpectedActivity();
+		expectedActivity(requestId, """
+				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "200_500"}
+				""").andExpect(status().isOk());
+		// The same again is not a change: no new version.
+		expectedActivity(requestId, """
+				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "200_500"}
+				""").andExpect(status().isOk());
+		expectedActivity(requestId, FULL_PROFILE).andExpect(status().isOk());
+
+		perform(get("/api/console/requests/{id}", requestId))
+			.andExpect(jsonPath("$.expectedActivity.monthlyAmountUsd").value(350.00))
+			.andExpect(jsonPath("$.expectedActivity.versions.length()").value(2))
+			.andExpect(jsonPath("$.expectedActivity.versions[0].version").value(1))
+			.andExpect(jsonPath("$.expectedActivity.versions[0].current").value(false))
+			.andExpect(jsonPath("$.expectedActivity.versions[0].monthlyAmountRangeCode").value("200_500"))
+			.andExpect(jsonPath("$.expectedActivity.versions[0].monthlyAmountUsd").doesNotExist())
+			.andExpect(jsonPath("$.expectedActivity.versions[0].changedBy").value("CUSTOMER"))
+			.andExpect(jsonPath("$.expectedActivity.versions[0].declaredAt", notNullValue()))
+			.andExpect(jsonPath("$.expectedActivity.versions[1].version").value(2))
+			.andExpect(jsonPath("$.expectedActivity.versions[1].current").value(true))
+			.andExpect(jsonPath("$.expectedActivity.versions[1].additionalTransactionTypeCodes", contains("REMESAS")))
+			.andExpect(jsonPath("$.expectedActivity.versions[1].monthlyAmountUsd").value(350.00))
+			.andExpect(jsonPath("$.timeline[?(@.type == 'EXPECTED_ACTIVITY_REGISTERED')].description",
+					containsInAnyOrder("Movimiento esperado registrado (versión 1)",
+							"Movimiento esperado registrado (versión 1)", "Movimiento esperado registrado (versión 2)")));
+	}
+
+	@Test
+	void theVersionsOfTheProfileCannotBeChangedOrDeleted() throws Exception {
+		String requestId = requestAtExpectedActivity();
+		expectedActivity(requestId, FULL_PROFILE).andExpect(status().isOk());
+		em.flush();
+
+		assertThatThrownBy(() -> jdbc.update(
+				"update expected_activity_version set monthly_amount_range_code = 'MAS_1000' where request_id = ?::uuid",
+				requestId))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("cannot be modified or deleted");
+	}
+
+	@Test
+	void theVersionsOfTheProfileCannotBeDeleted() throws Exception {
+		String requestId = requestAtExpectedActivity();
+		expectedActivity(requestId, FULL_PROFILE).andExpect(status().isOk());
+		em.flush();
+
+		assertThatThrownBy(
+				() -> jdbc.update("delete from expected_activity_version where request_id = ?::uuid", requestId))
+			.isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
 	void theOldBodyWithOnlyTypeAndRangeIsStillAccepted() throws Exception {
 		String requestId = submittedRequest("""
 				{"transactionTypeCode": "AHORRO", "monthlyAmountRangeCode": "HASTA_200"}

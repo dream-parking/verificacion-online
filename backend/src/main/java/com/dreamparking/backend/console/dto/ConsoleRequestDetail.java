@@ -16,6 +16,7 @@ import com.dreamparking.backend.identity.entity.enums.UnreadableSide;
 import com.dreamparking.backend.onboarding.entity.enums.DeviceLocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
+import com.dreamparking.backend.onboarding.entity.enums.ProfileChangedBy;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
@@ -65,7 +66,10 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			String rangeLabel, Instant registeredAt, Instant updatedAt) {
 	}
 
-	/** Declared expected activity (VDI-24), the baseline the account movements are compared against (VDI-3). */
+	/**
+	 * Declared expected activity (VDI-24), the baseline the account movements are compared against (VDI-3): the
+	 * version in force, and in {@code versions} every version the customer declared, the oldest first.
+	 */
 	@Schema(name = "ConsoleRequestExpectedActivity")
 	public record ExpectedActivity(String transactionTypeCode, String transactionTypeLabel,
 			String monthlyAmountRangeCode, String monthlyAmountRangeLabel,
@@ -73,7 +77,17 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			@Schema(description = "Monto mensual estimado en USD (null si no lo declaró)") BigDecimal monthlyAmountUsd,
 			@Schema(description = "Depósitos o pagos recibidos al mes (null si no lo declaró)") Short monthlyTransactionCount,
 			@Schema(description = "Salidas de dinero al mes en USD (null si no lo declaró)") BigDecimal monthlyOutflowUsd,
-			Instant registeredAt, Instant updatedAt) {
+			Instant registeredAt, Instant updatedAt,
+			@Schema(description = "Todas las versiones del perfil declarado, de la más antigua a la vigente") List<ProfileVersion> versions) {
+	}
+
+	/** One version of the declared profile (VDI-3); only the last one is {@code current}. */
+	@Schema(name = "ConsoleRequestProfileVersion")
+	public record ProfileVersion(int version, boolean current, String transactionTypeCode, String transactionTypeLabel,
+			String monthlyAmountRangeCode, String monthlyAmountRangeLabel, List<String> additionalTransactionTypeCodes,
+			BigDecimal monthlyAmountUsd, Short monthlyTransactionCount, BigDecimal monthlyOutflowUsd,
+			@Schema(description = "Quién la declaró: CUSTOMER = la persona, antes de enviar la solicitud") ProfileChangedBy changedBy,
+			Instant declaredAt) {
 	}
 
 	/**

@@ -238,4 +238,78 @@ void main() {
       expect(f.idBirthDate, '12/04/1990');
     });
   });
+
+  group('declared data against the DUI', () {
+    ApplicationForm declared({String dui = '04567891-2', String first = 'Marta Alejandra', String last = 'Rivas Cruz'}) =>
+        ApplicationForm()
+          ..dui = dui
+          ..firstNames = first
+          ..lastNames = last
+          ..idDui = '04567891-2'
+          ..idFirstNames = 'Marta Alejandra'
+          ..idLastNames = 'Rivas Cruz'
+          ..idBirthDate = '12/04/1990'
+          ..idExpiryDate = '01/06/2029';
+
+    test('the same identity has no differences', () {
+      expect(declared().identityMismatches(), isEmpty);
+    });
+
+    test('case, accents, ñ and extra spaces do not count, the same as the API compares', () {
+      expect((declared(first: '  MARTA   alejandra ')).identityMismatches(), isEmpty);
+      final f = declared()
+        ..idFirstNames = 'María José'
+        ..firstNames = 'maria  jose'
+        ..idLastNames = 'Muñoz Peña'
+        ..lastNames = 'MUNOZ PENA';
+      expect(f.identityMismatches(), isEmpty);
+    });
+
+    test('a typographic apostrophe is the same as a plain one', () {
+      final f = declared(last: "D'Aubuisson")..idLastNames = 'D’Aubuisson';
+      expect(f.identityMismatches(), isEmpty);
+    });
+
+    test('a different first name is reported with what was written and what the DUI says', () {
+      final m = declared(first: 'Pedro').identityMismatches();
+      expect(m, hasLength(1));
+      expect(m.single.label, 'Nombres');
+      expect(m.single.declared, 'Pedro');
+      expect(m.single.read, 'Marta Alejandra');
+    });
+
+    test('a different last name and a different DUI are reported each one', () {
+      final m = declared(last: 'López', dui: '07145973-5').identityMismatches();
+      expect(m.map((x) => x.label), ['Número de DUI', 'Apellidos']);
+      expect(m.first.declared, '07145973-5');
+      expect(m.first.read, '04567891-2');
+    });
+
+    test('everything different lists the three, DUI first', () {
+      final f = declared(dui: '07145973-5', first: 'Pedro', last: 'López');
+      expect(f.identityMismatches().map((x) => x.label), ['Número de DUI', 'Nombres', 'Apellidos']);
+    });
+
+    test('a missing name is not the same as a different one only if both are empty', () {
+      expect(declared(first: 'Marta').identityMismatches().single.label, 'Nombres', reason: 'a shorter name is different');
+    });
+
+    test('a hyphen is not a space: «Rivas-Cruz» and «Rivas Cruz» differ, as for the API', () {
+      expect(declared(last: 'Rivas-Cruz').identityMismatches().single.label, 'Apellidos');
+    });
+
+    test('the confirmed data is what is compared, so correcting the DUI fields can remove the difference', () {
+      final f = declared(first: 'Pedro');
+      expect(f.identityMismatches(), isNotEmpty);
+      f.idFirstNames = 'Pedro';
+      expect(f.identityMismatches(), isEmpty);
+    });
+
+    test('the same differences always give the same signature, and different ones do not', () {
+      expect(declared(first: 'Pedro').identityDifferenceSignature, declared(first: ' PEDRO').identityDifferenceSignature);
+      expect(declared(first: 'Pedro').identityDifferenceSignature,
+          isNot(declared(first: 'Juan').identityDifferenceSignature));
+    });
+  });
 }
+

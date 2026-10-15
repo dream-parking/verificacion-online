@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -30,14 +31,17 @@ import com.dreamparking.backend.onboarding.dto.ExpectedActivityRequest;
 import com.dreamparking.backend.onboarding.dto.IncomeDeclarationRequest;
 import com.dreamparking.backend.onboarding.dto.OnboardingRequestResponse;
 import com.dreamparking.backend.onboarding.entity.ExpectedActivity;
+import com.dreamparking.backend.onboarding.entity.ExpectedActivityVersion;
 import com.dreamparking.backend.onboarding.entity.IncomeDeclaration;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.PrivacyConsent;
 import com.dreamparking.backend.onboarding.entity.RequestEvent;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
+import com.dreamparking.backend.onboarding.entity.enums.ProfileChangedBy;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
+import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
 import com.dreamparking.backend.onboarding.repository.PrivacyConsentRepository;
@@ -78,6 +82,8 @@ public class OnboardingService {
 
 	private final IdentityDocumentRepository identityDocuments;
 
+	private final ExpectedActivityVersionRepository profileVersions;
+
 	private final boolean identityDocumentRequired;
 
 	public OnboardingService(OnboardingRequestRepository requests, PrivacyConsentRepository consents,
@@ -85,6 +91,7 @@ public class OnboardingService {
 			RequestEventRepository events, CatalogService catalogService,
 			PrivacyNoticeService privacyNoticeService, CustomerService customerService,
 			RiskAssessmentService riskAssessmentService, IdentityDocumentRepository identityDocuments,
+			ExpectedActivityVersionRepository profileVersions,
 			@Value("${app.onboarding.identity-document-required:true}") boolean identityDocumentRequired) {
 		this.requests = requests;
 		this.consents = consents;
@@ -96,6 +103,7 @@ public class OnboardingService {
 		this.customerService = customerService;
 		this.riskAssessmentService = riskAssessmentService;
 		this.identityDocuments = identityDocuments;
+		this.profileVersions = profileVersions;
 		this.identityDocumentRequired = identityDocumentRequired;
 	}
 
@@ -225,10 +233,27 @@ public class OnboardingService {
 				body.monthlyTransactionCount() == null ? null : body.monthlyTransactionCount().shortValue());
 		activity.setMonthlyOutflowUsd(body.monthlyOutflowUsd());
 		expectedActivities.save(activity);
+		short version = recordProfileVersion(activity);
 
 		completeStep(request, OnboardingStep.EXPECTED_ACTIVITY);
-		recordEvent(request, RequestEventType.EXPECTED_ACTIVITY_REGISTERED, "Movimiento esperado registrado");
+		recordEvent(request, RequestEventType.EXPECTED_ACTIVITY_REGISTERED,
+				"Movimiento esperado registrado (versión %d)".formatted(version), Map.of("version", version));
 		return riskAssessmentService.evaluate(request, range);
+	}
+
+	/**
+	 * VDI-3: a declaration that changes something is a new version of the declared profile; the previous ones stay as
+	 * they were. Sending the same again adds nothing. Returns the version in force.
+	 */
+	private short recordProfileVersion(ExpectedActivity activity) {
+		Optional<ExpectedActivityVersion> latest = profileVersions
+			.findFirstByRequest_IdOrderByVersionDesc(activity.getRequest().getId());
+		if (latest.isPresent() && latest.get().declaresTheSameAs(activity)) {
+			return latest.get().getVersion();
+		}
+		short next = (short) (latest.map(ExpectedActivityVersion::getVersion).orElse((short) 0) + 1);
+		profileVersions.save(new ExpectedActivityVersion(activity, next, ProfileChangedBy.CUSTOMER));
+		return next;
 	}
 
 	/** Extra types of money: active catalog codes, without repeating the main type or each other. */

@@ -23,7 +23,9 @@ import com.dreamparking.backend.identity.service.DuiValidator;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
+import com.dreamparking.backend.onboarding.entity.ExpectedActivityVersion;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
+import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
@@ -81,11 +83,14 @@ public class ConsoleRequestService {
 
 	private final IdentityDocumentImageRepository identityDocumentImages;
 
+	private final ExpectedActivityVersionRepository expectedActivityVersions;
+
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
 			RiskAssessmentService riskAssessments, IdentityDocumentRepository identityDocuments,
-			IdentityDocumentImageRepository identityDocumentImages) {
+			IdentityDocumentImageRepository identityDocumentImages,
+			ExpectedActivityVersionRepository expectedActivityVersions) {
 		this.jdbc = jdbc;
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
@@ -96,6 +101,7 @@ public class ConsoleRequestService {
 		this.riskAssessments = riskAssessments;
 		this.identityDocuments = identityDocuments;
 		this.identityDocumentImages = identityDocumentImages;
+		this.expectedActivityVersions = expectedActivityVersions;
 	}
 
 	/**
@@ -123,10 +129,12 @@ public class ConsoleRequestService {
 		List<ConsoleRequestListItem> content = jdbc.query(LIST_PAGE, params, (rs, row) -> {
 			total[0] = rs.getLong("total");
 			OffsetDateTime date = rs.getObject("activity_date", OffsetDateTime.class);
+			int score = rs.getInt("score");
 			return new ConsoleRequestListItem(rs.getObject("id", UUID.class), rs.getString("number"),
 					rs.getString("name"), date == null ? null : date.toInstant(), rs.getString("transaction_type_label"),
 					rs.getString("monthly_amount_range_label"), RiskLevel.valueOf(rs.getString("risk_level")),
-					RequestStatus.valueOf(rs.getString("status")), rs.getShort("completed_steps"));
+					rs.wasNull() ? null : score, RequestStatus.valueOf(rs.getString("status")),
+					rs.getShort("completed_steps"));
 		});
 		if (total[0] < 0) {
 			// Past the last page (or nothing matches): the window count came with no row.
@@ -153,7 +161,7 @@ public class ConsoleRequestService {
 					a.getTransactionType().getLabel(), a.getMonthlyAmountRange().getCode(),
 					a.getMonthlyAmountRange().getLabel(), List.copyOf(a.getExtraTransactionTypeCodes()),
 					a.getMonthlyAmountUsd(), a.getMonthlyTransactionCount(), a.getMonthlyOutflowUsd(),
-					a.getRegisteredAt(), a.getUpdatedAt()))
+					a.getRegisteredAt(), a.getUpdatedAt(), profileVersions(requestId)))
 			.orElse(null);
 		var risk = riskAssessments.findCurrent(requestId).orElse(null);
 		var signalsView = signals.findById(requestId)
@@ -175,6 +183,18 @@ public class ConsoleRequestService {
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
 				request.getSubmittedAt(), applicant, identityDocument, income, expectedActivity, risk, signalsView, stepTimes,
 				timeline);
+	}
+
+	/** Every version of the declared profile, the oldest first; the last one is the one in force. */
+	private List<ConsoleRequestDetail.ProfileVersion> profileVersions(UUID requestId) {
+		List<ExpectedActivityVersion> versions = expectedActivityVersions.findByRequest_IdOrderByVersionAsc(requestId);
+		return versions.stream()
+			.map(v -> new ConsoleRequestDetail.ProfileVersion(v.getVersion(), v == versions.get(versions.size() - 1),
+					v.getTransactionType().getCode(), v.getTransactionType().getLabel(),
+					v.getMonthlyAmountRange().getCode(), v.getMonthlyAmountRange().getLabel(), v.getExtraTypeCodes(),
+					v.getMonthlyAmountUsd(), v.getMonthlyTransactionCount(), v.getMonthlyOutflowUsd(),
+					v.getChangedBy(), v.getDeclaredAt()))
+			.toList();
 	}
 
 	private ConsoleRequestDetail.IdentityDocument toIdentityDocument(IdentityDocument d) {

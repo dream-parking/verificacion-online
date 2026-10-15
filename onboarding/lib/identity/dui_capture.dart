@@ -49,7 +49,15 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
   var _taking = false;
   var _disposed = false;
 
-  DuiSide get _side => widget.sides[_photos.length];
+  /// Where the person tapped to focus, while the ring is shown.
+  Offset? _focusRing;
+  Timer? _focusRingTimer;
+
+  /// All the photos asked for were taken: the screen waits (behind the «Revisando tu DUI…» message) for the answer.
+  bool get _allTaken => _photos.length >= widget.sides.length;
+
+  /// The side being photographed; once everything is taken it stays on the last one instead of going out of range.
+  DuiSide get _side => widget.sides[_allTaken ? widget.sides.length - 1 : _photos.length];
 
   @override
   void initState() {
@@ -74,8 +82,20 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
     }
   }
 
+  /// Focuses where the person tapped and shows a ring for a moment.
+  void _focusAt(CameraSession session, Offset local, Size area) {
+    if (area.isEmpty) return;
+    unawaited(session.focusAt(Offset((local.dx / area.width).clamp(0.0, 1.0), (local.dy / area.height).clamp(0.0, 1.0))));
+    _focusRingTimer?.cancel();
+    setState(() => _focusRing = local);
+    _focusRingTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _focusRing = null);
+    });
+  }
+
   @override
   void dispose() {
+    _focusRingTimer?.cancel();
     _disposed = true;
     _hints?.cancel();
     _session?.dispose();
@@ -84,7 +104,7 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
 
   Future<void> _take() async {
     final session = _session;
-    if (session == null || _taking) return;
+    if (session == null || _taking || _allTaken || _hint.blocksShutter) return;
     setState(() => _taking = true);
     try {
       final photo = await session.takePhoto();
@@ -171,12 +191,20 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
           ),
         ),
         Expanded(
-          child: Stack(
-            children: [
-              Positioned.fill(child: _FullPreview(child: session.preview)),
-              const Positioned.fill(child: _FrameOverlay()),
-              Positioned(left: 16, right: 16, bottom: 12, child: Center(child: _StatusPill(_hint))),
-            ],
+          child: LayoutBuilder(
+            builder: (context, c) => GestureDetector(
+              key: const Key('camera-preview'),
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (d) => _focusAt(session, d.localPosition, c.biggest),
+              child: Stack(
+                children: [
+                  Positioned.fill(child: session.preview),
+                  const Positioned.fill(child: _FrameOverlay()),
+                  if (_focusRing != null) _FocusRing(key: const Key('focus-ring'), at: _focusRing!),
+                  Positioned(left: 16, right: 16, bottom: 12, child: Center(child: _StatusPill(_hint))),
+                ],
+              ),
+            ),
           ),
         ),
         const Padding(
@@ -194,7 +222,7 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
         ),
         Padding(
           padding: EdgeInsets.fromLTRB(24, 16, 24, 20 + MediaQuery.paddingOf(context).bottom),
-          child: _Shutter(busy: _taking, onPressed: _take),
+          child: _Shutter(busy: _taking, blocked: _hint.blocksShutter, onPressed: _take),
         ),
       ],
     );
@@ -277,18 +305,25 @@ class _SideProgress extends StatelessWidget {
   }
 }
 
-/// The preview covers the whole area without stretching.
-class _FullPreview extends StatelessWidget {
-  const _FullPreview({required this.child});
+/// Ring where the person tapped to focus.
+class _FocusRing extends StatelessWidget {
+  const _FocusRing({super.key, required this.at});
 
-  final Widget child;
+  final Offset at;
+
+  static const _size = 72.0;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(width: 300, height: 400, child: child),
+    return Positioned(
+      left: at.dx - _size / 2,
+      top: at.dy - _size / 2,
+      child: IgnorePointer(
+        child: Container(
+          width: _size,
+          height: _size,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.brand, width: 2)),
+        ),
       ),
     );
   }
@@ -362,6 +397,7 @@ class _StatusPill extends StatelessWidget {
       FrameHint.analyzing => (Icons.center_focus_strong_outlined, Colors.black87, Colors.white),
       FrameHint.tooDark => (Icons.light_mode_outlined, const Color(0xFF3D3010), const Color(0xFFFFD27A)),
       FrameHint.moving => (Icons.open_with, const Color(0xFF3D3010), const Color(0xFFFFD27A)),
+      FrameHint.veryDark => (Icons.dark_mode_outlined, const Color(0xFF4A1A17), const Color(0xFFFFB4AB)),
     };
     return Semantics(
       liveRegion: true,
@@ -412,26 +448,32 @@ class _Tip extends StatelessWidget {
 }
 
 class _Shutter extends StatelessWidget {
-  const _Shutter({required this.busy, required this.onPressed});
+  const _Shutter({required this.busy, required this.blocked, required this.onPressed});
 
   final bool busy;
+
+  /// Off because there is not enough light to take the photo.
+  final bool blocked;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final off = busy || blocked;
     return Semantics(
       button: true,
-      label: 'Tomar foto',
+      excludeSemantics: true,
+      label: blocked ? 'Tomar foto. No disponible: hay muy poca luz.' : 'Tomar foto',
+      onTap: off ? null : onPressed,
       child: GestureDetector(
         key: const Key('shutter'),
-        onTap: busy ? null : onPressed,
+        onTap: off ? null : onPressed,
         child: Container(
           width: 80,
           height: 80,
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white54, width: 4)),
           child: DecoratedBox(
-            decoration: BoxDecoration(shape: BoxShape.circle, color: busy ? Colors.white38 : AppColors.brand),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: off ? Colors.white38 : AppColors.brand),
           ),
         ),
       ),

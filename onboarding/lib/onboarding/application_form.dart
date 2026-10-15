@@ -45,6 +45,36 @@ final _namePattern = RegExp(r"^\p{L}+([ '\-]\p{L}+)*$", unicode: true);
 /// Trims the name and leaves a single space between words, as the API expects it.
 String normalizeName(String raw) => raw.trim().replaceAll(RegExp(r'\s+'), ' ');
 
+/// One field where the declared data and the DUI say different things.
+class IdentityMismatch {
+  const IdentityMismatch(this.label, this.declared, this.read);
+
+  /// «Número de DUI», «Nombres» or «Apellidos».
+  final String label;
+
+  /// What the person wrote in the basic data.
+  final String declared;
+
+  /// What the DUI says, as confirmed.
+  final String read;
+}
+
+const _accents = {
+  'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a', 'ā': 'a',
+  'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'ē': 'e',
+  'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i', 'ī': 'i',
+  'ó': 'o', 'ò': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', 'ō': 'o',
+  'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u', 'ū': 'u',
+  'ñ': 'n', 'ç': 'c', 'ý': 'y', 'ÿ': 'y', 'š': 's', 'ž': 'z', 'č': 'c',
+};
+
+/// A name as the API compares it (`IdentityDocument.comparable`): without accents (the ñ too), in lowercase and
+/// with a single space between words.
+String comparableName(String raw) {
+  final lower = normalizePersonName(raw).toLowerCase();
+  return lower.split('').map((c) => _accents[c] ?? c).join();
+}
+
 /// Trims the name, leaves a single space between words and writes every typographic apostrophe
 /// (the phone keyboards type ’) as the plain one the API expects.
 String normalizePersonName(String raw) => normalizeName(raw.replaceAll(RegExp('[’‘ʼ]'), "'"));
@@ -147,6 +177,22 @@ class ApplicationForm {
           field,
     ]);
   }
+
+  /// Differences between what the person wrote in the basic data and what the DUI says (confirmed), compared as the
+  /// API does: without accents, capitals or extra spaces. DUI first. Empty when it is the same identity.
+  List<IdentityMismatch> identityMismatches() => [
+        if (dui != idDui) IdentityMismatch('Número de DUI', dui, idDui),
+        if (comparableName(firstNames) != comparableName(idFirstNames))
+          IdentityMismatch('Nombres', normalizePersonName(firstNames), normalizePersonName(idFirstNames)),
+        if (comparableName(lastNames) != comparableName(idLastNames))
+          IdentityMismatch('Apellidos', normalizePersonName(lastNames), normalizePersonName(idLastNames)),
+      ];
+
+  /// Identifies these differences, so a warning that was accepted is not asked again for the same data.
+  String get identityDifferenceSignature => identityMismatches()
+      .map((m) => '${m.label}:${m.label == 'Número de DUI' ? m.declared : comparableName(m.declared)}|'
+          '${m.label == 'Número de DUI' ? m.read : comparableName(m.read)}')
+      .join(';');
 
   /// The person typed in [field]: it is no longer marked and later readings do not overwrite it.
   void markEdited(String field) {

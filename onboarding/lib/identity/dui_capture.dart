@@ -100,7 +100,7 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
 
   Future<void> _take() async {
     final session = _session;
-    if (session == null || _taking) return;
+    if (session == null || _taking || _hint.blocksShutter) return;
     setState(() => _taking = true);
     try {
       final photo = await session.takePhoto();
@@ -218,7 +218,7 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
         ),
         Padding(
           padding: EdgeInsets.fromLTRB(24, 16, 24, 20 + MediaQuery.paddingOf(context).bottom),
-          child: _Shutter(busy: _taking, onPressed: _take),
+          child: _Shutter(busy: _taking, blocked: _hint.blocksShutter, onPressed: _take),
         ),
       ],
     );
@@ -393,6 +393,7 @@ class _StatusPill extends StatelessWidget {
       FrameHint.analyzing => (Icons.center_focus_strong_outlined, Colors.black87, Colors.white),
       FrameHint.tooDark => (Icons.light_mode_outlined, const Color(0xFF3D3010), const Color(0xFFFFD27A)),
       FrameHint.moving => (Icons.open_with, const Color(0xFF3D3010), const Color(0xFFFFD27A)),
+      FrameHint.veryDark => (Icons.dark_mode_outlined, const Color(0xFF4A1A17), const Color(0xFFFFB4AB)),
     };
     return Semantics(
       liveRegion: true,
@@ -443,26 +444,32 @@ class _Tip extends StatelessWidget {
 }
 
 class _Shutter extends StatelessWidget {
-  const _Shutter({required this.busy, required this.onPressed});
+  const _Shutter({required this.busy, required this.blocked, required this.onPressed});
 
   final bool busy;
+
+  /// Off because there is not enough light to take the photo.
+  final bool blocked;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final off = busy || blocked;
     return Semantics(
       button: true,
-      label: 'Tomar foto',
+      excludeSemantics: true,
+      label: blocked ? 'Tomar foto. No disponible: hay muy poca luz.' : 'Tomar foto',
+      onTap: off ? null : onPressed,
       child: GestureDetector(
         key: const Key('shutter'),
-        onTap: busy ? null : onPressed,
+        onTap: off ? null : onPressed,
         child: Container(
           width: 80,
           height: 80,
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white54, width: 4)),
           child: DecoratedBox(
-            decoration: BoxDecoration(shape: BoxShape.circle, color: busy ? Colors.white38 : AppColors.brand),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: off ? Colors.white38 : AppColors.brand),
           ),
         ),
       ),

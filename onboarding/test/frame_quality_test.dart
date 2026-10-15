@@ -64,7 +64,7 @@ void main() {
 
     test('a dim scene is reported as too dark even if it is steady, but it is not blocked', () {
       final m = FrameQualityMonitor();
-      final dim = flat(40);
+      final dim = flat(50);
       m.add(dim);
       m.add(dim);
       expect(m.add(dim), FrameHint.tooDark);
@@ -82,12 +82,58 @@ void main() {
 
     test('the limit between dim and very dark is where the monitor says', () {
       expect(FrameQualityMonitor().veryDarkMean, lessThan(FrameQualityMonitor().darkMean));
-      for (final (luma, expected) in [(24, FrameHint.veryDark), (26, FrameHint.tooDark), (54, FrameHint.tooDark), (56, FrameHint.good)]) {
+      for (final (luma, expected) in [(44, FrameHint.veryDark), (46, FrameHint.tooDark), (54, FrameHint.tooDark), (56, FrameHint.good)]) {
         final m = FrameQualityMonitor();
         m.add(flat(luma));
         m.add(flat(luma));
         expect(m.add(flat(luma)), expected, reason: 'luma $luma');
       }
+    });
+
+    test('the limit was set with an iPhone: a dim room reads 40 to 50 and counts as very dark', () {
+      expect(FrameQualityMonitor().veryDarkMean, 45);
+      final m = FrameQualityMonitor();
+      for (final luma in [41, 43, 40, 44]) {
+        m.add(flat(luma));
+      }
+      expect(m.hint, FrameHint.veryDark);
+    });
+
+    test('a scene hovering around the limit does not flicker: it stays blocked until it is clearly lit', () {
+      final m = FrameQualityMonitor();
+      for (var i = 0; i < 4; i++) {
+        m.add(flat(40));
+      }
+      expect(m.hint, FrameHint.veryDark);
+      final seen = <FrameHint>{};
+      for (final luma in [50, 40, 49, 43, 51, 42, 50]) {
+        seen.add(m.add(flat(luma)));
+      }
+      expect(seen, {FrameHint.veryDark}, reason: 'it never let go in the zone of the limit');
+    });
+
+    test('it lets go once the light is clearly above the limit', () {
+      final m = FrameQualityMonitor();
+      for (var i = 0; i < 4; i++) {
+        m.add(flat(40));
+      }
+      expect(m.hint, FrameHint.veryDark);
+      for (var i = 0; i < 3; i++) {
+        m.add(flat(54));
+      }
+      expect(m.hint, FrameHint.tooDark, reason: 'lit enough to take the photo, still dim');
+      for (var i = 0; i < 3; i++) {
+        m.add(flat(70));
+      }
+      expect(m.hint, FrameHint.good);
+    });
+
+    test('the release margin only applies once it is blocked', () {
+      final m = FrameQualityMonitor();
+      for (var i = 0; i < 4; i++) {
+        m.add(flat(50));
+      }
+      expect(m.hint, FrameHint.tooDark, reason: '50 is above the limit when it was not blocked before');
     });
 
     test('it recovers once there is light again', () {
@@ -112,8 +158,9 @@ void main() {
 
     test('too dark wins over moving: first fix the light', () {
       final m = FrameQualityMonitor();
+      // Dim (mean 50) and changing a lot from one frame to the next.
       for (var i = 0; i < 5; i++) {
-        m.add(flat(i.isEven ? 30 : 45));
+        m.add(stripes(shift: i * 4, light: 80, dark: 20));
       }
       expect(m.hint, FrameHint.tooDark);
     });

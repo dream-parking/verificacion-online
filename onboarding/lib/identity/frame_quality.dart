@@ -96,13 +96,18 @@ class LumaGrid {
 ///
 /// The thresholds are a starting point to be tuned on real phones.
 class FrameQualityMonitor {
-  FrameQualityMonitor({this.darkMean = 55, this.veryDarkMean = 25, this.movingDifference = 8, this.confirmations = 2});
+  FrameQualityMonitor({this.darkMean = 55, this.veryDarkMean = 45, this.veryDarkRelease = 7, this.movingDifference = 8, this.confirmations = 2});
 
   /// Mean luma under which there is not enough light: the person is warned.
   final double darkMean;
 
-  /// Mean luma under which the image is almost black: the shutter is off.
+  /// Mean luma under which the image is too dark to take the photo: the shutter is off. Set with an iPhone, where a
+  /// dim room reads between 40 and 50.
   final double veryDarkMean;
+
+  /// Once blocked, the light has to rise this much over [veryDarkMean] to let go, so a scene hovering around the
+  /// limit does not make the shutter flicker.
+  final double veryDarkRelease;
 
   /// Mean change between consecutive frames over which the phone is moving.
   final double movingDifference;
@@ -119,7 +124,8 @@ class FrameQualityMonitor {
     _previous = grid;
     if (previous == null) return hint;
 
-    final raw = grid.mean < veryDarkMean
+    final limit = hint == FrameHint.veryDark ? veryDarkMean + veryDarkRelease : veryDarkMean;
+    final raw = grid.mean < limit
         ? FrameHint.veryDark
         : grid.mean < darkMean
         ? FrameHint.tooDark

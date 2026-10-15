@@ -701,6 +701,13 @@
           "updatedAt" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "versions" : {
+            "description" : "Todas las versiones del perfil declarado, de la más antigua a la vigente",
+            "items" : {
+              "$ref" : "#/components/schemas/ConsoleRequestProfileVersion"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -898,6 +905,55 @@
           },
           "transactionTypeLabel" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestProfileVersion" : {
+        "properties" : {
+          "additionalTransactionTypeCodes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "changedBy" : {
+            "description" : "Quién la declaró: CUSTOMER = la persona, antes de enviar la solicitud",
+            "enum" : [ "CUSTOMER" ],
+            "type" : "string"
+          },
+          "current" : {
+            "type" : "boolean"
+          },
+          "declaredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "monthlyAmountRangeCode" : {
+            "type" : "string"
+          },
+          "monthlyAmountRangeLabel" : {
+            "type" : "string"
+          },
+          "monthlyAmountUsd" : {
+            "type" : "number"
+          },
+          "monthlyOutflowUsd" : {
+            "type" : "number"
+          },
+          "monthlyTransactionCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "transactionTypeCode" : {
+            "type" : "string"
+          },
+          "transactionTypeLabel" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"

@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import com.dreamparking.backend.common.validation.PersonName;
 import com.dreamparking.backend.console.entity.enums.ConsoleRole;
 import com.jayway.jsonpath.JsonPath;
 
@@ -50,9 +51,19 @@ class InputValidationApiTests {
 				 "mobilePhone": "7123-4567"}
 				"""))
 			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.errors.firstNames").value("Solo se permiten letras y espacios"))
-			.andExpect(jsonPath("$.errors.lastNames").value("Solo se permiten letras y espacios"))
+			.andExpect(jsonPath("$.errors.firstNames").value(PersonName.MESSAGE))
+			.andExpect(jsonPath("$.errors.lastNames").value(PersonName.MESSAGE))
 			.andExpect(jsonPath("$.errors.dui").doesNotExist());
+	}
+
+	@Test
+	void namesWithHyphensAndApostrophesAreAccepted() throws Exception {
+		String id = startRequest();
+		mvc.perform(put("/api/onboarding/requests/{id}/basic-data", id).contentType(JSON).content("""
+				{"dui": "04567891-2", "firstNames": "María-José", "lastNames": "D'Aubuisson Rivas-Cruz",
+				 "mobilePhone": "7123-4567"}
+				"""))
+			.andExpect(status().is2xxSuccessful());
 	}
 
 	@Test

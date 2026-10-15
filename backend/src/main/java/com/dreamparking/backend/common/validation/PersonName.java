@@ -18,9 +18,11 @@ import jakarta.validation.ReportAsSingleViolation;
 import jakarta.validation.constraints.Pattern;
 
 /**
- * First names, last names or full name of a person: Latin letters (accents, diaeresis and ñ included) in words
- * separated by single spaces; no digits, symbols, emojis or letters of other alphabets. Blanks around the name are
- * tolerated because the services trim them. {@code null} is valid; combine with {@code @NotBlank} and {@code @Size}.
+ * First names, last names or full name of a person, {@code María-José D'Aubuisson}: Latin letters (accents, diaeresis
+ * and ñ included) in words joined by a single space, apostrophe or hyphen (VDI-88, the same rule as the app, VDI-89);
+ * no digits, other symbols, emojis or letters of other alphabets, and no apostrophe or hyphen at the start, at the end
+ * or repeated. Blanks around the name are tolerated because the services trim them. {@code null} is valid; combine
+ * with {@code @NotBlank} and {@code @Size}.
  * <p>
  * Checked on the way in, not on the entities: a rule on an entity would also reject saving a record already stored
  * with other data.
@@ -40,9 +42,11 @@ public @interface PersonName {
 	 */
 	String LETTERS = "A-Za-zÀ-ÖØ-öø-ž";
 
-	String REGEXP = "\\s*[" + LETTERS + "]+( [" + LETTERS + "]+)*\\s*";
+	String REGEXP = "\\s*[" + LETTERS + "]+([ '\\-][" + LETTERS + "]+)*\\s*";
 
-	String message() default "Solo se permiten letras y espacios";
+	String MESSAGE = "Solo se permiten letras (incluidas tildes y ñ), espacios, apóstrofo (') y guion (-)";
+
+	String message() default MESSAGE;
 
 	Class<?>[] groups() default {};
 

@@ -10,6 +10,7 @@ import 'package:http/testing.dart';
 import 'package:onboarding/api/onboarding_api.dart';
 import 'package:onboarding/identity/document_camera.dart';
 import 'package:onboarding/identity/frame_quality.dart';
+import 'package:onboarding/onboarding/privacy_notice.dart';
 import 'package:onboarding/identity/identity_document.dart';
 import 'package:onboarding/main.dart';
 import 'package:onboarding/onboarding/application_form.dart';
@@ -936,7 +937,7 @@ void main() {
         await goToNotice(tester, FakeApi());
 
         expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
-        expect(find.text('Aviso aprobado por Legal · versión [X.Y]'), findsOneWidget);
+        expect(find.text('Aviso aprobado por Legal · versión 2026.1'), findsOneWidget);
         expect(find.text('Mientras llenas tu solicitud, recopilamos algunos datos para protegerte contra el fraude:'),
             findsOneWidget);
         for (final (title, description) in [
@@ -969,18 +970,84 @@ void main() {
         expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
       });
 
-      testWidgets('the full notice opens from the link, says it is provisional and closes', (tester) async {
+      Finder noticeSheet() => find.byType(BottomSheet);
+
+      /// Scrolls the full notice until [finder] shows.
+      Future<void> scrollToNotice(WidgetTester tester, Finder finder) => tester.scrollUntilVisible(
+            finder,
+            200,
+            scrollable: find.descendant(of: noticeSheet(), matching: find.byType(Scrollable)).first,
+          );
+
+      testWidgets('the full notice opens from the link, shows the final text with its version and closes', (tester) async {
         await goToNotice(tester, FakeApi());
         await tap(tester, find.text('Leer el aviso de privacidad completo'));
 
         expect(find.text('Aviso de privacidad'), findsOneWidget);
-        expect(find.textContaining('texto provisional'), findsOneWidget);
-        expect(find.textContaining('versión [X.Y]'), findsWidgets);
-        expect(find.text('Las fotos de tu DUI'), findsWidgets);
+        expect(find.descendant(of: noticeSheet(), matching: find.text('Aviso aprobado por Legal · versión 2026.1')), findsOneWidget);
+        expect(find.text(PrivacyNotice.fullIntro), findsOneWidget);
 
         await tap(tester, find.text('Cerrar'));
         expect(find.text('Aviso de privacidad'), findsNothing);
         expect(find.text('Aceptar y continuar'), findsOneWidget);
+      });
+
+      testWidgets('the full notice has every section with its text, and nothing is marked as provisional',
+          (tester) async {
+        await goToNotice(tester, FakeApi());
+        await tap(tester, find.text('Leer el aviso de privacidad completo'));
+
+        expect(PrivacyNotice.fullSections, hasLength(6));
+        for (final section in PrivacyNotice.fullSections) {
+          await scrollToNotice(tester, find.text(section.title));
+          expect(find.text(section.title), findsOneWidget, reason: section.title);
+          for (final paragraph in section.paragraphs) {
+            await scrollToNotice(tester, find.text(paragraph));
+            expect(find.text(paragraph), findsOneWidget, reason: paragraph);
+          }
+        }
+        expect(find.textContaining('provisional'), findsNothing);
+        expect(find.textContaining('Texto provisional'), findsNothing);
+        expect(find.textContaining('[X.Y]'), findsNothing);
+      });
+
+      testWidgets('the paragraphs of the full notice are justified', (tester) async {
+        await goToNotice(tester, FakeApi());
+        await tap(tester, find.text('Leer el aviso de privacidad completo'));
+
+        expect(tester.widget<Text>(find.text(PrivacyNotice.fullIntro)).textAlign, TextAlign.justify);
+        for (final section in PrivacyNotice.fullSections) {
+          for (final paragraph in section.paragraphs) {
+            await scrollToNotice(tester, find.text(paragraph));
+            expect(tester.widget<Text>(find.text(paragraph)).textAlign, TextAlign.justify, reason: paragraph);
+          }
+        }
+      });
+
+      testWidgets('the notice tells what the app really collects: the DUI photos, the approximate location, the device',
+          (tester) async {
+        final text = [for (final s in PrivacyNotice.fullSections) ...s.paragraphs].join(' ');
+        for (final word in ['fotos de tu DUI', 'ciudad y el país', 'dirección ni tus coordenadas', 'dispositivo', 'ritmo al escribir']) {
+          expect(text, contains(word), reason: word);
+        }
+      });
+
+      testWidgets('on a small screen the notice still scrolls to the end and can be closed', (tester) async {
+        tester.view.physicalSize = const Size(360, 480); // short: the notice has to scroll
+        addTearDown(tester.view.resetPhysicalSize);
+        await goToNotice(tester, FakeApi());
+        await tap(tester, find.text('Leer el aviso de privacidad completo'));
+
+        final last = PrivacyNotice.fullSections.last.paragraphs.last;
+        await scrollToNotice(tester, find.text(last));
+        expect(find.text(last), findsOneWidget);
+        expect(find.text('Cerrar'), findsOneWidget, reason: 'the button stays in view');
+        await tap(tester, find.text('Cerrar'));
+        expect(find.text('Aviso de privacidad'), findsNothing);
+      });
+
+      testWidgets('the version that is shown is the one the server records when the notice is accepted', (tester) async {
+        expect(PrivacyNotice.version, '2026.1');
       });
 
       testWidgets('after accepting, the other screens keep «Continuar»', (tester) async {

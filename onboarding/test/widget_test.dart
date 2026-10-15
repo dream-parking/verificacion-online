@@ -69,6 +69,9 @@ class FakeCamera implements DocumentCamera {
   var photos = 0;
   var disposed = 0;
 
+  /// Points (0 to 1) where the person tapped to focus, as the session received them.
+  final focusPoints = <Offset>[];
+
   /// The session that is open now, to push live-image hints into it.
   FakeCameraSession? current;
 
@@ -99,6 +102,9 @@ class FakeCameraSession implements CameraSession {
 
   @override
   Widget get preview => const ColoredBox(color: Colors.grey);
+
+  @override
+  Future<void> focusAt(Offset point) async => _camera.focusPoints.add(point);
 
   @override
   Future<Uint8List> takePhoto() async => Uint8List.fromList([0xFF, 0xD8, ++_camera.photos]);
@@ -1110,6 +1116,53 @@ void main() {
         camera.hint(FrameHint.good);
         await tester.pumpAndSettle();
         expect(find.text('Bien, mantén el teléfono quieto'), findsOneWidget);
+      });
+
+      testWidgets('tapping the image focuses there, with the point given in 0 to 1 of the image', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+
+        final area = find.byKey(const Key('camera-preview'));
+        final rect = tester.getRect(area);
+        await tester.tapAt(rect.topLeft + Offset(rect.width * 0.25, rect.height * 0.75));
+        await tester.pump();
+
+        expect(camera.focusPoints, hasLength(1));
+        expect(camera.focusPoints.single.dx, closeTo(0.25, 0.02));
+        expect(camera.focusPoints.single.dy, closeTo(0.75, 0.02));
+      });
+
+      testWidgets('a ring shows where it focused and goes away by itself', (tester) async {
+        await goToDui(tester, FakeApi(), FakeCamera());
+        expect(find.byKey(const Key('focus-ring')), findsNothing);
+
+        await tester.tap(find.byKey(const Key('camera-preview')));
+        await tester.pump();
+        expect(find.byKey(const Key('focus-ring')), findsOneWidget);
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(find.byKey(const Key('focus-ring')), findsNothing);
+      });
+
+      testWidgets('tapping again moves the ring and focuses again', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+        final rect = tester.getRect(find.byKey(const Key('camera-preview')));
+        await tester.tapAt(rect.center);
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.tapAt(rect.topLeft + const Offset(40, 40));
+        await tester.pump();
+        expect(camera.focusPoints, hasLength(2));
+        expect(find.byKey(const Key('focus-ring')), findsOneWidget, reason: 'only one ring at a time');
+      });
+
+      testWidgets('the shutter still takes the photo after tapping to focus', (tester) async {
+        final camera = FakeCamera();
+        await goToDui(tester, FakeApi(), camera);
+        await tester.tap(find.byKey(const Key('camera-preview')));
+        await tester.pump();
+        await tap(tester, shutter);
+        expect(camera.photos, 1);
       });
 
       testWidgets('a bad hint never blocks the photo: the person can still take it', (tester) async {

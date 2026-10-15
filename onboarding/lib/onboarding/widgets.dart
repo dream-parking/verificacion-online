@@ -487,3 +487,46 @@ class IconRow extends StatelessWidget {
     );
   }
 }
+
+/// Message of a wait («Revisando tu DUI…») that covers the screen while something is sent or read. Title and detail are
+/// centered, also when the detail takes two lines, and keep a margin to the edges.
+class LoadingOverlay extends StatelessWidget {
+  const LoadingOverlay({super.key, required this.title, required this.detail});
+
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.white.withValues(alpha: 0.92),
+        child: Semantics(
+          liveRegion: true,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 5,
+                    color: AppColors.brandGreen,
+                    backgroundColor: AppColors.border,
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(title, style: AppText.heading(20), textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                Text(detail, style: AppText.bodyMuted, textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

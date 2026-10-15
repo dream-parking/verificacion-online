@@ -178,10 +178,23 @@ class FakeApi {
   List<http.Request> get catalogs => calls.where((r) => r.url.path == '/api/catalogs').toList();
   List<http.Request> get signals => calls.where((r) => r.url.path.endsWith('/signals')).toList();
 
+  /// Requests that stay waiting until the test releases them, to see the wait messages. Keys: `start`
+  /// (create the request), or the last part of the path (`basic-data`, `identity-document`, `submit`...).
+  final holds = <String, Completer<void>>{};
+
+  /// Holds the request [name] until [release] is called.
+  void hold(String name) => holds[name] = Completer<void>();
+
+  void release(String name) => holds[name]?.complete();
+
+  String _holdName(http.BaseRequest req) =>
+      req.method == 'POST' && req.url.path == '/api/onboarding/requests' ? 'start' : req.url.pathSegments.last;
+
   OnboardingApi get api => OnboardingApi(
         baseUrl: 'https://api.test',
         client: MockClient((req) async {
           calls.add(req);
+          await holds[_holdName(req)]?.future;
           if (req.url.path == '/api/catalogs') {
             if (failCatalogsTimes > 0) {
               failCatalogsTimes--;
@@ -278,9 +291,13 @@ class FakeLocation implements DeviceLocationSource {
   final DeviceLocation result;
   var reads = 0;
 
+  /// While it is not completed the location is still being looked up.
+  Completer<void>? holdUntil;
+
   @override
   Future<DeviceLocation> read() async {
     reads++;
+    await holdUntil?.future;
     return result;
   }
 }
@@ -1999,6 +2016,148 @@ void main() {
         await tap(tester, confirmButton);
         expect(find.text('Tus datos no coinciden con tu DUI'), findsNothing);
         expect(find.textContaining('Escribe tu fecha de nacimiento'), findsOneWidget);
+      });
+    });
+
+    group('wait messages', () {
+      Future<void> acceptAndContinue(WidgetTester tester) async {
+        await tap(tester, find.text('Empezar'));
+        await acceptNotice(tester);
+      }
+
+      Future<void> toBasicData(WidgetTester tester) async {
+        await acceptAndContinue(tester);
+        await tapContinue(tester);
+        await skipLocation(tester);
+        await fillBasicData(tester);
+      }
+
+      testWidgets('while the request is created it says «Preparando tu solicitud…» and goes away when it is ready',
+          (tester) async {
+        final fake = FakeApi()..hold('start');
+        await tester.pumpWidget(app(fake));
+        await acceptAndContinue(tester);
+        await tester.tap(find.text('Aceptar y continuar'));
+        await tester.pump();
+
+        expect(find.text('Preparando tu solicitud…'), findsOneWidget);
+        expect(find.text('Esto puede tardar unos segundos.'), findsOneWidget);
+        fake.release('start');
+        await tester.pumpAndSettle();
+        expect(find.text('Preparando tu solicitud…'), findsNothing);
+        expect(find.text('¿Desde qué ciudad nos escribes?'), findsOneWidget);
+      });
+
+      testWidgets('while the location is looked up it says «Buscando tu ciudad…»', (tester) async {
+        final location = FakeLocation()..holdUntil = Completer<void>();
+        await tester.pumpWidget(app(FakeApi(), location: location));
+        await acceptAndContinue(tester);
+        await tapContinue(tester);
+        await tester.tap(find.text('Permitir ubicación aproximada'));
+        await tester.pump();
+
+        expect(find.text('Buscando tu ciudad…'), findsOneWidget);
+        location.holdUntil!.complete();
+        await tester.pumpAndSettle();
+        expect(find.text('Buscando tu ciudad…'), findsNothing);
+        expect(find.text('Cuéntanos quién eres'), findsOneWidget);
+      });
+
+      testWidgets('while the basic data is saved it says «Guardando tu información…»', (tester) async {
+        final fake = FakeApi()..hold('basic-data');
+        await tester.pumpWidget(app(fake));
+        await toBasicData(tester);
+        await tester.tap(find.text('Continuar'));
+        await tester.pump();
+
+        expect(find.text('Guardando tu información…'), findsOneWidget);
+        expect(find.text('Un momento, por favor.'), findsOneWidget);
+        fake.release('basic-data');
+        await tester.pumpAndSettle();
+        expect(find.text('Guardando tu información…'), findsNothing);
+      });
+
+      testWidgets('while the DUI photos are read it says «Revisando tu DUI…» with its detail', (tester) async {
+        final fake = FakeApi()..hold('identity-document');
+        await tester.pumpWidget(app(fake));
+        await toBasicData(tester);
+        await tapContinue(tester);
+        await tap(tester, shutter);
+        await tester.tap(shutter);
+        await tester.pump();
+
+        expect(find.text('Revisando tu DUI…'), findsOneWidget);
+        expect(find.text('Estamos leyendo tus fotos. Puede tardar unos segundos.'), findsOneWidget);
+        fake.release('identity-document');
+        await tester.pumpAndSettle();
+        expect(find.text('Revisando tu DUI…'), findsNothing);
+        expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
+      });
+
+      testWidgets('while the request is submitted it says «Enviando tu solicitud…» and asks not to close the app',
+          (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await toBasicData(tester);
+        await tapContinue(tester);
+        await passDui(tester);
+        await tap(tester, find.text('Remesas'));
+        await tap(tester, find.text('USD 500.01 a 1,000'));
+        await tapContinue(tester);
+        await tap(tester, find.text('Ahorro'));
+        await tap(tester, find.text('Más de USD 1,000'));
+        await tapContinue(tester);
+
+        fake.hold('submit');
+        await tester.tap(find.text('Enviar solicitud'));
+        await tester.pump();
+        expect(find.text('Enviando tu solicitud…'), findsOneWidget);
+        expect(find.text('No cierres la aplicación.'), findsOneWidget);
+
+        fake.release('submit');
+        await tester.pumpAndSettle();
+        expect(find.text('Enviando tu solicitud…'), findsNothing);
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+      });
+
+      testWidgets('after the last photo the camera screen behind the message does not break while the answer takes long',
+          (tester) async {
+        final fake = FakeApi()..hold('identity-document');
+        final camera = FakeCamera();
+        await tester.pumpWidget(app(fake, camera: camera));
+        await toBasicData(tester);
+        await tapContinue(tester);
+        await tap(tester, shutter);
+        await tester.tap(shutter);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+        camera.hint(FrameHint.good); // the live hint keeps arriving and rebuilds the screen
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+        await tester.tap(shutter, warnIfMissed: false); // a third tap changes nothing
+        await tester.pump();
+        expect(camera.photos, 2);
+        fake.release('identity-document');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('the wait message is centered inside the screen margins', (tester) async {
+        final fake = FakeApi()..hold('identity-document');
+        await tester.pumpWidget(app(fake));
+        await toBasicData(tester);
+        await tapContinue(tester);
+        await tap(tester, shutter);
+        await tester.tap(shutter);
+        await tester.pump();
+
+        final detail = tester.getRect(find.text('Estamos leyendo tus fotos. Puede tardar unos segundos.'));
+        expect(detail.left, greaterThanOrEqualTo(24 - 0.01));
+        expect(detail.right, lessThanOrEqualTo(390 - 24 + 0.01));
+        expect(detail.center.dx, closeTo(195, 1));
+        fake.release('identity-document');
+        await tester.pumpAndSettle();
       });
     });
 

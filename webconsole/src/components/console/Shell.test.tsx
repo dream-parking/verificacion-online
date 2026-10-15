@@ -65,18 +65,19 @@ beforeEach(() => {
 });
 
 describe("Shell", () => {
-  it("muestra el contenido y el título según la ruta", () => {
+  it("muestra el contenido sin repetir el título de la página en la barra", () => {
     render(<Shell>página</Shell>);
     expect(screen.getByText("página")).toBeInTheDocument();
-    expect(screen.getByText("Solicitudes", { selector: "div.truncate" })).toBeInTheDocument();
+    expect(screen.queryByText("Solicitudes", { selector: "div.truncate" })).not.toBeInTheDocument();
   });
 
   it.each([
     ["/requests/abc", "Solicitudes · Detalle"],
-    ["/alerts", "Bandeja de alertas"],
-    ["/map", "Mapa de ubicaciones"],
-    ["/score-rule", "Regla de score"],
-    ["/users", "Usuarios"],
+    ["/requests", ""],
+    ["/alerts", ""],
+    ["/map", ""],
+    ["/score-rule", ""],
+    ["/users", ""],
     ["/otra", ""],
   ])("el título de %s es «%s»", (path, title) => {
     pathname = path;

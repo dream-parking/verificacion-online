@@ -11,13 +11,9 @@ import { Logo } from "./Logo";
 
 const ONBOARDING_URL = process.env.NEXT_PUBLIC_ONBOARDING_URL;
 
+/** Only the pages without their own heading need a title here; the others already show it as their <h1>. */
 function titleFor(pathname: string) {
   if (pathname.startsWith("/requests/")) return "Solicitudes · Detalle";
-  if (pathname.startsWith("/requests")) return "Solicitudes";
-  if (pathname.startsWith("/alerts")) return "Bandeja de alertas";
-  if (pathname.startsWith("/map")) return "Mapa de ubicaciones";
-  if (pathname.startsWith("/score-rule")) return "Regla de score";
-  if (pathname.startsWith("/users")) return "Usuarios";
   return "";
 }
 

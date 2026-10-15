@@ -57,12 +57,27 @@ export type RequestSummary = {
   transactionTypeLabel: string | null;
   monthlyAmountRangeLabel: string | null;
   riskLevel: RiskLevel;
+  /** Score from 0 to 100 (VDI-84). Null without assessment or in the ones made by rule R-01; missing in older API versions. */
+  score?: number | null;
   status: RequestStatus;
   completedSteps: number;
 };
 
+/** What a signal added to the score. `points` is null when the signal was not available; `maxPoints` when it has no weight yet. */
+export type SignalContribution = {
+  signal: string;
+  name: string;
+  points: number | null;
+  maxPoints: number | null;
+  observation: string | null;
+};
+
 export type Assessment = {
   level: RiskLevel;
+  /** Score from 0 to 100, the model version and what each signal added. Null / empty in assessments made by rule R-01. */
+  score?: number | null;
+  modelVersion?: number | null;
+  signals?: SignalContribution[] | null;
   ruleCode: string | null;
   ruleName: string | null;
   ruleThreshold: number | null;
@@ -245,4 +260,23 @@ export async function fetchAllRequests(token: string): Promise<RequestSummary[]>
     ),
   );
   return [firstPage, ...rest].flatMap((p) => p.content);
+}
+
+export type DocumentSide = "FRONT" | "BACK";
+
+/** Decrypted DUI photo of a request, as an image Blob (VDI-80). Every call is recorded in the access audit. */
+export async function fetchDocumentPhoto(requestId: string, side: DocumentSide, token: string): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/console/requests/${encodeURIComponent(requestId)}/identity-document/${side}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new ApiError(0, "Sin conexión", "No pudimos conectar con el servidor.");
+  }
+  if (!res.ok) {
+    const problem = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, problem.title ?? res.statusText, problem.detail);
+  }
+  return res.blob();
 }

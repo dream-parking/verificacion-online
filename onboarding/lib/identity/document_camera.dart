@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import 'camera_geometry.dart';
 import 'frame_quality.dart';
 
 /// The camera could not be opened. [permissionDenied] tells the person to allow it in the settings.
@@ -20,6 +21,10 @@ class CameraUnavailable implements Exception {
 abstract class CameraSession {
   /// Live image of the camera, to be shown behind the frame.
   Widget get preview;
+
+  /// Focuses (and measures the light) at [point], given from 0 to 1 over the preview: (0, 0) is its top left corner.
+  /// It does nothing if the camera cannot.
+  Future<void> focusAt(Offset point);
 
   /// Light and steadiness of the live image, a few times per second while the camera is open. It can stay silent
   /// if the phone cannot analyze the image: the photo can be taken anyway.
@@ -54,11 +59,12 @@ class PlatformDocumentCamera implements DocumentCamera {
       // Android and BGRA on iOS, where the brightness is cheap to read.
       controller = CameraController(
         rear,
-        ResolutionPreset.high,
+        ResolutionPreset.veryHigh,
         enableAudio: false,
         imageFormatGroup: defaultTargetPlatform == TargetPlatform.android ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
       );
       await controller.initialize();
+      await _prepare(controller);
     } on CameraException catch (e) {
       debugPrint('Could not open the camera: ${e.code}');
       throw CameraUnavailable(permissionDenied: _deniedCodes.contains(e.code));
@@ -66,6 +72,30 @@ class PlatformDocumentCamera implements DocumentCamera {
     final session = _PlatformSession(controller);
     await session.startAnalysis();
     return session;
+  }
+
+  /// Zoom and focus for photographing a document. Whatever the phone cannot do is skipped: the camera still works.
+  static Future<void> _prepare(CameraController controller) async {
+    // The flash off: in the dark the phone would fire it on its own (automatic by default) and put a glare on the DUI.
+    // The Product Owner decided that the answer to the dark is to block the shutter, not to light the document.
+    await _tryTo('flash', () => controller.setFlashMode(FlashMode.off));
+    await _tryTo('zoom', () async {
+      final zoom = initialZoom(await controller.getMinZoomLevel(), await controller.getMaxZoomLevel());
+      await controller.setZoomLevel(zoom);
+    });
+    await _tryTo('focus', () async {
+      await controller.setFocusMode(FocusMode.auto);
+      await controller.setFocusPoint(const Offset(0.5, 0.5));
+    });
+  }
+
+  /// One setting at a time: a phone that cannot do one of them must not lose the others.
+  static Future<void> _tryTo(String what, Future<void> Function() action) async {
+    try {
+      await action();
+    } on CameraException catch (e) {
+      debugPrint('Could not set the $what: ${e.code}');
+    }
   }
 }
 
@@ -82,6 +112,7 @@ class _PlatformSession implements CameraSession {
 
   /// Starts reading the live frames. If the phone cannot, there are no hints and the photo works the same.
   Future<void> startAnalysis() async {
+    if (!_controller.supportsImageStreaming()) return;
     try {
       await _controller.startImageStream(_onFrame);
     } on Exception catch (e) {
@@ -97,11 +128,30 @@ class _PlatformSession implements CameraSession {
     final grid = image.format.group == ImageFormatGroup.bgra8888
         ? LumaGrid.fromBgra(plane.bytes, width: image.width, height: image.height, rowStride: plane.bytesPerRow)
         : LumaGrid.fromYPlane(plane.bytes, width: image.width, height: image.height, rowStride: plane.bytesPerRow);
-    _hints.add(_monitor.add(grid));
+    final ev = sceneEv(
+      aperture: image.lensAperture,
+      exposureNanoseconds: image.sensorExposureTime,
+      iso: image.sensorSensitivity,
+    );
+    _hints.add(_monitor.add(grid, sceneEv: ev));
   }
 
   @override
-  Widget get preview => CameraPreview(_controller);
+  Widget get preview {
+    final size = _controller.value.previewSize;
+    final camera = CameraPreview(_controller);
+    return size == null ? camera : CoverPreview(size: portraitSize(size), child: camera);
+  }
+
+  @override
+  Future<void> focusAt(Offset point) async {
+    try {
+      await _controller.setFocusPoint(point);
+      await _controller.setExposurePoint(point);
+    } on CameraException catch (e) {
+      debugPrint('Could not focus: ${e.code}');
+    }
+  }
 
   @override
   Stream<FrameHint> get hints => _hints.stream;

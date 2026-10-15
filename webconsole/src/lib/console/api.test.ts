@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiFetch, fetchAllRequests, login, type Page, type RequestSummary } from "./api";
+import { ApiError, apiFetch, fetchAllRequests, fetchDocumentPhoto, login, type Page, type RequestSummary } from "./api";
 
 const json = (body: unknown, init: ResponseInit = {}) =>
   new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" }, ...init });
@@ -119,5 +119,39 @@ describe("fetchAllRequests", () => {
   it("sin resultados devuelve una lista vacía", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(page(0, 0, []))));
     expect(await fetchAllRequests("tok")).toEqual([]);
+  });
+});
+
+describe("fetchDocumentPhoto", () => {
+  it("pide la foto del lado indicado con el token y devuelve la imagen", async () => {
+    const image = new Blob(["img"], { type: "image/jpeg" });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, blob: async () => image });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const blob = await fetchDocumentPhoto("a b", "FRONT", "tok");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url.endsWith("/api/console/requests/a%20b/identity-document/FRONT")).toBe(true);
+    expect(init.headers).toEqual({ Authorization: "Bearer tok" });
+    expect(blob).toBe(image);
+  });
+
+  it("si el servidor la rechaza lanza el error con su título y detalle", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({ title: "No encontrada", detail: "Sin foto" }, { status: 404 })));
+    const error = await failure(fetchDocumentPhoto("r1", "BACK", "tok"));
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 404, title: "No encontrada", detail: "Sin foto" });
+  });
+
+  it("si la respuesta de error no es JSON usa el texto del estado", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 500, statusText: "Server Error" })));
+    const error = await failure(fetchDocumentPhoto("r1", "BACK", "tok"));
+    expect(error).toMatchObject({ status: 500, title: "Server Error" });
+  });
+
+  it("sin conexión lanza un ApiError de estado 0", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("network")));
+    const error = await failure(fetchDocumentPhoto("r1", "FRONT", "tok"));
+    expect(error).toMatchObject({ status: 0, title: "Sin conexión" });
   });
 });

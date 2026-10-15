@@ -132,6 +132,19 @@ class RiskScoreSignalsApiTests {
 			.andExpect(jsonPath("$.risk.signals[*].signal").value(hasItem("AMOUNT")));
 	}
 
+	@Test
+	void theConsoleListCarriesTheScore() throws Exception {
+		String id = startRequest();
+		send(id, "expected-activity", """
+				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "MAS_1000"}
+				""").andExpect(status().isOk());
+
+		// newest first, so the request just made is on the first page
+		mvc.perform(get("/api/console/requests"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.content[?(@.id == '" + id + "')].score").value(hasItem(20)));
+	}
+
 	private void sendSignals(String id, int typingSpeedCpm) throws Exception {
 		send(id, "signals", """
 				{"deviceFingerprint": "fp-%s", "deviceModel": "Galaxy A54", "operatingSystem": "Android",

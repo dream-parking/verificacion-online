@@ -303,11 +303,11 @@ class FakeSavedRequestStore implements SavedRequestStore {
 }
 
 /// `GET /resume` of a request left at [step], with what the API saved up to there.
-String resumeJson(String step, {String state = 'RESUMABLE'}) =>
+String resumeJson(String step, {String state = 'RESUMABLE', bool confirmedDui = true}) =>
     state != 'RESUMABLE'
     ? '{"requestId":"$requestId","state":"$state","firstName":"Marta"}'
     : '{"requestId":"$requestId","state":"RESUMABLE","currentStep":"$step","firstName":"Marta",'
-          '"saved":{"basicData":{"firstNames":"Marta Alejandra","lastNames":"Rivas Cruz","dui":"04812377-5","mobilePhone":"7845-2310"},'
+          '"saved":{${confirmedDui ? '"identityDocument":{"confirmed":true,"ocrStatus":"READ"},' : ''}"basicData":{"firstNames":"Marta Alejandra","lastNames":"Rivas Cruz","dui":"04812377-5","mobilePhone":"7845-2310"},'
           '"income":{"sourceCode":"SALARIO","rangeCode":"500_1000"},'
           '"expectedActivity":{"transactionTypeCode":"AHORRO","monthlyAmountRangeCode":"200_500"}}}';
 
@@ -2522,21 +2522,31 @@ void main() {
         },
       );
 
-      testWidgets(
-        'at the DUI step the camera opens: the photos are not kept in the phone',
-        (tester) async {
-          final camera = FakeCamera();
-          final fake = FakeApi(
-            resumeResponse: (200, resumeJson('IDENTITY_DOCUMENT')),
-          );
-          await tester.pumpWidget(
-            app(fake, camera: camera, store: FakeSavedRequestStore(requestId)),
-          );
-          await tester.pumpAndSettle();
-          await tap(tester, find.text('Continuar mi solicitud'));
-          expect(shutter, findsOneWidget);
-        },
-      );
+      testWidgets('at the DUI step it says the photos must be taken again, then the camera opens', (tester) async {
+        await openWith(tester, 'IDENTITY_DOCUMENT');
+        expect(find.textContaining('volver a tomar las fotos de tu DUI'), findsOneWidget, reason: 'the welcome already warns it');
+        await tap(tester, find.text('Continuar mi solicitud'));
+        expect(find.text('Vuelve a tomar las fotos de tu DUI'), findsOneWidget);
+        await tap(tester, find.text('Entendido'));
+        expect(shutter, findsOneWidget);
+      });
+
+      testWidgets('if the DUI was never confirmed it does not skip it, even if the API moved on', (tester) async {
+        await openWith(tester, 'INCOME', body: resumeJson('INCOME', confirmedDui: false));
+        await tap(tester, find.text('Continuar mi solicitud'));
+        expect(find.text('Vuelve a tomar las fotos de tu DUI'), findsOneWidget);
+        await tap(tester, find.text('Entendido'));
+        expect(shutter, findsOneWidget);
+        expect(find.text('Paso 3 de 5'), findsNothing);
+      });
+
+      testWidgets('with the DUI already confirmed it is not asked again and back skips its empty screens', (tester) async {
+        await openWith(tester, 'INCOME');
+        await tap(tester, find.text('Continuar mi solicitud'));
+        expect(find.text('Vuelve a tomar las fotos de tu DUI'), findsNothing);
+        await tap(tester, find.byTooltip('Volver al paso anterior'));
+        expect(find.text('Paso 1 de 5'), findsOneWidget);
+      });
 
       testWidgets(
         '«Empezar de nuevo» abandons the request, forgets it and shows the normal welcome',

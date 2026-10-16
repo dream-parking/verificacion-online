@@ -985,6 +985,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             LabeledTextField(
               controller: _firstNames,
               label: 'Nombres',
+              textCapitalization: TextCapitalization.words,
               helper: 'Hasta $maxNameLength caracteres.',
               placeholder: 'Por ejemplo, Marta Alejandra',
               autofillHints: const [AutofillHints.givenName],
@@ -999,6 +1000,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             LabeledTextField(
               controller: _lastNames,
               label: 'Apellidos',
+              textCapitalization: TextCapitalization.words,
               helper: 'Hasta $maxNameLength caracteres.',
               placeholder: 'Por ejemplo, Rivas Cruz',
               autofillHints: const [AutofillHints.familyName],
@@ -1154,10 +1156,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               keyboardType: TextInputType.number, mask: formatDui, set: (v) => _form.idDui = v),
           const SizedBox(height: 20),
           _idField('idFirstNames', _idFirstNames, 'Nombres', 'Por ejemplo, Marta Alejandra',
-              limit: maxNameLength, set: (v) => _form.idFirstNames = v),
+              limit: maxNameLength, textCapitalization: TextCapitalization.words, set: (v) => _form.idFirstNames = v),
           const SizedBox(height: 20),
           _idField('idLastNames', _idLastNames, 'Apellidos', 'Por ejemplo, Rivas Cruz',
-              limit: maxNameLength, set: (v) => _form.idLastNames = v),
+              limit: maxNameLength, textCapitalization: TextCapitalization.words, set: (v) => _form.idLastNames = v),
           const SizedBox(height: 20),
           _idField('idBirthDate', _idBirthDate, 'Fecha de nacimiento', 'dd/mm/aaaa',
               keyboardType: TextInputType.number, mask: formatDate, set: (v) => _form.idBirthDate = v),
@@ -1182,6 +1184,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     required void Function(String) set,
     String Function(String)? mask,
     TextInputType keyboardType = TextInputType.text,
+    TextCapitalization textCapitalization = TextCapitalization.none,
     int? limit,
   }) {
     return Column(
@@ -1192,6 +1195,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           label: label,
           placeholder: placeholder,
           keyboardType: keyboardType,
+          textCapitalization: textCapitalization,
           formatters: [if (mask != null) maskFormatter(mask), if (limit != null) LengthLimitingTextInputFormatter(limit)],
           error: _errorFor(field),
           onChanged: (v) {

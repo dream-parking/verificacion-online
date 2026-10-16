@@ -537,6 +537,67 @@ void main() {
       expect(find.text('SOL-2026-00418'), findsNothing);
     });
 
+    testWidgets('the main button is gray until the screen is complete, but it can still be tapped', (tester) async {
+      bool ready() => tester.widget<PrimaryButton>(find.byType(PrimaryButton)).ready;
+
+      await tester.pumpWidget(app(FakeApi()));
+      expect(ready(), isTrue, reason: 'the welcome has nothing to fill in');
+      await tap(tester, find.text('Empezar'));
+
+      // Privacy notice: both boxes.
+      expect(ready(), isFalse);
+      await tap(tester, find.byType(Checkbox).at(0));
+      expect(ready(), isFalse, reason: 'the terms and conditions are missing');
+      await tap(tester, find.byType(Checkbox).at(1));
+      expect(ready(), isTrue);
+      await tapContinue(tester);
+      await skipLocation(tester);
+
+      // Basic data: the four fields.
+      expect(ready(), isFalse);
+      await tester.enterText(find.byType(TextField).at(0), 'Marta Alejandra');
+      await tester.pumpAndSettle();
+      expect(ready(), isFalse, reason: 'there is still the rest');
+      await tapContinue(tester);
+      expect(find.text('Escribe tus apellidos.'), findsOneWidget, reason: 'gray, but tapping it says what is missing');
+      expect(ready(), isFalse);
+      await fillBasicData(tester);
+      expect(ready(), isTrue);
+      await tapContinue(tester);
+
+      // Confirmation of the DUI data: it comes filled in and goes gray if something is cleared.
+      await tap(tester, shutter);
+      await tap(tester, shutter);
+      expect(ready(), isTrue);
+      await tester.enterText(find.byType(TextField).at(0), '');
+      await tester.pumpAndSettle();
+      expect(ready(), isFalse);
+      await tester.enterText(find.byType(TextField).at(0), '048123775');
+      await tester.pumpAndSettle();
+      expect(ready(), isTrue);
+      await tap(tester, find.text('Mis datos son correctos'));
+
+      // Income: source and range.
+      expect(ready(), isFalse);
+      await tap(tester, find.text('Remesas'));
+      expect(ready(), isFalse, reason: 'the range is missing');
+      await tap(tester, find.text('USD 500.01 a 1,000'));
+      expect(ready(), isTrue);
+      await tapContinue(tester);
+
+      // Expected activity: type and range.
+      expect(ready(), isFalse);
+      await tap(tester, find.text('Ahorro'));
+      expect(ready(), isFalse);
+      await tap(tester, find.text('Más de USD 1,000'));
+      expect(ready(), isTrue);
+      await tapContinue(tester);
+
+      // Review: nothing to fill in.
+      expect(find.text('Revisa tu solicitud'), findsOneWidget);
+      expect(ready(), isTrue);
+    });
+
     testWidgets('if recording the notice fails, the retry reuses the same request', (tester) async {
       final fake = FakeApi(privacyErrors: [503]);
       await tester.pumpWidget(app(fake));

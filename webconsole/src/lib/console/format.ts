@@ -7,7 +7,6 @@ import type {
   RequestStatus,
   RiskLevel,
   Step,
-  ScoreRule,
   Role,
 } from "./api";
 
@@ -58,13 +57,6 @@ export const STEPS: { step: Step; name: string }[] = [
   { step: "EXPECTED_ACTIVITY", name: "Movimiento esperado" },
   { step: "REVIEW", name: "Revisión" },
 ];
-
-export const RULE_STATUS: Record<ScoreRule["status"], string> = {
-  DRAFT: "Borrador",
-  PROVISIONAL: "Provisional",
-  CONFIRMED: "Confirmada",
-  RETIRED: "Retirada",
-};
 
 export const TYPING_PACE: Record<"SLOW" | "NORMAL" | "FAST", string> = {
   SLOW: "Pausado",

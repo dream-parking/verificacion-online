@@ -537,6 +537,33 @@ void main() {
       expect(find.text('SOL-2026-00418'), findsNothing);
     });
 
+    testWidgets('names start with a capital letter by default: the keyboard capitalizes each word', (tester) async {
+      TextCapitalization capitalization(int field) => tester.widget<TextField>(find.byType(TextField).at(field)).textCapitalization;
+
+      await tester.pumpWidget(app(FakeApi()));
+      await tap(tester, find.text('Empezar'));
+      await acceptNotice(tester);
+      await tapContinue(tester);
+      await skipLocation(tester);
+
+      // Basic data: first and last names in capitals; DUI and phone are numbers.
+      expect([for (var i = 0; i < 4; i++) capitalization(i)],
+          [TextCapitalization.words, TextCapitalization.words, TextCapitalization.none, TextCapitalization.none]);
+      await fillBasicData(tester);
+      await tapContinue(tester);
+
+      // Confirmation of the DUI data: DUI, first names, last names, birth date, expiry date.
+      await tap(tester, shutter);
+      await tap(tester, shutter);
+      expect([for (var i = 0; i < 5; i++) capitalization(i)], [
+        TextCapitalization.none,
+        TextCapitalization.words,
+        TextCapitalization.words,
+        TextCapitalization.none,
+        TextCapitalization.none,
+      ]);
+    });
+
     testWidgets('if recording the notice fails, the retry reuses the same request', (tester) async {
       final fake = FakeApi(privacyErrors: [503]);
       await tester.pumpWidget(app(fake));

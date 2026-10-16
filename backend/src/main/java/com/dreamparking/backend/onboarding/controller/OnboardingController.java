@@ -102,15 +102,15 @@ public class OnboardingController {
 	}
 
 	@ApiResponse(responseCode = "200", description = "Resumen de la solicitud con el paso completado")
-	@Operation(summary = "Acepta el aviso de privacidad vigente",
-			description = "Registra la aceptación, incluida la captura de señales, y la IP desde la que se aceptó.")
-	@ApiResponse(responseCode = "400", description = "`signalsAccepted` debe ser `true`", content = @Content)
+	@Operation(summary = "Acepta el aviso de privacidad vigente y los términos y condiciones",
+			description = "Registra la aceptación (incluida la captura de señales y, si se envía, los términos y condiciones), la versión del aviso, la fecha y hora y la IP desde la que se aceptó.")
+	@ApiResponse(responseCode = "400", description = "`signalsAccepted` debe ser `true`, y `termsAccepted`, si se envía, también", content = @Content)
 	@ApiResponse(responseCode = "404", description = "La solicitud no existe", content = @Content)
 	@ApiResponse(responseCode = "409", description = "La solicitud ya no está en progreso o no hay aviso vigente", content = @Content)
 	@PutMapping("/{requestId}/privacy-consent")
 	public OnboardingRequestResponse acceptPrivacyNotice(@PathVariable UUID requestId,
 			@Valid @RequestBody PrivacyConsentRequest body, HttpServletRequest http) {
-		return onboardingService.acceptPrivacyNotice(requestId, clientIp(http));
+		return onboardingService.acceptPrivacyNotice(requestId, body.termsAccepted(), clientIp(http));
 	}
 
 	@ApiResponse(responseCode = "200", description = "Resumen de la solicitud con el paso completado")

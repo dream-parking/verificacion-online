@@ -569,6 +569,28 @@
         },
         "type" : "object"
       },
+      "ConsoleRequestConsent" : {
+        "properties" : {
+          "acceptedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "noticeVersion" : {
+            "description" : "Versión del aviso aceptado",
+            "example" : "2026.1",
+            "type" : "string"
+          },
+          "signalsAccepted" : {
+            "description" : "Aceptó la captura de señales (siempre `true`: sin ella no se avanza)",
+            "type" : "boolean"
+          },
+          "termsAccepted" : {
+            "description" : "Aceptó los términos y condiciones; null si no se registró (solicitudes anteriores o una app que aún no lo envía)",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ConsoleRequestDetail" : {
         "properties" : {
           "applicant" : {
@@ -577,6 +599,9 @@
           "completedSteps" : {
             "format" : "int32",
             "type" : "integer"
+          },
+          "consent" : {
+            "$ref" : "#/components/schemas/ConsoleRequestConsent"
           },
           "expectedActivity" : {
             "$ref" : "#/components/schemas/ConsoleRequestExpectedActivity"
@@ -1570,6 +1595,13 @@
       "PrivacyConsentRequest" : {
         "properties" : {
           "signalsAccepted" : {
+            "description" : "Acepta el aviso de privacidad y la captura de señales; debe ser `true`",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "termsAccepted" : {
+            "description" : "Acepta los términos y condiciones; si se envía debe ser `true`. Sin él queda «sin registro»",
+            "example" : true,
             "type" : "boolean"
           }
         },
@@ -5150,7 +5182,7 @@
     },
     "/api/onboarding/requests/{requestId}/privacy-consent" : {
       "put" : {
-        "description" : "Registra la aceptación, incluida la captura de señales, y la IP desde la que se aceptó.",
+        "description" : "Registra la aceptación (incluida la captura de señales y, si se envía, los términos y condiciones), la versión del aviso, la fecha y hora y la IP desde la que se aceptó.",
         "operationId" : "onboardingAcceptPrivacyNotice",
         "parameters" : [ {
           "in" : "path",
@@ -5190,7 +5222,7 @@
                 }
               }
             },
-            "description" : "`signalsAccepted` debe ser `true`"
+            "description" : "`signalsAccepted` debe ser `true`, y `termsAccepted`, si se envía, también"
           },
           "404" : {
             "content" : {
@@ -5213,7 +5245,7 @@
             "description" : "La solicitud ya no está en progreso o no hay aviso vigente"
           }
         },
-        "summary" : "Acepta el aviso de privacidad vigente",
+        "summary" : "Acepta el aviso de privacidad vigente y los términos y condiciones",
         "tags" : [ "Onboarding" ]
       }
     },

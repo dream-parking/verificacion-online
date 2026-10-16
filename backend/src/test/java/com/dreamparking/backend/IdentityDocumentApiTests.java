@@ -200,6 +200,30 @@ class IdentityDocumentApiTests {
 		assertThat(audits).isEqualTo(1);
 	}
 
+	/** VDI-109: the detail carries the DUI data, so reading it is audited like the photos. */
+	@Test
+	void readingTheDetailWithTheDuiDataIsAudited() throws Exception {
+		when(ocr.read(any(), any())).thenReturn(marta());
+		String id = withBasicData();
+		upload(id, FRONT, BACK).andExpect(status().isOk());
+		flushAndClear();
+
+		mvc.perform(get("/api/console/requests/{id}", id))
+			.andExpect(status().isOk())
+			.andExpect(header().string("Cache-Control", "no-store"))
+			.andExpect(jsonPath("$.identityDocument.read.dui").value("04567891-2"));
+		mvc.perform(get("/api/console/requests/{id}", UUID.randomUUID())).andExpect(status().isNotFound());
+
+		Integer audits = jdbc.queryForObject(
+				"select count(*) from access_audit where user_id = ? and action = 'VIEW_REQUEST_DETAIL'",
+				Integer.class, analyst.getId());
+		assertThat(audits).isEqualTo(1);
+		String entity = jdbc.queryForObject(
+				"select entity_name || '/' || entity_id from access_audit where user_id = ? and action = 'VIEW_REQUEST_DETAIL'",
+				String.class, analyst.getId());
+		assertThat(entity).isEqualTo("onboarding_request/" + id);
+	}
+
 	@Test
 	void thePhotosAreStoredEncrypted() throws Exception {
 		when(ocr.read(any(), any())).thenReturn(marta());

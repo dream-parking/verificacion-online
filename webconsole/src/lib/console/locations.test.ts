@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { RequestDetail } from "./api";
 import { fetchLocations, groupByPlace, groupKey, placeName, type LocatedRequest } from "./locations";
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
@@ -7,17 +6,18 @@ const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("placeName", () => {
-  const signals = (s: Partial<NonNullable<RequestDetail["signals"]>>) => s as RequestDetail["signals"];
+  const place = { city: null, regionName: null, country: null, approximateLocation: null };
 
   it("junta ciudad, región y país sin repetir", () => {
-    const s = signals({ ipDetails: { city: "San Salvador", regionName: "San Salvador", country: "El Salvador" } as never });
-    expect(placeName(s)).toBe("San Salvador, El Salvador");
+    expect(placeName({ ...place, city: "San Salvador", regionName: "San Salvador", country: "El Salvador" })).toBe(
+      "San Salvador, El Salvador",
+    );
   });
   it("usa la ubicación aproximada de la app si el servidor no resolvió nada", () => {
-    expect(placeName(signals({ approximateLocation: "Santa Tecla" }))).toBe("Santa Tecla");
+    expect(placeName({ ...place, approximateLocation: "Santa Tecla" })).toBe("Santa Tecla");
   });
-  it("devuelve null sin señales", () => {
-    expect(placeName(null)).toBeNull();
+  it("devuelve null sin ubicación", () => {
+    expect(placeName(place)).toBeNull();
   });
 });
 
@@ -59,33 +59,38 @@ describe("groupByPlace", () => {
 });
 
 describe("fetchLocations", () => {
-  it("lee el detalle de cada solicitud y marca cuáles se ubicaron", async () => {
-    const summaries = ["r1", "r2", "r3"].map((id) => ({
+  it("lee todas las ubicaciones en una sola llamada y marca cuáles se ubicaron", async () => {
+    const row = (id: string, extra: object) => ({
       id,
       number: `N-${id}`,
       name: id,
       riskLevel: "LOW",
       status: "COMPLETED",
-    }));
-    const details: Record<string, unknown> = {
-      r1: { signals: { ip: "1.1.1.1", locationStatus: "AVAILABLE", latitude: 13.7, longitude: -89.2, approximateLocation: "SV" } },
-      r2: { signals: { ip: "10.0.0.1", locationStatus: "UNAVAILABLE", latitude: 1, longitude: 1 } },
-      r3: { signals: null },
-    };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation(async (url: string) => {
-        if (url.includes("/requests?")) {
-          return json({ content: summaries, page: 0, size: 100, totalElements: 3, totalPages: 1 });
-        }
-        return json(details[decodeURIComponent(url.split("/").pop()!)]);
-      }),
+      ip: null,
+      locationStatus: null,
+      latitude: null,
+      longitude: null,
+      city: null,
+      regionName: null,
+      country: null,
+      approximateLocation: null,
+      ...extra,
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      json([
+        row("r1", { ip: "1.1.1.1", locationStatus: "AVAILABLE", latitude: 13.7, longitude: -89.2, approximateLocation: "SV" }),
+        row("r2", { ip: "10.0.0.1", locationStatus: "UNAVAILABLE", latitude: 1, longitude: 1 }),
+        row("r3", {}),
+      ]),
     );
+    vi.stubGlobal("fetch", fetchMock);
 
     const result = await fetchLocations("tok");
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/console/requests/locations");
     expect(result.map((r) => r.id)).toEqual(["r1", "r2", "r3"]);
-    expect(result[0]).toMatchObject({ located: true, latitude: 13.7, longitude: -89.2, place: "SV", ip: "1.1.1.1" });
+    expect(result[0]).toMatchObject({ requestNumber: "N-r1", located: true, latitude: 13.7, longitude: -89.2, place: "SV", ip: "1.1.1.1" });
     expect(result[1]).toMatchObject({ located: false, latitude: null, longitude: null });
     expect(result[2]).toMatchObject({ located: false, ip: null, place: null });
   });

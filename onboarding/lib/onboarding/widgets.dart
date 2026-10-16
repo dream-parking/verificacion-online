@@ -152,6 +152,7 @@ class LabeledTextField extends StatelessWidget {
     this.label,
     this.helper,
     this.keyboardType = TextInputType.text,
+    this.textCapitalization = TextCapitalization.none,
     this.autofillHints,
     this.formatters = const [],
     this.onChanged,
@@ -165,6 +166,9 @@ class LabeledTextField extends StatelessWidget {
   final String placeholder;
   final String error;
   final TextInputType keyboardType;
+
+  /// `words` for names: the keyboard starts every word with a capital letter, and the person can still change it.
+  final TextCapitalization textCapitalization;
   final Iterable<String>? autofillHints;
   final List<TextInputFormatter> formatters;
   final ValueChanged<String>? onChanged;
@@ -182,6 +186,7 @@ class LabeledTextField extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          textCapitalization: textCapitalization,
           autofillHints: autofillHints,
           inputFormatters: formatters,
           onChanged: onChanged,

@@ -139,6 +139,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   /// The request was picked up with the DUI confirmed: its screens are empty in the phone, so back skips them.
   var _duiConfirmedBeforeResume = false;
 
+  /// The data of the DUI was confirmed and saved in the API; the review says so (VDI-87).
+  var _duiConfirmed = false;
+
   /// Differences between the basic data and the DUI that the person already accepted («Continuar de todos modos»).
   String? _acceptedDifference;
 
@@ -261,6 +264,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final afterDui = const [Screen.income, Screen.expectedActivity, Screen.review].contains(info.step);
     final askAgain = info.step == Screen.identityDocument || (afterDui && !info.identityConfirmed);
     _duiConfirmedBeforeResume = afterDui && info.identityConfirmed;
+    _duiConfirmed = info.identityConfirmed;
     _goTo(askAgain ? Screen.identityDocument : info.step!);
     if (askAgain) unawaited(_explainPhotosAgain());
   }
@@ -445,6 +449,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   /// VDI-77: sends both photos. If they can be read, it moves on to confirm the data; if not, it says what to fix.
   Future<void> _uploadDui() async {
     setState(() {
+      _duiConfirmed = false;
       _uploadingDui = true;
       _duiError = null;
       _unreadable = null;
@@ -506,6 +511,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       await save();
       if (!mounted) return;
       setState(() => _saving = false);
+      if (step == Screen.identityConfirmation) _duiConfirmed = true;
       _completeStep(_signalStepOf(step));
       _correctingBasicData = false;
       _goTo(returnToConfirmation ? Screen.identityConfirmation : _next[step]!);
@@ -672,6 +678,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
     setState(() {
       _form = ApplicationForm();
+      _duiConfirmed = false;
+      _duiConfirmedBeforeResume = false;
       _createdRequestId = null;
       _duiPhotos.clear();
       _unreadable = null;
@@ -1407,6 +1415,18 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             line2: 'DUI ${_form.dui} · Cel. ${_form.phone}',
             onEdit: () => _goTo(Screen.basicData),
           ),
+          if (_duiConfirmed) ...[
+            const SizedBox(height: 14),
+            _SummaryCard(
+              title: 'Tu DUI',
+              line1: _form.idDui.isEmpty
+                  ? 'Ya guardamos las fotos y los datos de tu DUI'
+                  : 'DUI ${_form.idDui} · Vence ${_form.idExpiryDate}',
+              line2: _form.idDui.isEmpty
+                  ? 'Confirmado · las fotos no se guardan en tu teléfono'
+                  : 'Confirmado · foto del frente y del reverso',
+            ),
+          ],
           const SizedBox(height: 14),
           _SummaryCard(
             title: 'Tus ingresos',
@@ -1749,17 +1769,19 @@ class _AcceptanceCheckbox extends StatelessWidget {
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
     required this.title,
-    required this.editSemanticLabel,
+    this.editSemanticLabel,
     required this.line1,
     required this.line2,
-    required this.onEdit,
+    this.onEdit,
   });
 
   final String title;
-  final String editSemanticLabel;
+  final String? editSemanticLabel;
   final String line1;
   final String line2;
-  final VoidCallback onEdit;
+
+  /// `null` for a card that only informs: it has no «Editar».
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1777,7 +1799,7 @@ class _SummaryCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(child: SectionTitle(title)),
-              LinkButton(text: 'Editar', semanticLabel: editSemanticLabel, onPressed: onEdit),
+              if (onEdit != null) LinkButton(text: 'Editar', semanticLabel: editSemanticLabel, onPressed: onEdit!),
             ],
           ),
           Text(line1, style: AppText.body),

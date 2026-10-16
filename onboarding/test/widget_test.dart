@@ -496,6 +496,10 @@ void main() {
       expect(find.text('Paso 5 de 5'), findsOneWidget);
       expect(find.text('Marta Alejandra Rivas Cruz'), findsOneWidget);
       expect(find.text('DUI 04812377-5 · Cel. 7845-2310'), findsOneWidget);
+      expect(find.text('Tu DUI'), findsOneWidget);
+      expect(find.text('DUI 04812377-5 · Vence 01/06/2029'), findsOneWidget);
+      expect(find.text('Confirmado · foto del frente y del reverso'), findsOneWidget);
+      expect(find.text('Editar'), findsNWidgets(3), reason: 'the DUI card is informative: it has no edit link');
       expect(find.text('Remesas'), findsOneWidget);
       expect(find.text('USD 500.01 a 1,000 al mes'), findsOneWidget);
       expect(find.text('Ahorro'), findsOneWidget);
@@ -2507,6 +2511,9 @@ void main() {
           expect(find.text('DUI 04812377-5 · Cel. 7845-2310'), findsOneWidget);
           expect(find.text('Salario'), findsOneWidget);
           expect(find.text('Ahorro'), findsOneWidget);
+          expect(find.text('Tu DUI'), findsOneWidget);
+          expect(find.text('Ya guardamos las fotos y los datos de tu DUI'), findsOneWidget);
+          expect(find.text('Confirmado · las fotos no se guardan en tu teléfono'), findsOneWidget);
 
           await tap(tester, find.text('Enviar solicitud'));
           expect(

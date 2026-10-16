@@ -303,10 +303,19 @@ class FakeSavedRequestStore implements SavedRequestStore {
 }
 
 /// `GET /resume` of a request left at [step], with what the API saved up to there.
+const _savedSteps = ['BASIC_DATA', 'IDENTITY_DOCUMENT', 'INCOME', 'EXPECTED_ACTIVITY', 'REVIEW'];
+
+/// `steps` of `GET /resume`: the ones before [current] done and saved on 8 Oct, [current] on its turn, the rest pending.
+String _stepsJson(String current) {
+  final at = _savedSteps.indexOf(current);
+  return '[{"step":"PRIVACY_NOTICE","state":"DONE","savedAt":"2026-10-08T20:00:00Z"},'
+      '${[for (var i = 0; i < _savedSteps.length; i++) '{"step":"${_savedSteps[i]}","state":"${i < at ? 'DONE' : i == at ? 'CURRENT' : 'PENDING'}","savedAt":${i < at ? '"2026-10-08T21:42:00Z"' : 'null'}}'].join(',')}]';
+}
+
 String resumeJson(String step, {String state = 'RESUMABLE', bool confirmedDui = true}) =>
     state != 'RESUMABLE'
     ? '{"requestId":"$requestId","state":"$state","firstName":"Marta"}'
-    : '{"requestId":"$requestId","state":"RESUMABLE","currentStep":"$step","firstName":"Marta",'
+    : '{"requestId":"$requestId","state":"RESUMABLE","currentStep":"$step","firstName":"Marta","steps":${_stepsJson(step)},'
           '"saved":{${confirmedDui ? '"identityDocument":{"confirmed":true,"ocrStatus":"READ"},' : ''}"basicData":{"firstNames":"Marta Alejandra","lastNames":"Rivas Cruz","dui":"04812377-5","mobilePhone":"7845-2310"},'
           '"income":{"sourceCode":"SALARIO","rangeCode":"500_1000"},'
           '"expectedActivity":{"transactionTypeCode":"AHORRO","monthlyAmountRangeCode":"200_500"}}}';
@@ -2460,20 +2469,37 @@ void main() {
             fake.resumes.single.url.path,
             '/api/onboarding/requests/$requestId/resume',
           );
-          expect(find.text('Tienes una solicitud a medias'), findsOneWidget);
+          expect(find.text('¡Hola de nuevo, Marta!'), findsOneWidget);
           expect(find.textContaining('Marta'), findsWidgets);
           expect(find.textContaining('Tus ingresos'), findsWidgets);
-          expect(find.text('Continuar mi solicitud'), findsOneWidget);
+          expect(find.text('Continuar donde quedé'), findsOneWidget);
           expect(find.text('Empezar de nuevo'), findsOneWidget);
           expect(find.text('Empezar'), findsNothing);
         },
       );
 
+      testWidgets('the welcome lists the steps: the saved ones with their date, where it was left and the pending ones', (tester) async {
+        await openWith(tester, 'INCOME');
+        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.textContaining('Guardado el'), findsNWidgets(2));
+        expect(find.text('Aquí te quedaste'), findsOneWidget);
+        expect(find.text('Pendiente'), findsNWidgets(2));
+        expect(find.text('Si empiezas de nuevo, tendrás que escribir tus datos otra vez.'), findsOneWidget);
+      });
+
+      testWidgets('with the DUI unconfirmed the list puts the person back at the DUI, whatever step the API says', (tester) async {
+        await openWith(tester, 'INCOME', body: resumeJson('INCOME', confirmedDui: false));
+        expect(find.text('Paso 2 de 5'), findsOneWidget);
+        expect(find.textContaining('Guardado el'), findsOneWidget);
+        expect(find.text('Aquí te quedaste'), findsOneWidget);
+        expect(find.text('Pendiente'), findsNWidgets(3));
+      });
+
       testWidgets(
         'continuing goes to the step where it was, without creating another request or sending signals',
         (tester) async {
           final fake = await openWith(tester, 'INCOME');
-          await tap(tester, find.text('Continuar mi solicitud'));
+          await tap(tester, find.text('Continuar donde quedé'));
           expect(find.text('Paso 3 de 5'), findsOneWidget);
           expect(fake.starts, isEmpty);
           expect(fake.privacyConsents, isEmpty);
@@ -2487,7 +2513,7 @@ void main() {
 
       testWidgets('what was saved fills the screens again', (tester) async {
         await openWith(tester, 'BASIC_DATA');
-        await tap(tester, find.text('Continuar mi solicitud'));
+        await tap(tester, find.text('Continuar donde quedé'));
         expect(find.text('Paso 1 de 5'), findsOneWidget);
         final fields = tester
             .widgetList<TextField>(find.byType(TextField))
@@ -2505,7 +2531,7 @@ void main() {
         (tester) async {
           final store = FakeSavedRequestStore(requestId);
           final fake = await openWith(tester, 'REVIEW', store: store);
-          await tap(tester, find.text('Continuar mi solicitud'));
+          await tap(tester, find.text('Continuar donde quedé'));
           expect(find.text('Revisa tu solicitud'), findsOneWidget);
           expect(find.text('Marta Alejandra Rivas Cruz'), findsOneWidget);
           expect(find.text('DUI 04812377-5 · Cel. 7845-2310'), findsOneWidget);
@@ -2532,7 +2558,7 @@ void main() {
       testWidgets('at the DUI step it says the photos must be taken again, then the camera opens', (tester) async {
         await openWith(tester, 'IDENTITY_DOCUMENT');
         expect(find.textContaining('volver a tomar las fotos de tu DUI'), findsOneWidget, reason: 'the welcome already warns it');
-        await tap(tester, find.text('Continuar mi solicitud'));
+        await tap(tester, find.text('Continuar donde quedé'));
         expect(find.text('Vuelve a tomar las fotos de tu DUI'), findsOneWidget);
         await tap(tester, find.text('Entendido'));
         expect(shutter, findsOneWidget);
@@ -2540,7 +2566,7 @@ void main() {
 
       testWidgets('if the DUI was never confirmed it does not skip it, even if the API moved on', (tester) async {
         await openWith(tester, 'INCOME', body: resumeJson('INCOME', confirmedDui: false));
-        await tap(tester, find.text('Continuar mi solicitud'));
+        await tap(tester, find.text('Continuar donde quedé'));
         expect(find.text('Vuelve a tomar las fotos de tu DUI'), findsOneWidget);
         await tap(tester, find.text('Entendido'));
         expect(shutter, findsOneWidget);
@@ -2549,7 +2575,7 @@ void main() {
 
       testWidgets('with the DUI already confirmed it is not asked again and back skips its empty screens', (tester) async {
         await openWith(tester, 'INCOME');
-        await tap(tester, find.text('Continuar mi solicitud'));
+        await tap(tester, find.text('Continuar donde quedé'));
         expect(find.text('Vuelve a tomar las fotos de tu DUI'), findsNothing);
         await tap(tester, find.byTooltip('Volver al paso anterior'));
         expect(find.text('Paso 1 de 5'), findsOneWidget);
@@ -2566,7 +2592,7 @@ void main() {
             '/api/onboarding/requests/$requestId/abandon',
           );
           expect(store.id, isNull);
-          expect(find.text('Tienes una solicitud a medias'), findsNothing);
+          expect(find.text('¡Hola de nuevo, Marta!'), findsNothing);
           expect(find.text('Empezar'), findsOneWidget);
         },
       );
@@ -2599,7 +2625,7 @@ void main() {
               body: resumeJson('', state: state),
             );
             expect(store.id, isNull);
-            expect(find.text('Tienes una solicitud a medias'), findsNothing);
+            expect(find.text('¡Hola de nuevo, Marta!'), findsNothing);
             expect(find.text('Empezar'), findsOneWidget);
           },
         );
@@ -2626,7 +2652,7 @@ void main() {
             body: '{"status":503}',
           );
           expect(store.id, requestId);
-          expect(find.text('Tienes una solicitud a medias'), findsNothing);
+          expect(find.text('¡Hola de nuevo, Marta!'), findsNothing);
           expect(find.text('Empezar'), findsOneWidget);
         },
       );

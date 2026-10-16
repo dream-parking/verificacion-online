@@ -1,10 +1,22 @@
 import '../onboarding/application_form.dart';
 
+/// One step of the request as the API reports it: `DONE`, `SKIPPED`, `CURRENT` or `PENDING`, and when it was saved.
+class ResumeStep {
+  const ResumeStep(this.screen, this.state, this.savedAt);
+
+  final Screen screen;
+  final String state;
+  final DateTime? savedAt;
+
+  bool get done => state == 'DONE';
+}
+
 /// Where a request was left and what was saved (`GET /{id}/resume`, VDI-86).
 class ResumeInfo {
   const ResumeInfo({
     required this.resumable,
     this.step,
+    this.steps = const [],
     this.firstName,
     this.firstNames,
     this.lastNames,
@@ -23,6 +35,9 @@ class ResumeInfo {
 
   /// Screen of the step the person was in; `null` when it cannot be resumed.
   final Screen? step;
+
+  /// The steps the person sees (the privacy notice is not one of them), each with its state and when it was saved.
+  final List<ResumeStep> steps;
 
   /// For the greeting.
   final String? firstName;
@@ -52,6 +67,11 @@ class ResumeInfo {
     return ResumeInfo(
       resumable: resumable,
       step: resumable ? screenOf(json['currentStep'] as String?) : null,
+      steps: [
+        for (final s in (json['steps'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>())
+          if (screenOf(s['step'] as String?) case final screen? when s['step'] != 'PRIVACY_NOTICE')
+            ResumeStep(screen, s['state'] as String? ?? '', s['savedAt'] == null ? null : DateTime.parse(s['savedAt'] as String)),
+      ],
       firstName: json['firstName'] as String?,
       firstNames: basic['firstNames'] as String?,
       lastNames: basic['lastNames'] as String?,

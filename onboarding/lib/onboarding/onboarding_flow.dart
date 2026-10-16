@@ -15,6 +15,7 @@ import '../signals/signals.dart';
 import '../theme.dart';
 import 'application_form.dart';
 import 'privacy_notice.dart';
+import 'resume_view.dart';
 import 'saved_request.dart';
 import 'widgets.dart';
 
@@ -232,7 +233,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
-  /// VDI-87: «Continuar mi solicitud». The screens are filled with what the API saved and it goes to the step where it
+  /// Step a request picked up goes to. The DUI photos are not kept in the phone: if the DUI was not confirmed it is done
+  /// again, even if the API moved on.
+  static Screen _resumeTarget(ResumeInfo info) {
+    final afterDui = const [Screen.income, Screen.expectedActivity, Screen.review].contains(info.step);
+    return info.step == Screen.identityDocument || (afterDui && !info.identityConfirmed) ? Screen.identityDocument : info.step!;
+  }
+
+  /// VDI-87: «Continuar donde quedé». The screens are filled with what the API saved and it goes to the step where it
   /// was. The privacy notice was already accepted. The device is not read again: new signals would replace the ones
   /// already saved.
   void _resumeRequest() {
@@ -261,11 +269,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _resumable = null;
     });
     // The DUI photos are not kept in the phone. If the step was not confirmed it is done again, even if the API moved on.
-    final afterDui = const [Screen.income, Screen.expectedActivity, Screen.review].contains(info.step);
-    final askAgain = info.step == Screen.identityDocument || (afterDui && !info.identityConfirmed);
-    _duiConfirmedBeforeResume = afterDui && info.identityConfirmed;
+    final target = _resumeTarget(info);
+    final askAgain = target == Screen.identityDocument;
+    _duiConfirmedBeforeResume = !askAgain && const [Screen.income, Screen.expectedActivity, Screen.review].contains(info.step);
     _duiConfirmed = info.identityConfirmed;
-    _goTo(askAgain ? Screen.identityDocument : info.step!);
+    _goTo(target);
     if (askAgain) unawaited(_explainPhotosAgain());
   }
 
@@ -815,9 +823,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                PrimaryButton(text: 'Continuar mi solicitud', onPressed: _resumeRequest),
+                PrimaryButton(text: 'Continuar donde quedé', onPressed: _resumeRequest),
                 const SizedBox(height: 12),
                 SecondaryButton(text: 'Empezar de nuevo', onPressed: _startOver),
+                const SizedBox(height: 10),
+                const Text(
+                  'Si empiezas de nuevo, tendrás que escribir tus datos otra vez.',
+                  style: AppText.small,
+                  textAlign: TextAlign.center,
+                ),
               ],
             )
           : _screen == Screen.location
@@ -849,7 +863,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   Widget _content() => switch (_screen) {
-        Screen.welcome => _Welcome(resumable: _resumable),
+        Screen.welcome => _resumable == null ? const _Welcome() : ResumeView(info: _resumable!, current: _resumeTarget(_resumable!)),
         Screen.privacy => _privacy(),
         Screen.location => const _LocationPermission(),
         Screen.basicData => _basicData(),
@@ -1620,18 +1634,7 @@ class _LocationPermission extends StatelessWidget {
 // ---------------------------------------------------------------- 1. Welcome
 
 class _Welcome extends StatelessWidget {
-  const _Welcome({this.resumable});
-
-  /// A request left halfway: the welcome offers to pick it up (VDI-87).
-  final ResumeInfo? resumable;
-
-  static const _stepNames = {
-    Screen.basicData: 'Datos básicos',
-    Screen.identityDocument: 'Tu DUI',
-    Screen.income: 'Tus ingresos',
-    Screen.expectedActivity: 'El dinero de tu cuenta',
-    Screen.review: 'Revisar y enviar',
-  };
+  const _Welcome();
 
   static const _steps = [
     ('Datos básicos', 'Tu nombre, DUI y celular.'),
@@ -1688,35 +1691,6 @@ class _Welcome extends StatelessWidget {
             ],
           ),
         ),
-        if (resumable != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.brand, width: 2),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Tienes una solicitud a medias',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${resumable!.firstName == null ? 'Te' : '${resumable!.firstName}, te'} quedaste en '
-                    '«${_stepNames[resumable!.step] ?? 'tu solicitud'}». Lo que ya guardamos sigue aquí.'
-                    '${resumable!.step == Screen.identityDocument || (!resumable!.identityConfirmed && resumable!.step != Screen.basicData) ? ' Tendrás que volver a tomar las fotos de tu DUI.' : ''}',
-                    style: AppText.bodyMuted,
-                  ),
-                ],
-              ),
-            ),
-          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
           child: Column(

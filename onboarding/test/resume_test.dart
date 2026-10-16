@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 
 import 'package:onboarding/api/onboarding_api.dart';
 import 'package:onboarding/api/resume.dart';
+import 'package:onboarding/onboarding/resume_view.dart';
 import 'package:onboarding/onboarding/application_form.dart';
 
 void main() {
@@ -47,6 +48,30 @@ void main() {
           reason: 'without a DUI saved it is not confirmed');
     });
 
+    test('it keeps the steps with their state and the date they were saved', () {
+      final info = ResumeInfo.fromJson({
+        'state': 'RESUMABLE',
+        'currentStep': 'INCOME',
+        'steps': [
+          {'step': 'PRIVACY_NOTICE', 'state': 'DONE', 'savedAt': '2026-10-08T20:00:00Z'},
+          {'step': 'BASIC_DATA', 'state': 'DONE', 'savedAt': '2026-10-08T21:42:00Z'},
+          {'step': 'IDENTITY_DOCUMENT', 'state': 'DONE', 'savedAt': '2026-10-08T21:50:00Z'},
+          {'step': 'INCOME', 'state': 'CURRENT', 'savedAt': null},
+          {'step': 'EXPECTED_ACTIVITY', 'state': 'PENDING', 'savedAt': null},
+          {'step': 'REVIEW', 'state': 'PENDING', 'savedAt': null},
+        ],
+      });
+      expect(info.steps.map((s) => s.screen), [Screen.basicData, Screen.identityDocument, Screen.income, Screen.expectedActivity, Screen.review],
+          reason: 'the privacy notice is not one of the 5 steps the person sees');
+      expect(info.steps.map((s) => s.done), [true, true, false, false, false]);
+      expect(info.steps.first.savedAt, DateTime.utc(2026, 10, 8, 21, 42));
+      expect(info.steps[2].savedAt, isNull);
+    });
+
+    test('without steps the list is empty', () {
+      expect(ResumeInfo.fromJson({'state': 'RESUMABLE', 'currentStep': 'INCOME'}).steps, isEmpty);
+    });
+
     test('each API step has its screen; the privacy notice goes on with the basic data', () {
       expect(ResumeInfo.screenOf('PRIVACY_NOTICE'), Screen.basicData);
       expect(ResumeInfo.screenOf('BASIC_DATA'), Screen.basicData);
@@ -83,6 +108,18 @@ void main() {
       expect(info.firstNames, 'Marta');
       expect(info.incomeSource, isNull);
       expect(info.transactionType, isNull);
+    });
+  });
+
+  group('formatSavedAt', () {
+    test('day, abbreviated month and 12-hour time, as the design shows it', () {
+      expect(formatSavedAt(DateTime(2026, 10, 8, 21, 42)), '8 de oct. a las 9:42 p. m.');
+      expect(formatSavedAt(DateTime(2026, 1, 15, 9, 5)), '15 de ene. a las 9:05 a. m.');
+    });
+
+    test('midnight and noon are 12', () {
+      expect(formatSavedAt(DateTime(2026, 3, 1, 0, 7)), '1 de mar. a las 12:07 a. m.');
+      expect(formatSavedAt(DateTime(2026, 3, 1, 12, 0)), '1 de mar. a las 12:00 p. m.');
     });
   });
 

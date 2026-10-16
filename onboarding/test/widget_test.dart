@@ -11,6 +11,7 @@ import 'package:onboarding/api/onboarding_api.dart';
 import 'package:onboarding/identity/document_camera.dart';
 import 'package:onboarding/identity/frame_quality.dart';
 import 'package:onboarding/onboarding/privacy_notice.dart';
+import 'package:onboarding/onboarding/saved_request.dart';
 import 'package:onboarding/identity/identity_document.dart';
 import 'package:onboarding/main.dart';
 import 'package:onboarding/onboarding/application_form.dart';
@@ -130,6 +131,8 @@ class FakeApi {
     this.submitErrors = const [],
     this.identityResponses = const [],
     this.confirmationErrors = const [],
+    this.resumeResponse,
+    this.abandonStatus = 200,
     this.number = 'SOL-2026-00419',
   });
 
@@ -158,6 +161,12 @@ class FakeApi {
   /// HTTP codes returned by the first `PUT /identity-document/confirmation` calls (then 200).
   List<int> confirmationErrors;
 
+  /// Response of `GET /resume` as (HTTP code, body); without it the request does not exist (404).
+  (int, String)? resumeResponse;
+
+  /// HTTP code of `POST /abandon`.
+  int abandonStatus;
+
   /// Number the server assigns on submit.
   final String number;
 
@@ -175,6 +184,8 @@ class FakeApi {
   List<http.Request> get submits => calls.where((r) => r.url.path.endsWith('/submit')).toList();
   List<http.Request> get incomes => calls.where((r) => r.url.path.endsWith('/income')).toList();
   List<http.Request> get activities => calls.where((r) => r.url.path.endsWith('/expected-activity')).toList();
+  List<http.Request> get resumes => calls.where((r) => r.url.path.endsWith('/resume')).toList();
+  List<http.Request> get abandons => calls.where((r) => r.url.path.endsWith('/abandon')).toList();
   List<http.Request> get catalogs => calls.where((r) => r.url.path == '/api/catalogs').toList();
   List<http.Request> get signals => calls.where((r) => r.url.path.endsWith('/signals')).toList();
 
@@ -237,6 +248,13 @@ class FakeApi {
             submitted = true;
             return http.Response('{"number":"$number","status":"COMPLETED","completedSteps":5}', 200);
           }
+          if (req.url.path.endsWith('/resume')) {
+            final (status, body) = resumeResponse ?? (404, '{"status":404,"detail":"Request not found"}');
+            return http.Response.bytes(utf8.encode(body), status);
+          }
+          if (req.url.path.endsWith('/abandon')) {
+            return http.Response('{"status":"ABANDONED"}', abandonStatus);
+          }
           if (req.method == 'GET' && req.url.path.startsWith('/api/onboarding/requests/')) {
             return submitted
                 ? http.Response('{"number":"$number","status":"COMPLETED"}', 200)
@@ -264,6 +282,34 @@ class FakeApi {
         }),
       );
 }
+
+/// Id the fake API gives to the requests it creates.
+const requestId = '11111111-2222-3333-4444-555555555555';
+
+/// Request id kept in memory, instead of the phone preferences.
+class FakeSavedRequestStore implements SavedRequestStore {
+  FakeSavedRequestStore([this.id]);
+
+  String? id;
+
+  @override
+  Future<String?> read() async => id;
+
+  @override
+  Future<void> save(String value) async => id = value;
+
+  @override
+  Future<void> clear() async => id = null;
+}
+
+/// `GET /resume` of a request left at [step], with what the API saved up to there.
+String resumeJson(String step, {String state = 'RESUMABLE'}) =>
+    state != 'RESUMABLE'
+    ? '{"requestId":"$requestId","state":"$state","firstName":"Marta"}'
+    : '{"requestId":"$requestId","state":"RESUMABLE","currentStep":"$step","firstName":"Marta",'
+          '"saved":{"basicData":{"firstNames":"Marta Alejandra","lastNames":"Rivas Cruz","dui":"04812377-5","mobilePhone":"7845-2310"},'
+          '"income":{"sourceCode":"SALARIO","rangeCode":"500_1000"},'
+          '"expectedActivity":{"transactionTypeCode":"AHORRO","monthlyAmountRangeCode":"200_500"}}}';
 
 /// Fake device: counts how many times it was read.
 class FakeDeviceInfo implements DeviceInfoSource {
@@ -393,6 +439,7 @@ void main() {
       DeviceLocationSource? location,
       DateTime Function()? clock,
       FakeCamera? camera,
+      SavedRequestStore? store,
     }) =>
         OnboardingApp(
           home: OnboardingFlow(
@@ -400,6 +447,7 @@ void main() {
             deviceInfo: device ?? FakeDeviceInfo(),
             location: location ?? FakeLocation(),
             camera: camera ?? FakeCamera(),
+            savedRequest: store ?? FakeSavedRequestStore(),
             clock: clock ?? DateTime.now,
           ),
         );
@@ -2353,6 +2401,218 @@ void main() {
         expect(find.text('Paso 5 de 5'), findsOneWidget);
         expect(fake.activities, hasLength(2));
       });
+    });
+
+    group('picking up a request left halfway (VDI-87)', () {
+      Future<FakeApi> openWith(
+        WidgetTester tester,
+        String step, {
+        FakeSavedRequestStore? store,
+        int status = 200,
+        String? body,
+      }) async {
+        final fake = FakeApi(
+          resumeResponse: (status, body ?? resumeJson(step)),
+        );
+        await tester.pumpWidget(
+          app(fake, store: store ?? FakeSavedRequestStore(requestId)),
+        );
+        await tester.pumpAndSettle();
+        return fake;
+      }
+
+      testWidgets(
+        'the request id is kept in the phone when the notice is accepted',
+        (tester) async {
+          final store = FakeSavedRequestStore();
+          await tester.pumpWidget(app(FakeApi(), store: store));
+          await tap(tester, find.text('Empezar'));
+          expect(
+            store.id,
+            isNull,
+            reason: 'nothing is kept before the request exists',
+          );
+          await acceptNotice(tester);
+          await tapContinue(tester);
+          expect(store.id, requestId);
+        },
+      );
+
+      testWidgets('without a saved request it does not ask the API', (
+        tester,
+      ) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await tester.pumpAndSettle();
+        expect(fake.resumes, isEmpty);
+        expect(find.text('Empezar'), findsOneWidget);
+      });
+
+      testWidgets(
+        'it offers to continue or to start over, and says where the person was',
+        (tester) async {
+          final fake = await openWith(tester, 'INCOME');
+          expect(
+            fake.resumes.single.url.path,
+            '/api/onboarding/requests/$requestId/resume',
+          );
+          expect(find.text('Tienes una solicitud a medias'), findsOneWidget);
+          expect(find.textContaining('Marta'), findsWidgets);
+          expect(find.textContaining('Tus ingresos'), findsWidgets);
+          expect(find.text('Continuar mi solicitud'), findsOneWidget);
+          expect(find.text('Empezar de nuevo'), findsOneWidget);
+          expect(find.text('Empezar'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'continuing goes to the step where it was, without creating another request or sending signals',
+        (tester) async {
+          final fake = await openWith(tester, 'INCOME');
+          await tap(tester, find.text('Continuar mi solicitud'));
+          expect(find.text('Paso 3 de 5'), findsOneWidget);
+          expect(fake.starts, isEmpty);
+          expect(fake.privacyConsents, isEmpty);
+          expect(
+            fake.signals,
+            isEmpty,
+            reason: 'new signals would replace the ones already saved',
+          );
+        },
+      );
+
+      testWidgets('what was saved fills the screens again', (tester) async {
+        await openWith(tester, 'BASIC_DATA');
+        await tap(tester, find.text('Continuar mi solicitud'));
+        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        final fields = tester
+            .widgetList<TextField>(find.byType(TextField))
+            .toList();
+        expect(fields.map((f) => f.controller?.text), [
+          'Marta Alejandra',
+          'Rivas Cruz',
+          '04812377-5',
+          '7845-2310',
+        ]);
+      });
+
+      testWidgets(
+        'at the review it shows what was saved and submits the same request',
+        (tester) async {
+          final store = FakeSavedRequestStore(requestId);
+          final fake = await openWith(tester, 'REVIEW', store: store);
+          await tap(tester, find.text('Continuar mi solicitud'));
+          expect(find.text('Revisa tu solicitud'), findsOneWidget);
+          expect(find.text('Marta Alejandra Rivas Cruz'), findsOneWidget);
+          expect(find.text('DUI 04812377-5 · Cel. 7845-2310'), findsOneWidget);
+          expect(find.text('Salario'), findsOneWidget);
+          expect(find.text('Ahorro'), findsOneWidget);
+
+          await tap(tester, find.text('Enviar solicitud'));
+          expect(
+            fake.submits.single.url.path,
+            '/api/onboarding/requests/$requestId/submit',
+          );
+          expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+          expect(
+            store.id,
+            isNull,
+            reason: 'a submitted request is not offered again',
+          );
+        },
+      );
+
+      testWidgets(
+        'at the DUI step the camera opens: the photos are not kept in the phone',
+        (tester) async {
+          final camera = FakeCamera();
+          final fake = FakeApi(
+            resumeResponse: (200, resumeJson('IDENTITY_DOCUMENT')),
+          );
+          await tester.pumpWidget(
+            app(fake, camera: camera, store: FakeSavedRequestStore(requestId)),
+          );
+          await tester.pumpAndSettle();
+          await tap(tester, find.text('Continuar mi solicitud'));
+          expect(shutter, findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        '«Empezar de nuevo» abandons the request, forgets it and shows the normal welcome',
+        (tester) async {
+          final store = FakeSavedRequestStore(requestId);
+          final fake = await openWith(tester, 'INCOME', store: store);
+          await tap(tester, find.text('Empezar de nuevo'));
+          expect(
+            fake.abandons.single.url.path,
+            '/api/onboarding/requests/$requestId/abandon',
+          );
+          expect(store.id, isNull);
+          expect(find.text('Tienes una solicitud a medias'), findsNothing);
+          expect(find.text('Empezar'), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'if abandoning fails (it was already closed) it starts over anyway',
+        (tester) async {
+          final store = FakeSavedRequestStore(requestId);
+          final fake = FakeApi(
+            resumeResponse: (200, resumeJson('INCOME')),
+            abandonStatus: 409,
+          );
+          await tester.pumpWidget(app(fake, store: store));
+          await tester.pumpAndSettle();
+          await tap(tester, find.text('Empezar de nuevo'));
+          expect(store.id, isNull);
+          expect(find.text('Empezar'), findsOneWidget);
+        },
+      );
+
+      for (final state in ['EXPIRED', 'COMPLETED', 'ABANDONED']) {
+        testWidgets(
+          'a $state request is forgotten and the normal welcome is shown',
+          (tester) async {
+            final store = FakeSavedRequestStore(requestId);
+            await openWith(
+              tester,
+              '',
+              store: store,
+              body: resumeJson('', state: state),
+            );
+            expect(store.id, isNull);
+            expect(find.text('Tienes una solicitud a medias'), findsNothing);
+            expect(find.text('Empezar'), findsOneWidget);
+          },
+        );
+      }
+
+      testWidgets('a request that does not exist is forgotten', (tester) async {
+        final store = FakeSavedRequestStore(requestId);
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake, store: store));
+        await tester.pumpAndSettle();
+        expect(store.id, isNull);
+        expect(find.text('Empezar'), findsOneWidget);
+      });
+
+      testWidgets(
+        'without connection the welcome is shown and the request is kept for next time',
+        (tester) async {
+          final store = FakeSavedRequestStore(requestId);
+          await openWith(
+            tester,
+            '',
+            store: store,
+            status: 503,
+            body: '{"status":503}',
+          );
+          expect(store.id, requestId);
+          expect(find.text('Tienes una solicitud a medias'), findsNothing);
+          expect(find.text('Empezar'), findsOneWidget);
+        },
+      );
     });
 
     testWidgets('Banco Tangamandapio brand: full logo on welcome and emblem on the steps', (tester) async {

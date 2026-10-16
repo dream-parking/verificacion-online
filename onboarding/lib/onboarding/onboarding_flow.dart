@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../api/catalogs.dart';
 import '../api/onboarding_api.dart';
+import '../api/resume.dart';
 import '../identity/document_camera.dart';
 import '../identity/dui_capture.dart';
 import '../identity/identity_document.dart';
@@ -14,6 +15,7 @@ import '../signals/signals.dart';
 import '../theme.dart';
 import 'application_form.dart';
 import 'privacy_notice.dart';
+import 'saved_request.dart';
 import 'widgets.dart';
 
 /// Account opening flow: welcome → privacy → location permission → 5 steps → confirmation.
@@ -24,6 +26,7 @@ class OnboardingFlow extends StatefulWidget {
     this.deviceInfo,
     this.camera = const PlatformDocumentCamera(),
     this.location,
+    this.savedRequest = const PreferencesSavedRequestStore(),
     this.clock = DateTime.now,
   });
 
@@ -38,6 +41,9 @@ class OnboardingFlow extends StatefulWidget {
 
   /// Approximate location reader (VDI-73); tests pass a fake one.
   final DeviceLocationSource? location;
+
+  /// Where the id of the request in progress is kept (VDI-87); tests pass one in memory.
+  final SavedRequestStore savedRequest;
 
   /// Current time used to measure timings (VDI-43); tests pass a controlled one.
   final DateTime Function() clock;
@@ -126,6 +132,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   String? _duiError;
   var _uploadingDui = false;
 
+  /// A request left halfway that the person can pick up (VDI-87). `null` when there is none.
+  ResumeInfo? _resumable;
+  String? _resumableId;
+
   /// Differences between the basic data and the DUI that the person already accepted («Continuar de todos modos»).
   String? _acceptedDifference;
 
@@ -158,6 +168,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   void initState() {
     super.initState();
     _loadCatalogs();
+    unawaited(_checkSavedRequest());
   }
 
   Future<void> _loadCatalogs() async {
@@ -168,6 +179,94 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     } on ApiException catch (e) {
       debugPrint('Could not load the catalogs: $e');
       if (mounted) setState(() => _catalogsFailed = true);
+    }
+  }
+
+  /// VDI-87: when the app opens, asks the API about the request kept in the phone. It is offered only if it can go on;
+  /// if it expired, was submitted, abandoned or does not exist, it is forgotten. Without connection it is kept for next time.
+  Future<void> _checkSavedRequest() async {
+    final String? id;
+    try {
+      id = await widget.savedRequest.read();
+    } on Exception catch (e) {
+      debugPrint('Could not read the saved request: $e');
+      return;
+    }
+    if (id == null) return;
+    try {
+      final info = await _api.resume(id);
+      if (!mounted) return;
+      if (info.resumable && info.step != null) {
+        setState(() {
+          _resumable = info;
+          _resumableId = id;
+        });
+      } else {
+        await _forgetSavedRequest();
+      }
+    } on ApiException catch (e) {
+      debugPrint('Could not check the saved request: $e');
+      if (e.status == 404) await _forgetSavedRequest();
+    }
+  }
+
+  Future<void> _forgetSavedRequest() async {
+    try {
+      await widget.savedRequest.clear();
+    } on Exception catch (e) {
+      debugPrint('Could not forget the saved request: $e');
+    }
+  }
+
+  Future<void> _keepRequest(String id) async {
+    try {
+      await widget.savedRequest.save(id);
+    } on Exception catch (e) {
+      debugPrint('Could not keep the request: $e');
+    }
+  }
+
+  /// VDI-87: «Continuar mi solicitud». The screens are filled with what the API saved and it goes to the step where it
+  /// was. The privacy notice was already accepted. The device is not read again: new signals would replace the ones
+  /// already saved.
+  void _resumeRequest() {
+    final info = _resumable!;
+    _firstNames.text = info.firstNames ?? '';
+    _lastNames.text = info.lastNames ?? '';
+    _dui.text = info.dui ?? '';
+    _phone.text = info.mobilePhone ?? '';
+    _incomeSourceDetail.text = info.incomeDetail ?? '';
+    setState(() {
+      _form
+        ..id = _resumableId
+        ..privacyAcceptedAt = widget.clock()
+        ..accepted = true
+        ..termsAccepted = true
+        ..firstNames = info.firstNames ?? ''
+        ..lastNames = info.lastNames ?? ''
+        ..dui = info.dui ?? ''
+        ..phone = info.mobilePhone ?? ''
+        ..incomeSource = info.incomeSource ?? ''
+        ..incomeSourceDetail = info.incomeDetail ?? ''
+        ..incomeRange = info.incomeRange ?? ''
+        ..transactionType = info.transactionType ?? ''
+        ..amountRange = info.amountRange ?? '';
+      _createdRequestId = _resumableId;
+      _resumable = null;
+    });
+    _goTo(info.step!);
+  }
+
+  /// VDI-87: «Empezar de nuevo». The request is abandoned so a new one can be opened; if the API cannot do it (it was
+  /// already closed, or there is no connection) the person starts over anyway.
+  Future<void> _startOver() async {
+    final id = _resumableId!;
+    setState(() => _resumable = null);
+    await _forgetSavedRequest();
+    try {
+      await _api.abandon(id);
+    } on ApiException catch (e) {
+      debugPrint('Could not abandon the request: $e');
     }
   }
 
@@ -507,6 +606,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           ..privacyAcceptedAt = widget.clock();
         _starting = false;
       });
+      unawaited(_keepRequest(id));
       _signals.steps.complete(Screen.privacy, _form.privacyAcceptedAt!);
       _goTo(Screen.location);
       unawaited(_captureDevice());
@@ -535,6 +635,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _form.number = number;
         _submitting = false;
       });
+      unawaited(_forgetSavedRequest());
       _goTo(Screen.confirmation);
     } on ApiException catch (e) {
       debugPrint('Could not submit the request: $e');
@@ -679,7 +780,17 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       padding: EdgeInsets.fromLTRB(24, 12, 24, 20 + MediaQuery.paddingOf(context).bottom),
-      child: _screen == Screen.location
+      child: _screen == Screen.welcome && _resumable != null
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PrimaryButton(text: 'Continuar mi solicitud', onPressed: _resumeRequest),
+                const SizedBox(height: 12),
+                SecondaryButton(text: 'Empezar de nuevo', onPressed: _startOver),
+              ],
+            )
+          : _screen == Screen.location
           ? Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -708,7 +819,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   Widget _content() => switch (_screen) {
-        Screen.welcome => const _Welcome(),
+        Screen.welcome => _Welcome(resumable: _resumable),
         Screen.privacy => _privacy(),
         Screen.location => const _LocationPermission(),
         Screen.basicData => _basicData(),
@@ -1467,7 +1578,18 @@ class _LocationPermission extends StatelessWidget {
 // ---------------------------------------------------------------- 1. Welcome
 
 class _Welcome extends StatelessWidget {
-  const _Welcome();
+  const _Welcome({this.resumable});
+
+  /// A request left halfway: the welcome offers to pick it up (VDI-87).
+  final ResumeInfo? resumable;
+
+  static const _stepNames = {
+    Screen.basicData: 'Datos básicos',
+    Screen.identityDocument: 'Tu DUI',
+    Screen.income: 'Tus ingresos',
+    Screen.expectedActivity: 'El dinero de tu cuenta',
+    Screen.review: 'Revisar y enviar',
+  };
 
   static const _steps = [
     ('Datos básicos', 'Tu nombre, DUI y celular.'),
@@ -1524,6 +1646,34 @@ class _Welcome extends StatelessWidget {
             ],
           ),
         ),
+        if (resumable != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.brand, width: 2),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Tienes una solicitud a medias',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${resumable!.firstName == null ? 'Te' : '${resumable!.firstName}, te'} quedaste en '
+                    '«${_stepNames[resumable!.step] ?? 'tu solicitud'}». Lo que ya guardamos sigue aquí.',
+                    style: AppText.bodyMuted,
+                  ),
+                ],
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
           child: Column(

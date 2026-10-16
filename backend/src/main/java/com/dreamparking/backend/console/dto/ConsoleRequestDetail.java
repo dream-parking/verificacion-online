@@ -24,17 +24,25 @@ import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
 /**
- * Everything the console's request detail screen shows. {@code identityDocument}, {@code income},
+ * Everything the console's request detail screen shows. {@code consent}, {@code identityDocument}, {@code income},
  * {@code expectedActivity}, {@code risk} and {@code signals} are null until the customer reaches that point of the flow.
  */
 public record ConsoleRequestDetail(UUID id, String number, RequestStatus status, short completedSteps,
-		RiskLevel riskLevel, Instant startedAt, Instant submittedAt, Applicant applicant,
+		RiskLevel riskLevel, Instant startedAt, Instant submittedAt, Applicant applicant, Consent consent,
 		IdentityDocument identityDocument, Income income, ExpectedActivity expectedActivity,
 		RiskAssessmentResponse risk, Signals signals, List<StepTime> steps, List<TimelineEntry> timeline) {
 
 	/** Personal data as declared; internal use only. */
 	@Schema(name = "ConsoleRequestApplicant")
 	public record Applicant(String firstNames, String lastNames, String dui, String mobilePhone) {
+	}
+
+	/** The privacy notice the customer accepted (VDI-93): its version, when, and whether the terms were accepted. */
+	@Schema(name = "ConsoleRequestConsent")
+	public record Consent(@Schema(description = "Versión del aviso aceptado", example = "2026.1") String noticeVersion,
+			Instant acceptedAt,
+			@Schema(description = "Aceptó la captura de señales (siempre `true`: sin ella no se avanza)") boolean signalsAccepted,
+			@Schema(description = "Aceptó los términos y condiciones; null si no se registró (solicitudes anteriores o una app que aún no lo envía)") Boolean termsAccepted) {
 	}
 
 	/**

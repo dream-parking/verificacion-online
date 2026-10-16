@@ -697,7 +697,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_screen == Screen.basicData) ...const [_SavedNote(), SizedBox(height: 10)],
-                PrimaryButton(text: text, onPressed: _busy ? null : _continue),
+                PrimaryButton(text: text, ready: _form.isScreenValid(_screen), onPressed: _busy ? null : _continue),
                 if (_screen == Screen.privacy) ...const [
                   SizedBox(height: 10),
                   Text(PrivacyNotice.recordedNote, style: AppText.small, textAlign: TextAlign.center),

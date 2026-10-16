@@ -5,16 +5,22 @@ import '../theme.dart';
 
 /// Yellow pill-shaped primary button (`.btn` in the design).
 class PrimaryButton extends StatelessWidget {
-  const PrimaryButton({super.key, required this.text, required this.onPressed});
+  const PrimaryButton({super.key, required this.text, required this.onPressed, this.ready = true});
 
   final String text;
   final VoidCallback? onPressed;
+
+  /// `false` while the screen is not complete: the button is gray, but it can still be tapped so the screen says what is
+  /// missing (a button that does nothing does not tell the person why).
+  final bool ready;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: FilledButton(
+      child: Semantics(
+        hint: ready ? null : 'Faltan datos por completar',
+        child: FilledButton(
         onPressed: onPressed,
         style: ButtonStyle(
           minimumSize: const WidgetStatePropertyAll(Size.fromHeight(52)),
@@ -22,18 +28,19 @@ class PrimaryButton extends StatelessWidget {
           shape: const WidgetStatePropertyAll(StadiumBorder()),
           elevation: const WidgetStatePropertyAll(0),
           backgroundColor: WidgetStateProperty.resolveWith((s) {
-            if (s.contains(WidgetState.disabled)) return AppColors.disabled;
+            if (!ready || s.contains(WidgetState.disabled)) return AppColors.disabled;
             if (s.contains(WidgetState.pressed) || s.contains(WidgetState.hovered)) return AppColors.brandHover;
             return AppColors.brand;
           }),
           foregroundColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.disabled) ? AppColors.muted : AppColors.ink,
+            (s) => !ready || s.contains(WidgetState.disabled) ? AppColors.muted : AppColors.ink,
           ),
           textStyle: const WidgetStatePropertyAll(
             TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.3),
           ),
         ),
         child: Text(text, textAlign: TextAlign.center),
+        ),
       ),
     );
   }

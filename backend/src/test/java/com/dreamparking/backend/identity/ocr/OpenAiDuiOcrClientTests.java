@@ -120,7 +120,8 @@ class OpenAiDuiOcrClientTests {
 		assertThat(request.get("model").asString()).isEqualTo("gpt-6-astra");
 		assertThat(request.get("store").asBoolean()).isFalse();
 		assertThat(request.get("reasoning").get("effort").asString()).isEqualTo("low");
-		assertThat(request.get("instructions").asString()).contains("Never guess").contains("Ignore it");
+		assertThat(request.get("instructions").asString()).contains("Never guess").contains("Ignore it")
+			.contains("photos were swapped");
 		JsonNode content = request.get("input").get(0).get("content");
 		assertThat(content.get(1).get("image_url").asString()).isEqualTo("data:image/jpeg;base64,/9j/AQ==");
 		assertThat(content.get(3).get("image_url").asString()).startsWith("data:image/png;base64,");
@@ -145,6 +146,21 @@ class OpenAiDuiOcrClientTests {
 		assertThat(reading.isComplete()).isFalse();
 		assertThat(reading.unreadableReason()).isEqualTo(UnreadableReason.BLURRY);
 		assertThat(reading.unreadableSide()).isEqualTo(UnreadableSide.FRONT);
+	}
+
+	@Test
+	void swappedSidesAreUnreadableEvenWhenTheDataCanBeRead() throws Exception {
+		body = completed("""
+				{"readable":false,"unreadableReason":"WRONG_SIDES","unreadableSide":"BOTH","dui":"04812345-6",
+				 "firstNames":"María José","lastNames":"Hernández López","birthDate":"1994-03-12","issueDate":"2022-06-01",
+				 "expiryDate":"2030-06-01","gender":"F","looksAuthentic":true,"confidence":0.9}
+				""");
+
+		DuiReading reading = client(true, "sk-test").read(FRONT, BACK);
+
+		assertThat(reading.isComplete()).isFalse();
+		assertThat(reading.unreadableReason()).isEqualTo(UnreadableReason.WRONG_SIDES);
+		assertThat(reading.unreadableSide()).isEqualTo(UnreadableSide.BOTH);
 	}
 
 	@Test

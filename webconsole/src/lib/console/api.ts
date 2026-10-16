@@ -102,6 +102,19 @@ export type IpDetails = {
   lookedUpAt: string | null;
 };
 
+/** One version of the declared transactional profile (VDI-3). The API sends them oldest first; only the last is current. */
+export type ProfileVersion = {
+  version: number;
+  current: boolean;
+  transactionTypeCode: string;
+  transactionTypeLabel: string | null;
+  monthlyAmountRangeCode: string;
+  monthlyAmountRangeLabel: string | null;
+  /** Who declared it: CUSTOMER is the person, in the app, before submitting. */
+  changedBy: "CUSTOMER" | null;
+  declaredAt: string;
+};
+
 export type RequestDetail = {
   id: string;
   number: string | null;
@@ -127,6 +140,8 @@ export type RequestDetail = {
     monthlyAmountRangeLabel: string | null;
     registeredAt: string;
     updatedAt: string | null;
+    /** Every version of the declared profile, oldest first. Missing in older API versions. */
+    versions?: ProfileVersion[] | null;
   } | null;
   risk: Assessment | null;
   signals: {

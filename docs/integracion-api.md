@@ -64,7 +64,8 @@ Reglas:
 | Método y ruta | Rol | Tarea |
 |---|---|---|
 | `GET /requests?status=&riskLevel=&q=&page=&size=` | cualquiera | VDI-56 |
-| `GET /requests/{id}` (DUI leído, ingresos, movimiento, score con el aporte de cada señal, señales, pasos, línea de tiempo) | cualquiera | VDI-44, 49, 53, 56, 81 |
+| `GET /requests/locations` (ubicación según la IP de cada solicitud, para el mapa, en una sola llamada; sin datos del DUI) | cualquiera | VDI-109 |
+| `GET /requests/{id}` (DUI leído y confirmado con los campos corregidos, ingresos, movimiento, score con el aporte de cada señal, señales, pasos, línea de tiempo): sin caché; cada consulta queda en la auditoría de accesos (`VIEW_REQUEST_DETAIL`) | cualquiera | VDI-44, 49, 53, 56, 81, 109 |
 | `GET /requests/{id}/identity-document/{side}` (`FRONT` o `BACK`): la foto descifrada, sin caché; cada consulta queda en la auditoría de accesos | cualquiera | VDI-80, VDI-81 |
 | `GET /score-model` (rangos y pesos del modelo vigente) | cualquiera | VDI-82 |
 | `GET /score-rules` (reglas vigentes; R-01 está retirada) | cualquiera | VDI-57 |

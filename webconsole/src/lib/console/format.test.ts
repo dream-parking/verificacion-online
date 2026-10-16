@@ -9,8 +9,10 @@ import {
   deviceLocationText,
   locationFailureText,
   minSec,
+  profileTimeline,
   usd,
 } from "./format";
+import type { ProfileVersion } from "./api";
 
 describe("fechas en hora de El Salvador (UTC−6)", () => {
   // 2026-10-06T04:08:03Z son las 10:08:03 p. m. del 5 de octubre en El Salvador.
@@ -86,5 +88,50 @@ describe("deviceLocationText", () => {
   it("una app anterior no la envía", () => {
     expect(deviceLocationText(null, null)).toContain("Sin dato");
     expect(deviceLocationText(undefined, undefined)).toContain("Sin dato");
+  });
+});
+
+describe("profileTimeline", () => {
+  const version = (n: number, extra: Partial<ProfileVersion> = {}): ProfileVersion => ({
+    version: n,
+    current: false,
+    transactionTypeCode: "PAGO_SALARIO",
+    transactionTypeLabel: "Salario y transferencias",
+    monthlyAmountRangeCode: "R1",
+    monthlyAmountRangeLabel: "Menos de USD 500",
+    changedBy: "CUSTOMER",
+    declaredAt: "2026-10-09T15:49:00Z",
+    ...extra,
+  });
+
+  it("ordena de la más nueva a la más vieja y solo la última es la vigente", () => {
+    const list = profileTimeline([version(1), version(2, { current: true }), version(3)]);
+    expect(list.map((e) => e.version)).toEqual([3, 2, 1]);
+    expect(list.map((e) => e.current)).toEqual([true, false, false]);
+  });
+
+  it("pone la fecha y la hora de El Salvador, y desde la versión 2 quién la cambió", () => {
+    const [second, first] = profileTimeline([version(1), version(2, { declaredAt: "2026-10-09T15:51:00Z" })]);
+    expect(first.when).toBe("09/10/2026 · 9:49 a. m.");
+    expect(second.when).toBe("09/10/2026 · 9:51 a. m. · cambiada por la persona antes de enviar");
+  });
+
+  it("no dice quién la cambió si el API no lo informa", () => {
+    const [second] = profileTimeline([version(1), version(2, { changedBy: null })]);
+    expect(second.when).not.toContain("cambiada");
+  });
+
+  it("usa la etiqueta del tipo de dinero y del monto, o el código si falta", () => {
+    const [entry] = profileTimeline([version(1)]);
+    expect(entry).toMatchObject({ transactionType: "Salario y transferencias", monthlyAmount: "Menos de USD 500" });
+
+    const [bare] = profileTimeline([version(1, { transactionTypeLabel: null, monthlyAmountRangeLabel: null })]);
+    expect(bare).toMatchObject({ transactionType: "PAGO_SALARIO", monthlyAmount: "R1" });
+  });
+
+  it("sin versiones devuelve una lista vacía", () => {
+    expect(profileTimeline([])).toEqual([]);
+    expect(profileTimeline(null)).toEqual([]);
+    expect(profileTimeline(undefined)).toEqual([]);
   });
 });

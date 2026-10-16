@@ -1,7 +1,24 @@
-// Location of every request, for the map screen. The list endpoint has no location, so the detail of
-// each request is read (a few at a time). A dedicated endpoint in the API would avoid one call per request.
+// Location of every request, for the map screen, in one call (VDI-109). The map used to read the detail of each
+// request, but the detail carries the DUI data and every read of it is recorded in the access audit.
 
-import { apiFetch, fetchAllRequests, type RequestDetail, type RequestStatus, type RiskLevel } from "./api";
+import { apiFetch, type RequestStatus, type RiskLevel } from "./api";
+
+/** One row of `GET /api/console/requests/locations`. */
+export type RequestLocation = {
+  id: string;
+  number: string | null;
+  name: string | null;
+  riskLevel: RiskLevel;
+  status: RequestStatus;
+  ip: string | null;
+  locationStatus: "AVAILABLE" | "UNAVAILABLE" | null;
+  latitude: number | null;
+  longitude: number | null;
+  city: string | null;
+  regionName: string | null;
+  country: string | null;
+  approximateLocation: string | null;
+};
 
 export type LocatedRequest = {
   id: string;
@@ -17,44 +34,31 @@ export type LocatedRequest = {
   located: boolean;
 };
 
+type Place = Pick<RequestLocation, "city" | "regionName" | "country" | "approximateLocation">;
+
 /** City, region and country as the server resolved them; the app's own text is only a fallback. */
-export function placeName(signals: RequestDetail["signals"]): string | null {
-  const geo = signals?.ipDetails;
-  const resolved = [...new Set([geo?.city, geo?.regionName, geo?.country].filter(Boolean))].join(", ");
-  return resolved || signals?.approximateLocation || null;
+export function placeName(p: Place): string | null {
+  const resolved = [...new Set([p.city, p.regionName, p.country].filter(Boolean))].join(", ");
+  return resolved || p.approximateLocation || null;
 }
 
-const CONCURRENCY = 6;
-
 export async function fetchLocations(token: string): Promise<LocatedRequest[]> {
-  const requests = await fetchAllRequests(token);
-  const result: LocatedRequest[] = new Array(requests.length);
-  let next = 0;
-
-  async function worker() {
-    while (next < requests.length) {
-      const index = next++;
-      const request = requests[index];
-      const detail = await apiFetch<RequestDetail>(`/api/console/requests/${encodeURIComponent(request.id)}`, { token });
-      const s = detail.signals;
-      const located = s?.locationStatus === "AVAILABLE" && s.latitude != null && s.longitude != null;
-      result[index] = {
-        id: request.id,
-        requestNumber: request.number,
-        name: request.name,
-        riskLevel: request.riskLevel,
-        status: request.status,
-        ip: s?.ip ?? null,
-        place: placeName(s),
-        latitude: located ? s.latitude! : null,
-        longitude: located ? s.longitude! : null,
-        located,
-      };
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, requests.length) }, worker));
-  return result;
+  const rows = await apiFetch<RequestLocation[]>("/api/console/requests/locations", { token });
+  return rows.map((r) => {
+    const located = r.locationStatus === "AVAILABLE" && r.latitude != null && r.longitude != null;
+    return {
+      id: r.id,
+      requestNumber: r.number,
+      name: r.name,
+      riskLevel: r.riskLevel,
+      status: r.status,
+      ip: r.ip,
+      place: placeName(r),
+      latitude: located ? r.latitude : null,
+      longitude: located ? r.longitude : null,
+      located,
+    };
+  });
 }
 
 /** Requests that share a spot (about 100 m) are drawn as one marker. */

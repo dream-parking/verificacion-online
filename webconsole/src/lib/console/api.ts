@@ -102,6 +102,40 @@ export type IpDetails = {
   lookedUpAt: string | null;
 };
 
+/** One version of the declared transactional profile (VDI-3). The API sends them oldest first; only the last is current. */
+export type ProfileVersion = {
+  version: number;
+  current: boolean;
+  transactionTypeCode: string;
+  transactionTypeLabel: string | null;
+  monthlyAmountRangeCode: string;
+  monthlyAmountRangeLabel: string | null;
+  /** Who declared it: CUSTOMER is the person, in the app, before submitting. */
+  changedBy: "CUSTOMER" | null;
+  declaredAt: string;
+};
+
+/** Data of a DUI, as read from the photo or as the person confirmed it. Plain dates come as "yyyy-mm-dd"; what was not read is null. */
+export type DuiData = {
+  dui: string | null;
+  firstNames: string | null;
+  lastNames: string | null;
+  birthDate: string | null;
+  issueDate?: string | null;
+  expiryDate: string | null;
+  gender?: string | null;
+};
+
+/** The DUI of a request (VDI-81): what was read, what the person confirmed and the fields they corrected. */
+export type IdentityDocument = {
+  ocrStatus: "READ" | "UNREADABLE" | "FAILED";
+  read: DuiData | null;
+  confirmed: DuiData | null;
+  confirmedAt: string | null;
+  /** Names of the fields the person changed from the reading: dui, firstNames, lastNames, birthDate, expiryDate. */
+  correctedFields: string[] | null;
+};
+
 export type RequestDetail = {
   id: string;
   number: string | null;
@@ -127,7 +161,11 @@ export type RequestDetail = {
     monthlyAmountRangeLabel: string | null;
     registeredAt: string;
     updatedAt: string | null;
+    /** Every version of the declared profile, oldest first. Missing in older API versions. */
+    versions?: ProfileVersion[] | null;
   } | null;
+  /** Null until the person reaches the DUI step; missing in older API versions. */
+  identityDocument?: IdentityDocument | null;
   risk: Assessment | null;
   signals: {
     ip: string | null;
@@ -166,20 +204,15 @@ export type RequestDetail = {
   timeline: { type: string; description: string | null; actor: string | null; occurredAt: string }[] | null;
 };
 
-export type ScoreRule = {
-  code: string;
+/** Score model in force: the ranges of each level and the points each signal can add (null: no weight yet). */
+export type ScoreModel = {
+  version: number;
   name: string;
-  description: string | null;
-  evaluatedField: string | null;
-  operator: string | null;
-  threshold: number | null;
-  currency: string | null;
-  resultIfMatched: RiskLevel;
-  resultIfNotMatched: RiskLevel | null;
-  status: "DRAFT" | "PROVISIONAL" | "CONFIRMED" | "RETIRED";
-  statusNote: string | null;
+  low: { from: number; to: number };
+  medium: { from: number; to: number };
+  high: { from: number; to: number };
   validFrom: string | null;
-  version: number | null;
+  weights: { signal: string; name: string; maxPoints: number | null }[];
 };
 
 export type Alert = {

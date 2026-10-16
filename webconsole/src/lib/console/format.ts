@@ -4,10 +4,10 @@ import type {
   Criticality,
   AlertStatus,
   DeviceLocationStatus,
+  ProfileVersion,
   RequestStatus,
   RiskLevel,
   Step,
-  ScoreRule,
   Role,
 } from "./api";
 
@@ -58,13 +58,6 @@ export const STEPS: { step: Step; name: string }[] = [
   { step: "EXPECTED_ACTIVITY", name: "Movimiento esperado" },
   { step: "REVIEW", name: "Revisión" },
 ];
-
-export const RULE_STATUS: Record<ScoreRule["status"], string> = {
-  DRAFT: "Borrador",
-  PROVISIONAL: "Provisional",
-  CONFIRMED: "Confirmada",
-  RETIRED: "Retirada",
-};
 
 export const TYPING_PACE: Record<"SLOW" | "NORMAL" | "FAST", string> = {
   SLOW: "Pausado",
@@ -157,3 +150,32 @@ export const minSec = (s: number) => `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 export const duration = (s: number) => `${Math.floor(s / 60)} min ${pad2(s % 60)} s`;
 
 export const usd = (n: number, currency = "USD") => `${currency} ${n.toLocaleString("en-US")}`;
+
+/** What the declared profile card says when the person has not declared the expected movement yet. */
+export const NO_PROFILE = "Sin declaración de movimiento";
+
+export type ProfileEntry = {
+  version: number;
+  /** Only the newest version is the one in force, whatever the API says for the others. */
+  current: boolean;
+  /** "09/10/2026 · 9:51 a. m.", plus who changed it from version 2 on. */
+  when: string;
+  transactionType: string;
+  monthlyAmount: string;
+};
+
+/** The versions of the declared profile for the console: newest first (the API sends them the other way around). */
+export function profileTimeline(versions: ProfileVersion[] | null | undefined): ProfileEntry[] {
+  const newest = Math.max(0, ...(versions ?? []).map((v) => v.version));
+  return [...(versions ?? [])]
+    .sort((a, b) => b.version - a.version)
+    .map((v) => ({
+      version: v.version,
+      current: v.version === newest,
+      when: `${formatDate(v.declaredAt)} · ${formatTime(v.declaredAt)}${
+        v.version >= 2 && v.changedBy === "CUSTOMER" ? " · cambiada por la persona antes de enviar" : ""
+      }`,
+      transactionType: v.transactionTypeLabel ?? v.transactionTypeCode,
+      monthlyAmount: v.monthlyAmountRangeLabel ?? v.monthlyAmountRangeCode,
+    }));
+}

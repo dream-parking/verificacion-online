@@ -76,7 +76,7 @@ describe("Shell", () => {
     ["/requests", ""],
     ["/alerts", ""],
     ["/map", ""],
-    ["/score-rule", ""],
+    ["/score-model", ""],
     ["/users", ""],
     ["/otra", ""],
   ])("el título de %s es «%s»", (path, title) => {

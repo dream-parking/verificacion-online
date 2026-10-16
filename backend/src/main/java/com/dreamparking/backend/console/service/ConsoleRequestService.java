@@ -15,6 +15,7 @@ import com.dreamparking.backend.common.dto.PageResponse;
 import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.console.dto.ConsoleRequestDetail;
 import com.dreamparking.backend.console.dto.ConsoleRequestListItem;
+import com.dreamparking.backend.console.dto.ConsoleRequestLocation;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.repository.IdentityDocumentImageRepository;
@@ -22,6 +23,7 @@ import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
 import com.dreamparking.backend.identity.service.DuiValidator;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.entity.ExpectedActivityVersion;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
@@ -63,6 +65,15 @@ public class ConsoleRequestService {
 			ORDER BY p.activity_date DESC, p.id""";
 
 	private static final String LIST_COUNT = "SELECT count(*) FROM v_request_list " + LIST_FILTER;
+
+	/** Same order as the list; the location is the one of the last session, as in the detail. */
+	private static final String LOCATIONS = """
+			SELECT l.id, l.number, l.name, l.risk_level, l.status, host(s.ip) AS ip, s.location_status,
+			       s.geo_latitude, s.geo_longitude, s.geo_city, s.geo_region_name, s.geo_country, s.approximate_location
+			FROM v_request_list l
+			LEFT JOIN LATERAL (SELECT x.* FROM onboarding_session x WHERE x.request_id = l.id
+			                   ORDER BY x.started_at DESC LIMIT 1) s ON true
+			ORDER BY l.activity_date DESC, l.id""";
 
 	private final NamedParameterJdbcTemplate jdbc;
 
@@ -146,6 +157,22 @@ public class ConsoleRequestService {
 		}
 		int totalPages = (int) ((total[0] + pageSize - 1) / pageSize);
 		return new PageResponse<>(content, pageNumber, pageSize, total[0], totalPages);
+	}
+
+	/**
+	 * Location of every request, newest first, for the console map. One query instead of a detail per request: the
+	 * detail carries the DUI data and every read of it is audited.
+	 */
+	public List<ConsoleRequestLocation> locations() {
+		return jdbc.query(LOCATIONS, (rs, row) -> {
+			String locationStatus = rs.getString("location_status");
+			return new ConsoleRequestLocation(rs.getObject("id", UUID.class), rs.getString("number"),
+					rs.getString("name"), RiskLevel.valueOf(rs.getString("risk_level")),
+					RequestStatus.valueOf(rs.getString("status")), rs.getString("ip"),
+					locationStatus == null ? null : LocationStatus.valueOf(locationStatus),
+					rs.getBigDecimal("geo_latitude"), rs.getBigDecimal("geo_longitude"), rs.getString("geo_city"),
+					rs.getString("geo_region_name"), rs.getString("geo_country"), rs.getString("approximate_location"));
+		});
 	}
 
 	public ConsoleRequestDetail detail(UUID requestId) {

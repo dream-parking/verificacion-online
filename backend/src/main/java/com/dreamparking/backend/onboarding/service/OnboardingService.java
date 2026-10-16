@@ -119,15 +119,19 @@ public class OnboardingService {
 		return OnboardingRequestResponse.of(find(requestId));
 	}
 
-	/** Step 1: accepts the privacy notice in force, recording where it was accepted from. */
+	/**
+	 * Step 1: accepts the privacy notice in force, recording the notice version, the date and time, where it was
+	 * accepted from and whether the terms and conditions were accepted ({@code null} when the app did not send it).
+	 */
 	@Transactional
-	public OnboardingRequestResponse acceptPrivacyNotice(UUID requestId, InetAddress ip) {
+	public OnboardingRequestResponse acceptPrivacyNotice(UUID requestId, Boolean termsAccepted, InetAddress ip) {
 		OnboardingRequest request = findInProgress(requestId);
 
 		PrivacyConsent consent = consents.findById(requestId).orElseGet(PrivacyConsent::new);
 		consent.setRequest(request);
 		consent.setNotice(privacyNoticeService.current());
 		consent.setSignalsAccepted(true);
+		consent.setTermsAccepted(termsAccepted);
 		consent.setIp(ip);
 		consents.save(consent);
 

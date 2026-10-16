@@ -41,6 +41,10 @@ public class PrivacyConsent {
 	@Column(name = "signals_accepted", nullable = false)
 	private Boolean signalsAccepted;
 
+	/** Terms and conditions accepted (VDI-93); null in consents given before it was recorded. */
+	@Column(name = "terms_accepted")
+	private Boolean termsAccepted;
+
 	@CreationTimestamp
 	@Column(name = "accepted_at", nullable = false)
 	private Instant acceptedAt;
@@ -75,6 +79,14 @@ public class PrivacyConsent {
 
 	public void setSignalsAccepted(Boolean signalsAccepted) {
 		this.signalsAccepted = signalsAccepted;
+	}
+
+	public Boolean getTermsAccepted() {
+		return termsAccepted;
+	}
+
+	public void setTermsAccepted(Boolean termsAccepted) {
+		this.termsAccepted = termsAccepted;
 	}
 
 	public Instant getAcceptedAt() {

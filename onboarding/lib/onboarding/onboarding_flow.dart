@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../api/catalogs.dart';
 import '../api/onboarding_api.dart';
+import '../api/resume.dart';
 import '../identity/document_camera.dart';
 import '../identity/dui_capture.dart';
 import '../identity/identity_document.dart';
@@ -14,6 +15,8 @@ import '../signals/signals.dart';
 import '../theme.dart';
 import 'application_form.dart';
 import 'privacy_notice.dart';
+import 'resume_view.dart';
+import 'saved_request.dart';
 import 'widgets.dart';
 
 /// Account opening flow: welcome → privacy → location permission → 5 steps → confirmation.
@@ -24,6 +27,7 @@ class OnboardingFlow extends StatefulWidget {
     this.deviceInfo,
     this.camera = const PlatformDocumentCamera(),
     this.location,
+    this.savedRequest = const PreferencesSavedRequestStore(),
     this.clock = DateTime.now,
   });
 
@@ -38,6 +42,9 @@ class OnboardingFlow extends StatefulWidget {
 
   /// Approximate location reader (VDI-73); tests pass a fake one.
   final DeviceLocationSource? location;
+
+  /// Where the id of the request in progress is kept (VDI-87); tests pass one in memory.
+  final SavedRequestStore savedRequest;
 
   /// Current time used to measure timings (VDI-43); tests pass a controlled one.
   final DateTime Function() clock;
@@ -126,6 +133,16 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   String? _duiError;
   var _uploadingDui = false;
 
+  /// A request left halfway that the person can pick up (VDI-87). `null` when there is none.
+  ResumeInfo? _resumable;
+  String? _resumableId;
+
+  /// The request was picked up with the DUI confirmed: its screens are empty in the phone, so back skips them.
+  var _duiConfirmedBeforeResume = false;
+
+  /// The data of the DUI was confirmed and saved in the API; the review says so (VDI-87).
+  var _duiConfirmed = false;
+
   /// Differences between the basic data and the DUI that the person already accepted («Continuar de todos modos»).
   String? _acceptedDifference;
 
@@ -158,6 +175,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   void initState() {
     super.initState();
     _loadCatalogs();
+    unawaited(_checkSavedRequest());
   }
 
   Future<void> _loadCatalogs() async {
@@ -168,6 +186,118 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     } on ApiException catch (e) {
       debugPrint('Could not load the catalogs: $e');
       if (mounted) setState(() => _catalogsFailed = true);
+    }
+  }
+
+  /// VDI-87: when the app opens, asks the API about the request kept in the phone. It is offered only if it can go on;
+  /// if it expired, was submitted, abandoned or does not exist, it is forgotten. Without connection it is kept for next time.
+  Future<void> _checkSavedRequest() async {
+    final String? id;
+    try {
+      id = await widget.savedRequest.read();
+    } on Exception catch (e) {
+      debugPrint('Could not read the saved request: $e');
+      return;
+    }
+    if (id == null) return;
+    try {
+      final info = await _api.resume(id);
+      if (!mounted) return;
+      if (info.resumable && info.step != null) {
+        setState(() {
+          _resumable = info;
+          _resumableId = id;
+        });
+      } else {
+        await _forgetSavedRequest();
+      }
+    } on ApiException catch (e) {
+      debugPrint('Could not check the saved request: $e');
+      if (e.status == 404) await _forgetSavedRequest();
+    }
+  }
+
+  Future<void> _forgetSavedRequest() async {
+    try {
+      await widget.savedRequest.clear();
+    } on Exception catch (e) {
+      debugPrint('Could not forget the saved request: $e');
+    }
+  }
+
+  Future<void> _keepRequest(String id) async {
+    try {
+      await widget.savedRequest.save(id);
+    } on Exception catch (e) {
+      debugPrint('Could not keep the request: $e');
+    }
+  }
+
+  /// Step a request picked up goes to. The DUI photos are not kept in the phone: if the DUI was not confirmed it is done
+  /// again, even if the API moved on.
+  static Screen _resumeTarget(ResumeInfo info) {
+    final afterDui = const [Screen.income, Screen.expectedActivity, Screen.review].contains(info.step);
+    return info.step == Screen.identityDocument || (afterDui && !info.identityConfirmed) ? Screen.identityDocument : info.step!;
+  }
+
+  /// VDI-87: «Continuar donde quedé». The screens are filled with what the API saved and it goes to the step where it
+  /// was. The privacy notice was already accepted. The device is not read again: new signals would replace the ones
+  /// already saved.
+  void _resumeRequest() {
+    final info = _resumable!;
+    _firstNames.text = info.firstNames ?? '';
+    _lastNames.text = info.lastNames ?? '';
+    _dui.text = info.dui ?? '';
+    _phone.text = info.mobilePhone ?? '';
+    _incomeSourceDetail.text = info.incomeDetail ?? '';
+    setState(() {
+      _form
+        ..id = _resumableId
+        ..privacyAcceptedAt = widget.clock()
+        ..accepted = true
+        ..termsAccepted = true
+        ..firstNames = info.firstNames ?? ''
+        ..lastNames = info.lastNames ?? ''
+        ..dui = info.dui ?? ''
+        ..phone = info.mobilePhone ?? ''
+        ..incomeSource = info.incomeSource ?? ''
+        ..incomeSourceDetail = info.incomeDetail ?? ''
+        ..incomeRange = info.incomeRange ?? ''
+        ..transactionType = info.transactionType ?? ''
+        ..amountRange = info.amountRange ?? '';
+      _createdRequestId = _resumableId;
+      _resumable = null;
+    });
+    // The DUI photos are not kept in the phone. If the step was not confirmed it is done again, even if the API moved on.
+    final target = _resumeTarget(info);
+    final askAgain = target == Screen.identityDocument;
+    _duiConfirmedBeforeResume = !askAgain && const [Screen.income, Screen.expectedActivity, Screen.review].contains(info.step);
+    _duiConfirmed = info.identityConfirmed;
+    _goTo(target);
+    if (askAgain) unawaited(_explainPhotosAgain());
+  }
+
+  Future<void> _explainPhotosAgain() => showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('Vuelve a tomar las fotos de tu DUI'),
+          content: const Text(
+              'Por tu seguridad, las fotos de tu DUI no se guardan en el teléfono. Tómalas otra vez para continuar con tu solicitud.'),
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Entendido'))],
+        ),
+      );
+
+  /// VDI-87: «Empezar de nuevo». The request is abandoned so a new one can be opened; if the API cannot do it (it was
+  /// already closed, or there is no connection) the person starts over anyway.
+  Future<void> _startOver() async {
+    final id = _resumableId!;
+    setState(() => _resumable = null);
+    await _forgetSavedRequest();
+    try {
+      await _api.abandon(id);
+    } on ApiException catch (e) {
+      debugPrint('Could not abandon the request: $e');
     }
   }
 
@@ -327,6 +457,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   /// VDI-77: sends both photos. If they can be read, it moves on to confirm the data; if not, it says what to fix.
   Future<void> _uploadDui() async {
     setState(() {
+      _duiConfirmed = false;
       _uploadingDui = true;
       _duiError = null;
       _unreadable = null;
@@ -388,6 +519,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       await save();
       if (!mounted) return;
       setState(() => _saving = false);
+      if (step == Screen.identityConfirmation) _duiConfirmed = true;
       _completeStep(_signalStepOf(step));
       _correctingBasicData = false;
       _goTo(returnToConfirmation ? Screen.identityConfirmation : _next[step]!);
@@ -507,6 +639,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           ..privacyAcceptedAt = widget.clock();
         _starting = false;
       });
+      unawaited(_keepRequest(id));
       _signals.steps.complete(Screen.privacy, _form.privacyAcceptedAt!);
       _goTo(Screen.location);
       unawaited(_captureDevice());
@@ -535,6 +668,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _form.number = number;
         _submitting = false;
       });
+      unawaited(_forgetSavedRequest());
       _goTo(Screen.confirmation);
     } on ApiException catch (e) {
       debugPrint('Could not submit the request: $e');
@@ -552,6 +686,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
     setState(() {
       _form = ApplicationForm();
+      _duiConfirmed = false;
+      _duiConfirmedBeforeResume = false;
       _createdRequestId = null;
       _duiPhotos.clear();
       _unreadable = null;
@@ -640,8 +776,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   /// Back goes to the previous step; repeating a photo goes back to the confirmation it came from.
-  Screen? get _previousScreen =>
-      _screen == Screen.identityDocument && _retakingDui ? Screen.identityConfirmation : _previous[_screen];
+  Screen? get _previousScreen {
+    if (_screen == Screen.identityDocument && _retakingDui) return Screen.identityConfirmation;
+    if (_screen == Screen.income && _duiConfirmedBeforeResume) return Screen.basicData;
+    return _previous[_screen];
+  }
 
   Widget _header(Screen? previous) {
     return SizedBox(
@@ -679,7 +818,23 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       padding: EdgeInsets.fromLTRB(24, 12, 24, 20 + MediaQuery.paddingOf(context).bottom),
-      child: _screen == Screen.location
+      child: _screen == Screen.welcome && _resumable != null
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PrimaryButton(text: 'Continuar donde quedé', onPressed: _resumeRequest),
+                const SizedBox(height: 12),
+                SecondaryButton(text: 'Empezar de nuevo', onPressed: _startOver),
+                const SizedBox(height: 10),
+                const Text(
+                  'Si empiezas de nuevo, tendrás que escribir tus datos otra vez.',
+                  style: AppText.small,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            )
+          : _screen == Screen.location
           ? Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -708,7 +863,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   Widget _content() => switch (_screen) {
-        Screen.welcome => const _Welcome(),
+        Screen.welcome => _resumable == null ? const _Welcome() : ResumeView(info: _resumable!, current: _resumeTarget(_resumable!)),
         Screen.privacy => _privacy(),
         Screen.location => const _LocationPermission(),
         Screen.basicData => _basicData(),
@@ -1274,6 +1429,18 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             line2: 'DUI ${_form.dui} · Cel. ${_form.phone}',
             onEdit: () => _goTo(Screen.basicData),
           ),
+          if (_duiConfirmed) ...[
+            const SizedBox(height: 14),
+            _SummaryCard(
+              title: 'Tu DUI',
+              line1: _form.idDui.isEmpty
+                  ? 'Ya guardamos las fotos y los datos de tu DUI'
+                  : 'DUI ${_form.idDui} · Vence ${_form.idExpiryDate}',
+              line2: _form.idDui.isEmpty
+                  ? 'Confirmado · las fotos no se guardan en tu teléfono'
+                  : 'Confirmado · foto del frente y del reverso',
+            ),
+          ],
           const SizedBox(height: 14),
           _SummaryCard(
             title: 'Tus ingresos',
@@ -1576,17 +1743,19 @@ class _AcceptanceCheckbox extends StatelessWidget {
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
     required this.title,
-    required this.editSemanticLabel,
+    this.editSemanticLabel,
     required this.line1,
     required this.line2,
-    required this.onEdit,
+    this.onEdit,
   });
 
   final String title;
-  final String editSemanticLabel;
+  final String? editSemanticLabel;
   final String line1;
   final String line2;
-  final VoidCallback onEdit;
+
+  /// `null` for a card that only informs: it has no «Editar».
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1604,7 +1773,7 @@ class _SummaryCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(child: SectionTitle(title)),
-              LinkButton(text: 'Editar', semanticLabel: editSemanticLabel, onPressed: onEdit),
+              if (onEdit != null) LinkButton(text: 'Editar', semanticLabel: editSemanticLabel, onPressed: onEdit!),
             ],
           ),
           Text(line1, style: AppText.body),

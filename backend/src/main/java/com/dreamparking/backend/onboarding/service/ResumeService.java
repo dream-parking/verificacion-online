@@ -20,12 +20,14 @@ import com.dreamparking.backend.onboarding.dto.ResumeResponse;
 import com.dreamparking.backend.onboarding.dto.ResumeResponse.ResumeState;
 import com.dreamparking.backend.onboarding.dto.ResumeResponse.StepProgress;
 import com.dreamparking.backend.onboarding.dto.ResumeResponse.StepState;
+import com.dreamparking.backend.onboarding.entity.ExpectedActivityVersion;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestEvent;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
+import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
@@ -52,6 +54,8 @@ public class ResumeService {
 
 	private final ExpectedActivityRepository expectedActivities;
 
+	private final ExpectedActivityVersionRepository expectedActivityVersions;
+
 	private final IdentityDocumentRepository identityDocuments;
 
 	private final RequestEventRepository events;
@@ -63,13 +67,15 @@ public class ResumeService {
 	private final Duration resumeWindow;
 
 	public ResumeService(OnboardingRequestRepository requests, IncomeDeclarationRepository incomeDeclarations,
-			ExpectedActivityRepository expectedActivities, IdentityDocumentRepository identityDocuments,
+			ExpectedActivityRepository expectedActivities,
+			ExpectedActivityVersionRepository expectedActivityVersions, IdentityDocumentRepository identityDocuments,
 			RequestEventRepository events, OnboardingService onboardingService,
 			@Value("${app.onboarding.identity-document-required:true}") boolean identityDocumentRequired,
 			@Value("${app.onboarding.resume-window-days:7}") long resumeWindowDays) {
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
 		this.expectedActivities = expectedActivities;
+		this.expectedActivityVersions = expectedActivityVersions;
 		this.identityDocuments = identityDocuments;
 		this.events = events;
 		this.onboardingService = onboardingService;
@@ -167,9 +173,16 @@ public class ResumeService {
 			.orElse(null);
 		var expectedActivity = expectedActivities.findById(request.getId())
 			.map(a -> new ResumeResponse.ExpectedActivity(a.getTransactionType().getCode(),
-					a.getMonthlyAmountRange().getCode(), a.getVersion()))
+					a.getMonthlyAmountRange().getCode(), profileVersion(request)))
 			.orElse(null);
 		return new ResumeResponse.Saved(basicData, identityDocument, income, expectedActivity);
+	}
+
+	/** The version of the declared profile in force (VDI-3): the highest one. */
+	private short profileVersion(OnboardingRequest request) {
+		return expectedActivityVersions.findFirstByRequest_IdOrderByVersionDesc(request.getId())
+			.map(ExpectedActivityVersion::getVersion)
+			.orElse((short) 1);
 	}
 
 	private static String firstName(String firstNames) {

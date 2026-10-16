@@ -29,7 +29,7 @@ import com.jayway.jsonpath.JsonPath;
 
 /**
  * VDI-86: a request saved half-way is resumed from its last step. Each step is saved when it is completed, so resuming
- * reports where the request stopped (with the DUI step skipped while it is optional) and hands back what was saved.
+ * reports where the request stopped and hands back what was saved. The DUI step is required, as in main.
  */
 @Import({ TestcontainersConfiguration.class, TestAuth.class })
 @SpringBootTest
@@ -76,13 +76,13 @@ class ResumeApiTests {
 	}
 
 	@Test
-	void afterTheBasicDataItContinuesAtTheIncomeAndSkipsTheOptionalDui() throws Exception {
+	void afterTheBasicDataItContinuesAtTheDui() throws Exception {
 		String id = startRequest();
 		saveConsentAndBasicData(id);
 
 		mvc.perform(get("/api/onboarding/requests/{id}/resume", id))
 			.andExpect(jsonPath("$.state").value("RESUMABLE"))
-			.andExpect(jsonPath("$.currentStep").value("INCOME"))
+			.andExpect(jsonPath("$.currentStep").value("IDENTITY_DOCUMENT"))
 			.andExpect(jsonPath("$.completedSteps").value(2))
 			.andExpect(jsonPath("$.firstName").value("Ana"))
 			.andExpect(jsonPath("$.steps[0].step").value("PRIVACY_NOTICE"))
@@ -91,10 +91,9 @@ class ResumeApiTests {
 			.andExpect(jsonPath("$.steps[1].state").value("DONE"))
 			.andExpect(jsonPath("$.steps[1].savedAt").isNotEmpty())
 			.andExpect(jsonPath("$.steps[2].step").value("IDENTITY_DOCUMENT"))
-			.andExpect(jsonPath("$.steps[2].state").value("SKIPPED"))
+			.andExpect(jsonPath("$.steps[2].state").value("CURRENT"))
 			.andExpect(jsonPath("$.steps[2].savedAt").isEmpty())
-			.andExpect(jsonPath("$.steps[3].state").value("CURRENT"))
-			.andExpect(jsonPath("$.steps[4].state").value("PENDING"))
+			.andExpect(jsonPath("$.steps[3].state").value("PENDING"))
 			.andExpect(jsonPath("$.saved.basicData.dui").value("01234567-8"))
 			.andExpect(jsonPath("$.saved.basicData.firstNames").value("Ana Sofía"))
 			.andExpect(jsonPath("$.saved.basicData.lastNames").value("Pérez López"))
@@ -107,6 +106,7 @@ class ResumeApiTests {
 	void afterTheMoneyStepItContinuesAtTheReviewWithEverythingSaved() throws Exception {
 		String id = startRequest();
 		saveConsentAndBasicData(id);
+		DuiStep.complete(mvc, id, "01234567-8", "Ana Sofía", "Pérez López");
 		send(id, "income", "{\"sourceCode\": \"SALARIO\", \"rangeCode\": \"HASTA_500\"}").andExpect(status().isNoContent());
 		send(id, "expected-activity", "{\"transactionTypeCode\": \"AHORRO\", \"monthlyAmountRangeCode\": \"200_500\"}")
 			.andExpect(status().isOk());
@@ -115,10 +115,13 @@ class ResumeApiTests {
 
 		mvc.perform(get("/api/onboarding/requests/{id}/resume", id))
 			.andExpect(jsonPath("$.currentStep").value("REVIEW"))
+			.andExpect(jsonPath("$.steps[2].state").value("DONE"))
+			.andExpect(jsonPath("$.steps[2].savedAt").isNotEmpty())
 			.andExpect(jsonPath("$.steps[3].state").value("DONE"))
 			.andExpect(jsonPath("$.steps[3].savedAt").isNotEmpty())
 			.andExpect(jsonPath("$.steps[4].state").value("DONE"))
 			.andExpect(jsonPath("$.steps[5].state").value("CURRENT"))
+			.andExpect(jsonPath("$.saved.identityDocument.confirmed").value(true))
 			.andExpect(jsonPath("$.saved.income.sourceCode").value("SALARIO"))
 			.andExpect(jsonPath("$.saved.income.rangeCode").value("HASTA_500"))
 			.andExpect(jsonPath("$.saved.expectedActivity.transactionTypeCode").value("AHORRO"))
@@ -130,6 +133,7 @@ class ResumeApiTests {
 	void aSubmittedRequestCannotBeResumedAndShowsNoSavedData() throws Exception {
 		String id = startRequest();
 		saveConsentAndBasicData(id);
+		DuiStep.complete(mvc, id, "01234567-8", "Ana Sofía", "Pérez López");
 		send(id, "income", "{\"sourceCode\": \"SALARIO\", \"rangeCode\": \"HASTA_500\"}").andExpect(status().isNoContent());
 		send(id, "expected-activity", "{\"transactionTypeCode\": \"AHORRO\", \"monthlyAmountRangeCode\": \"200_500\"}")
 			.andExpect(status().isOk());

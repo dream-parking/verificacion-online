@@ -20,6 +20,7 @@ import com.dreamparking.backend.onboarding.dto.ResumeResponse.StepState;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
+import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
@@ -45,6 +46,18 @@ class ResumeServiceTests {
 		assertThat(response.currentStep()).isEqualTo(OnboardingStep.IDENTITY_DOCUMENT);
 		assertThat(response.steps().get(2).state()).isEqualTo(StepState.CURRENT);
 		assertThat(response.steps().get(3).state()).isEqualTo(StepState.PENDING);
+	}
+
+	@Test
+	void anOptionalDuiTheCustomerDidNotConfirmIsSkipped() {
+		requestWithSteps(2);
+
+		ResumeResponse response = service(false).resume(id);
+
+		assertThat(response.steps().get(2).state()).isEqualTo(StepState.SKIPPED);
+		assertThat(response.steps().get(2).savedAt()).isNull();
+		assertThat(response.currentStep()).isEqualTo(OnboardingStep.INCOME);
+		assertThat(response.saved().identityDocument()).isNull();
 	}
 
 	@Test
@@ -85,8 +98,8 @@ class ResumeServiceTests {
 
 	private ResumeService service(boolean identityDocumentRequired) {
 		return new ResumeService(requests, mock(IncomeDeclarationRepository.class),
-				mock(ExpectedActivityRepository.class), identityDocuments, events, mock(OnboardingService.class),
-				identityDocumentRequired, 7);
+				mock(ExpectedActivityRepository.class), mock(ExpectedActivityVersionRepository.class), identityDocuments,
+				events, mock(OnboardingService.class), identityDocumentRequired, 7);
 	}
 
 }

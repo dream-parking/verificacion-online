@@ -166,20 +166,15 @@ export type RequestDetail = {
   timeline: { type: string; description: string | null; actor: string | null; occurredAt: string }[] | null;
 };
 
-export type ScoreRule = {
-  code: string;
+/** Score model in force: the ranges of each level and the points each signal can add (null: no weight yet). */
+export type ScoreModel = {
+  version: number;
   name: string;
-  description: string | null;
-  evaluatedField: string | null;
-  operator: string | null;
-  threshold: number | null;
-  currency: string | null;
-  resultIfMatched: RiskLevel;
-  resultIfNotMatched: RiskLevel | null;
-  status: "DRAFT" | "PROVISIONAL" | "CONFIRMED" | "RETIRED";
-  statusNote: string | null;
+  low: { from: number; to: number };
+  medium: { from: number; to: number };
+  high: { from: number; to: number };
   validFrom: string | null;
-  version: number | null;
+  weights: { signal: string; name: string; maxPoints: number | null }[];
 };
 
 export type Alert = {

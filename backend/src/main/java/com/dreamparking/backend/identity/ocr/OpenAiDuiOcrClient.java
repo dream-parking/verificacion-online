@@ -46,9 +46,14 @@ public class OpenAiDuiOcrClient implements DuiOcrClient {
 			  cannot read with certainty.
 			- Set readable to false when the DUI number or the names cannot be read with certainty, and give the main
 			  reason: BLURRY (out of focus or moved), GLARE (reflections hide text), CROPPED (part of the card is
-			  outside the photo), TOO_DARK, NOT_A_DUI (not a Salvadoran DUI), WRONG_SIDES (both photos show the same
-			  side, or the sides belong to different cards) or OTHER. Also say which photo has to be taken again in
-			  unreadableSide: FRONT, BACK or BOTH. When readable is true, unreadableReason and unreadableSide are null.
+			  outside the photo), TOO_DARK, NOT_A_DUI (not a Salvadoran DUI), WRONG_SIDES (see the next rule) or
+			  OTHER. Also say which photo has to be taken again in unreadableSide: FRONT, BACK or BOTH. When readable
+			  is true, unreadableReason and unreadableSide are null.
+			- The front is the side with the holder's photo, names and DUI number. The back is the other side, with
+			  the address, the machine-readable lines (with "<<<") and the barcode. Set readable to false with
+			  WRONG_SIDES and unreadableSide BOTH, even when every value can be read, when the photo labeled as the
+			  front shows the back or the photo labeled as the back shows the front (the photos were swapped), when
+			  both photos show the same side, or when the sides belong to different cards.
 			- dui: the DUI number as 8 digits, a hyphen and the check digit, for example 01234567-8.
 			- firstNames and lastNames: as printed, in title case, keeping accents and ñ ("MARÍA JOSÉ" becomes
 			  "María José"). Do not include the "conocido por" name.

@@ -8,6 +8,7 @@ import '../identity/identity_document.dart';
 import '../onboarding/application_form.dart';
 import '../signals/signals.dart';
 import 'catalogs.dart';
+import 'resume.dart';
 
 /// Error talking to the API: no connection, timeout or an error response.
 class ApiException implements Exception {
@@ -147,6 +148,15 @@ class OnboardingApi {
       'birthDate': dateForApi(birthDate),
       'expiryDate': dateForApi(expiryDate),
     });
+  }
+
+  /// VDI-87: where a request was left and what was saved. Throws an [ApiException] 404 if it does not exist.
+  Future<ResumeInfo> resume(String requestId) async =>
+      ResumeInfo.fromJson(await _send('GET', '/api/onboarding/requests/$requestId/resume'));
+
+  /// VDI-87: «Empezar de nuevo». Leaves the request abandoned; 409 if it is no longer in progress.
+  Future<void> abandon(String requestId) async {
+    await _send('POST', '/api/onboarding/requests/$requestId/abandon');
   }
 
   Future<Map<String, dynamic>> _send(String method, String path, {Object? body}) async {

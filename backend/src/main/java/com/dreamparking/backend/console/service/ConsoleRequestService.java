@@ -28,6 +28,7 @@ import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
+import com.dreamparking.backend.onboarding.repository.PrivacyConsentRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
 import com.dreamparking.backend.onboarding.repository.RequestSignalsRepository;
 import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
@@ -85,12 +86,14 @@ public class ConsoleRequestService {
 
 	private final ExpectedActivityVersionRepository expectedActivityVersions;
 
+	private final PrivacyConsentRepository consents;
+
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
 			RiskAssessmentService riskAssessments, IdentityDocumentRepository identityDocuments,
 			IdentityDocumentImageRepository identityDocumentImages,
-			ExpectedActivityVersionRepository expectedActivityVersions) {
+			ExpectedActivityVersionRepository expectedActivityVersions, PrivacyConsentRepository consents) {
 		this.jdbc = jdbc;
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
@@ -102,6 +105,7 @@ public class ConsoleRequestService {
 		this.identityDocuments = identityDocuments;
 		this.identityDocumentImages = identityDocumentImages;
 		this.expectedActivityVersions = expectedActivityVersions;
+		this.consents = consents;
 	}
 
 	/**
@@ -150,6 +154,10 @@ public class ConsoleRequestService {
 
 		var applicant = new ConsoleRequestDetail.Applicant(request.getFirstNames(), request.getLastNames(),
 				request.getDui(), request.getMobilePhone());
+		var consent = consents.findById(requestId)
+			.map(c -> new ConsoleRequestDetail.Consent(c.getNotice().getVersion(), c.getAcceptedAt(),
+					Boolean.TRUE.equals(c.getSignalsAccepted()), c.getTermsAccepted()))
+			.orElse(null);
 		var identityDocument = identityDocuments.findById(requestId).map(this::toIdentityDocument).orElse(null);
 		var income = incomeDeclarations.findById(requestId)
 			.map(d -> new ConsoleRequestDetail.Income(d.getSource().getCode(), d.getSource().getLabel(),
@@ -181,7 +189,7 @@ public class ConsoleRequestService {
 
 		return new ConsoleRequestDetail(request.getId(), request.getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
-				request.getSubmittedAt(), applicant, identityDocument, income, expectedActivity, risk, signalsView, stepTimes,
+				request.getSubmittedAt(), applicant, consent, identityDocument, income, expectedActivity, risk, signalsView, stepTimes,
 				timeline);
 	}
 

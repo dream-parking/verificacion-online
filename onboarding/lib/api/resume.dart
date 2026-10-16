@@ -10,6 +10,7 @@ class ResumeInfo {
     this.lastNames,
     this.dui,
     this.mobilePhone,
+    this.identityConfirmed = false,
     this.incomeSource,
     this.incomeRange,
     this.incomeDetail,
@@ -31,6 +32,9 @@ class ResumeInfo {
   final String? lastNames;
   final String? dui;
   final String? mobilePhone;
+
+  /// The person confirmed the data of the DUI. The photos stay in the API: the phone does not keep them.
+  final bool identityConfirmed;
   final String? incomeSource;
   final String? incomeRange;
   final String? incomeDetail;
@@ -40,6 +44,7 @@ class ResumeInfo {
   factory ResumeInfo.fromJson(Map<String, dynamic> json) {
     final saved = json['saved'] as Map<String, dynamic>? ?? const {};
     final basic = saved['basicData'] as Map<String, dynamic>? ?? const {};
+    final identity = saved['identityDocument'] as Map<String, dynamic>? ?? const {};
     final income = saved['income'] as Map<String, dynamic>? ?? const {};
     final activity =
         saved['expectedActivity'] as Map<String, dynamic>? ?? const {};
@@ -52,6 +57,7 @@ class ResumeInfo {
       lastNames: basic['lastNames'] as String?,
       dui: basic['dui'] as String?,
       mobilePhone: basic['mobilePhone'] as String?,
+      identityConfirmed: identity['confirmed'] == true,
       incomeSource: income['sourceCode'] as String?,
       incomeRange: income['rangeCode'] as String?,
       incomeDetail: income['sourceDetail'] as String?,

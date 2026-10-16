@@ -35,6 +35,18 @@ void main() {
       expect([info.transactionType, info.amountRange], ['AHORRO', '200_500']);
     });
 
+    test('it says whether the DUI data was confirmed', () {
+      expect(ResumeInfo.fromJson(jsonDecode(resumable) as Map<String, dynamic>).identityConfirmed, isTrue);
+      final unconfirmed = ResumeInfo.fromJson({
+        'state': 'RESUMABLE',
+        'currentStep': 'INCOME',
+        'saved': {'identityDocument': {'confirmed': false, 'ocrStatus': 'READ'}},
+      });
+      expect(unconfirmed.identityConfirmed, isFalse);
+      expect(ResumeInfo.fromJson({'state': 'RESUMABLE', 'currentStep': 'INCOME'}).identityConfirmed, isFalse,
+          reason: 'without a DUI saved it is not confirmed');
+    });
+
     test('each API step has its screen; the privacy notice goes on with the basic data', () {
       expect(ResumeInfo.screenOf('PRIVACY_NOTICE'), Screen.basicData);
       expect(ResumeInfo.screenOf('BASIC_DATA'), Screen.basicData);

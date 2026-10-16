@@ -136,6 +136,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   ResumeInfo? _resumable;
   String? _resumableId;
 
+  /// The request was picked up with the DUI confirmed: its screens are empty in the phone, so back skips them.
+  var _duiConfirmedBeforeResume = false;
+
   /// Differences between the basic data and the DUI that the person already accepted («Continuar de todos modos»).
   String? _acceptedDifference;
 
@@ -254,8 +257,24 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _createdRequestId = _resumableId;
       _resumable = null;
     });
-    _goTo(info.step!);
+    // The DUI photos are not kept in the phone. If the step was not confirmed it is done again, even if the API moved on.
+    final afterDui = const [Screen.income, Screen.expectedActivity, Screen.review].contains(info.step);
+    final askAgain = info.step == Screen.identityDocument || (afterDui && !info.identityConfirmed);
+    _duiConfirmedBeforeResume = afterDui && info.identityConfirmed;
+    _goTo(askAgain ? Screen.identityDocument : info.step!);
+    if (askAgain) unawaited(_explainPhotosAgain());
   }
+
+  Future<void> _explainPhotosAgain() => showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('Vuelve a tomar las fotos de tu DUI'),
+          content: const Text(
+              'Por tu seguridad, las fotos de tu DUI no se guardan en el teléfono. Tómalas otra vez para continuar con tu solicitud.'),
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Entendido'))],
+        ),
+      );
 
   /// VDI-87: «Empezar de nuevo». The request is abandoned so a new one can be opened; if the API cannot do it (it was
   /// already closed, or there is no connection) the person starts over anyway.
@@ -741,8 +760,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   /// Back goes to the previous step; repeating a photo goes back to the confirmation it came from.
-  Screen? get _previousScreen =>
-      _screen == Screen.identityDocument && _retakingDui ? Screen.identityConfirmation : _previous[_screen];
+  Screen? get _previousScreen {
+    if (_screen == Screen.identityDocument && _retakingDui) return Screen.identityConfirmation;
+    if (_screen == Screen.income && _duiConfirmedBeforeResume) return Screen.basicData;
+    return _previous[_screen];
+  }
 
   Widget _header(Screen? previous) {
     return SizedBox(
@@ -1667,7 +1689,8 @@ class _Welcome extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     '${resumable!.firstName == null ? 'Te' : '${resumable!.firstName}, te'} quedaste en '
-                    '«${_stepNames[resumable!.step] ?? 'tu solicitud'}». Lo que ya guardamos sigue aquí.',
+                    '«${_stepNames[resumable!.step] ?? 'tu solicitud'}». Lo que ya guardamos sigue aquí.'
+                    '${resumable!.step == Screen.identityDocument || (!resumable!.identityConfirmed && resumable!.step != Screen.basicData) ? ' Tendrás que volver a tomar las fotos de tu DUI.' : ''}',
                     style: AppText.bodyMuted,
                   ),
                 ],

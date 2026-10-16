@@ -6,6 +6,7 @@ import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
 import { LocationMap } from "./LocationMap";
 import { DocumentPhotos } from "./DocumentPhotos";
 import { DuiDataTable } from "./DuiDataTable";
+import { ProfileVersions } from "./ProfileVersions";
 import { errorMessage, useLoad } from "@/lib/console/hooks";
 import { apiFetch, type RequestDetail } from "@/lib/console/api";
 import {
@@ -325,6 +326,14 @@ export function RequestDetailView({ id }: { id: string }) {
           </Card>
         </div>
       </div>
+
+      <Card
+        id="h-perfil"
+        title="Perfil transaccional declarado"
+        help="Qué dinero dice la persona que moverá en la cuenta. Cada cambio queda como una versión nueva; la vigente es la base del monitoreo."
+      >
+        <ProfileVersions versions={r.expectedActivity?.versions} />
+      </Card>
 
       <Card
         id="h-sen"

@@ -6,6 +6,7 @@ import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
 import { LocationMap } from "./LocationMap";
 import { DocumentPhotos } from "./DocumentPhotos";
 import { ProfileVersions } from "./ProfileVersions";
+import { DuiDataTable } from "./DuiDataTable";
 import { errorMessage, useLoad } from "@/lib/console/hooks";
 import { apiFetch, type RequestDetail } from "@/lib/console/api";
 import {
@@ -378,6 +379,7 @@ export function RequestDetailView({ id }: { id: string }) {
         title="Fotos del DUI"
         help="Se descifran al abrir esta pantalla y cada consulta queda en la auditoría de accesos."
       >
+        {r.identityDocument && <DuiDataTable document={r.identityDocument} />}
         <DocumentPhotos requestId={r.id} />
       </Card>
 

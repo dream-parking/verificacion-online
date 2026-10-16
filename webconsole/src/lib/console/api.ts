@@ -115,6 +115,27 @@ export type ProfileVersion = {
   declaredAt: string;
 };
 
+/** Data of a DUI, as read from the photo or as the person confirmed it. Plain dates come as "yyyy-mm-dd"; what was not read is null. */
+export type DuiData = {
+  dui: string | null;
+  firstNames: string | null;
+  lastNames: string | null;
+  birthDate: string | null;
+  issueDate?: string | null;
+  expiryDate: string | null;
+  gender?: string | null;
+};
+
+/** The DUI of a request (VDI-81): what was read, what the person confirmed and the fields they corrected. */
+export type IdentityDocument = {
+  ocrStatus: "READ" | "UNREADABLE" | "FAILED";
+  read: DuiData | null;
+  confirmed: DuiData | null;
+  confirmedAt: string | null;
+  /** Names of the fields the person changed from the reading: dui, firstNames, lastNames, birthDate, expiryDate. */
+  correctedFields: string[] | null;
+};
+
 export type RequestDetail = {
   id: string;
   number: string | null;
@@ -143,6 +164,8 @@ export type RequestDetail = {
     /** Every version of the declared profile, oldest first. Missing in older API versions. */
     versions?: ProfileVersion[] | null;
   } | null;
+  /** Null until the person reaches the DUI step; missing in older API versions. */
+  identityDocument?: IdentityDocument | null;
   risk: Assessment | null;
   signals: {
     ip: string | null;

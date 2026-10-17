@@ -19,6 +19,7 @@ import 'package:onboarding/onboarding/onboarding_flow.dart';
 import 'package:onboarding/onboarding/widgets.dart';
 import 'package:onboarding/signals/device_fingerprint.dart';
 import 'package:onboarding/signals/device_location.dart';
+import 'package:onboarding/theme.dart';
 
 /// Catalog like the one from the Dev API (VDI-46 and VDI-50).
 const devCatalog = {
@@ -1099,11 +1100,12 @@ void main() {
         await tap(tester, find.text('Empezar'));
       }
 
-      testWidgets('shows the version badge, the four data it collects and the closing text', (tester) async {
+      testWidgets('shows the four data it collects and the closing text, without a version badge', (tester) async {
         await goToNotice(tester, FakeApi());
 
         expect(find.text('Cuidamos tu cuenta desde el primer paso'), findsOneWidget);
-        expect(find.text('Aviso aprobado por Legal · versión 2026.1'), findsOneWidget);
+        expect(find.textContaining('Aviso aprobado por Legal'), findsNothing);
+        expect(find.textContaining('versión 2026.1'), findsNothing, reason: 'the version is in the full notice, not on this screen');
         expect(find.text('Mientras llenas tu solicitud, recopilamos algunos datos para protegerte contra el fraude:'),
             findsOneWidget);
         for (final (title, description) in [
@@ -1139,23 +1141,57 @@ void main() {
       Finder noticeSheet() => find.byType(BottomSheet);
 
       /// Scrolls the full notice until [finder] shows.
-      Future<void> scrollToNotice(WidgetTester tester, Finder finder) => tester.scrollUntilVisible(
-            finder,
-            200,
-            scrollable: find.descendant(of: noticeSheet(), matching: find.byType(Scrollable)).first,
-          );
+      Future<void> scrollToNotice(WidgetTester tester, Finder finder) async {
+        final scrollable = find.descendant(of: noticeSheet(), matching: find.byType(Scrollable)).first;
+        try {
+          await tester.scrollUntilVisible(finder, 200, scrollable: scrollable);
+        } on StateError {
+          // It is above the part that is shown (the list builds what is near): go up to it.
+          await tester.scrollUntilVisible(finder, -200, scrollable: scrollable);
+        }
+      }
 
       testWidgets('the full notice opens from the link, shows the final text with its version and closes', (tester) async {
         await goToNotice(tester, FakeApi());
         await tap(tester, find.text('Leer el aviso de privacidad completo'));
 
         expect(find.text('Aviso de privacidad'), findsOneWidget);
-        expect(find.descendant(of: noticeSheet(), matching: find.text('Aviso aprobado por Legal · versión 2026.1')), findsOneWidget);
+        expect(find.descendant(of: noticeSheet(), matching: find.textContaining('Aviso aprobado por Legal')), findsNothing);
         expect(find.text(PrivacyNotice.fullIntro), findsOneWidget);
 
         await tap(tester, find.text('Cerrar'));
         expect(find.text('Aviso de privacidad'), findsNothing);
         expect(find.text('Aceptar y continuar'), findsOneWidget);
+      });
+
+      testWidgets('the privacy contact and the version are in bold, and the contact is the bank domain', (tester) async {
+        await goToNotice(tester, FakeApi());
+        await tap(tester, find.text('Leer el aviso de privacidad completo'));
+
+        Finder boldPiece(String text) => find.byWidgetPredicate(
+              (w) =>
+                  w is Text &&
+                  w.textSpan is TextSpan &&
+                  ((w.textSpan! as TextSpan).children ?? const []).any(
+                    (c) => c is TextSpan && c.text == text && c.style?.fontWeight == FontWeight.w800,
+                  ),
+            );
+
+        await scrollToNotice(tester, boldPiece('privacidad@tangamandapio.com'));
+        expect(boldPiece('privacidad@tangamandapio.com'), findsOneWidget);
+        await scrollToNotice(tester, boldPiece('2026.1'));
+        expect(boldPiece('2026.1'), findsOneWidget);
+        expect(find.textContaining('tangamandapio.example'), findsNothing);
+      });
+
+      testWidgets('the four icons of the notice are green, the DUI one too', (tester) async {
+        await goToNotice(tester, FakeApi());
+
+        Finder circles(Color color) => find.byWidgetPredicate(
+              (w) => w is Container && w.decoration is BoxDecoration && (w.decoration! as BoxDecoration).color == color,
+            );
+        expect(circles(AppColors.brandSoft), findsNWidgets(4));
+        expect(circles(AppColors.blueSoft), findsNothing);
       });
 
       testWidgets('the full notice has every section with its text, and nothing is marked as provisional',
@@ -1168,8 +1204,8 @@ void main() {
           await scrollToNotice(tester, find.text(section.title));
           expect(find.text(section.title), findsOneWidget, reason: section.title);
           for (final paragraph in section.paragraphs) {
-            await scrollToNotice(tester, find.text(paragraph));
-            expect(find.text(paragraph), findsOneWidget, reason: paragraph);
+            await scrollToNotice(tester, find.text(PrivacyNotice.plain(paragraph)));
+            expect(find.text(PrivacyNotice.plain(paragraph)), findsOneWidget, reason: paragraph);
           }
         }
         expect(find.textContaining('provisional'), findsNothing);
@@ -1184,8 +1220,8 @@ void main() {
         expect(tester.widget<Text>(find.text(PrivacyNotice.fullIntro)).textAlign, TextAlign.justify);
         for (final section in PrivacyNotice.fullSections) {
           for (final paragraph in section.paragraphs) {
-            await scrollToNotice(tester, find.text(paragraph));
-            expect(tester.widget<Text>(find.text(paragraph)).textAlign, TextAlign.justify, reason: paragraph);
+            await scrollToNotice(tester, find.text(PrivacyNotice.plain(paragraph)));
+            expect(tester.widget<Text>(find.text(PrivacyNotice.plain(paragraph))).textAlign, TextAlign.justify, reason: paragraph);
           }
         }
       });
@@ -1204,7 +1240,7 @@ void main() {
         await goToNotice(tester, FakeApi());
         await tap(tester, find.text('Leer el aviso de privacidad completo'));
 
-        final last = PrivacyNotice.fullSections.last.paragraphs.last;
+        final last = PrivacyNotice.plain(PrivacyNotice.fullSections.last.paragraphs.last);
         await scrollToNotice(tester, find.text(last));
         expect(find.text(last), findsOneWidget);
         expect(find.text('Cerrar'), findsOneWidget, reason: 'the button stays in view');

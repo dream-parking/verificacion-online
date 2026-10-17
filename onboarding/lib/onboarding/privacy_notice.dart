@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 
 /// One kind of data the app collects, as the notice lists it.
 class NoticeItem {
-  const NoticeItem(this.icon, this.title, this.description, {this.document = false});
+  const NoticeItem(this.icon, this.title, this.description);
 
   final IconData icon;
   final String title;
   final String description;
-
-  /// The photos of the DUI: shown with the blue tint of the identity document in the design.
-  final bool document;
 }
 
 /// A section of the full privacy notice: a heading and its paragraphs.
@@ -29,8 +26,6 @@ abstract final class PrivacyNotice {
   /// Version of the notice shown: the one the server has in force and records when the notice is accepted
   /// (`privacy_notice.version`, VDI-93). If the server publishes a new version, change it here too.
   static const version = '2026.1';
-
-  static const badge = 'Aviso aprobado por Legal · versión $version';
 
   static const intro =
       'Mientras llenas tu solicitud, recopilamos algunos datos para protegerte contra el fraude:';
@@ -56,7 +51,6 @@ abstract final class PrivacyNotice {
       Icons.badge_outlined,
       'Las fotos de tu DUI',
       'Frente y reverso, guardadas de forma segura en tu expediente.',
-      document: true,
     ),
   ];
 
@@ -71,6 +65,22 @@ abstract final class PrivacyNotice {
   static const acceptButton = 'Aceptar y continuar';
 
   static const recordedNote = 'Guardamos la fecha y la versión del aviso que aceptas.';
+
+  /// A paragraph without its markup: the bold pieces are written between double asterisks.
+  static String plain(String paragraph) => paragraph.replaceAll('**', '');
+
+  /// A paragraph as text with its bold pieces (between double asterisks) in bold.
+  static TextSpan span(String paragraph, TextStyle style) {
+    final pieces = paragraph.split('**');
+    return TextSpan(
+      style: style,
+      children: [
+        for (var i = 0; i < pieces.length; i++)
+          if (pieces[i].isNotEmpty)
+            TextSpan(text: pieces[i], style: i.isOdd ? style.copyWith(fontWeight: FontWeight.w800) : null),
+      ],
+    );
+  }
 
   // Full notice (provisional).
   static const fullTitle = 'Aviso de privacidad';
@@ -104,10 +114,10 @@ abstract final class PrivacyNotice {
     ]),
     NoticeSection('Tus derechos', [
       'Puedes pedirnos acceso a tus datos, que los corrijamos, que los eliminemos cuando la ley lo permita y oponerte '
-          'a su uso. Escríbenos a privacidad@tangamandapio.example.',
+          'a su uso. Escríbenos a **privacidad@tangamandapio.com**.',
     ]),
     NoticeSection('Aceptación y versión', [
-      'Al aceptar guardamos la fecha y la versión de este aviso. Esta es la versión $version.',
+      'Al aceptar guardamos la fecha y la versión de este aviso. Esta es la versión **$version**.',
     ]),
   ];
 }

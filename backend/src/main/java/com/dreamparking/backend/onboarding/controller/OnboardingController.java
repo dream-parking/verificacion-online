@@ -30,8 +30,10 @@ import com.dreamparking.backend.onboarding.dto.CaptureSignalsRequest;
 import com.dreamparking.backend.onboarding.dto.ExpectedActivityRequest;
 import com.dreamparking.backend.onboarding.dto.IncomeDeclarationRequest;
 import com.dreamparking.backend.onboarding.dto.OnboardingRequestResponse;
+import com.dreamparking.backend.onboarding.dto.ResumeResponse;
 import com.dreamparking.backend.onboarding.dto.PrivacyConsentRequest;
 import com.dreamparking.backend.onboarding.service.OnboardingService;
+import com.dreamparking.backend.onboarding.service.ResumeService;
 import com.dreamparking.backend.onboarding.service.SignalsService;
 import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 
@@ -44,9 +46,13 @@ public class OnboardingController {
 
 	private final SignalsService signalsService;
 
-	public OnboardingController(OnboardingService onboardingService, SignalsService signalsService) {
+	private final ResumeService resumeService;
+
+	public OnboardingController(OnboardingService onboardingService, SignalsService signalsService,
+			ResumeService resumeService) {
 		this.onboardingService = onboardingService;
 		this.signalsService = signalsService;
+		this.resumeService = resumeService;
 	}
 
 	@Operation(summary = "Inicia una solicitud de onboarding")
@@ -62,6 +68,28 @@ public class OnboardingController {
 	@GetMapping("/{requestId}")
 	public OnboardingRequestResponse get(@PathVariable UUID requestId) {
 		return onboardingService.get(requestId);
+	}
+
+	@ApiResponse(responseCode = "200", description = "Dónde se quedó la solicitud y lo que ya se guardó")
+	@Operation(summary = "Retoma una solicitud a medias (VDI-86)",
+			description = "Cada paso queda guardado al completarse. Devuelve el paso en el que se quedó (`currentStep`), el "
+					+ "estado de cada paso y lo guardado para llenar las pantallas de nuevo. `state` dice si se puede "
+					+ "continuar: `RESUMABLE`; `EXPIRED` si pasaron más de 7 días sin actividad; `COMPLETED` o "
+					+ "`ABANDONED` si ya no está en progreso. Fuera de `RESUMABLE` no trae `saved` ni `currentStep`.")
+	@ApiResponse(responseCode = "404", description = "La solicitud no existe", content = @Content)
+	@GetMapping("/{requestId}/resume")
+	public ResumeResponse resume(@PathVariable UUID requestId) {
+		return resumeService.resume(requestId);
+	}
+
+	@ApiResponse(responseCode = "200", description = "Solicitud abandonada")
+	@Operation(summary = "Empezar de nuevo: abandona la solicitud a medias",
+			description = "Deja la solicitud como `ABANDONED` para que la app abra una nueva con `POST /`.")
+	@ApiResponse(responseCode = "404", description = "La solicitud no existe", content = @Content)
+	@ApiResponse(responseCode = "409", description = "La solicitud ya no está en progreso", content = @Content)
+	@PostMapping("/{requestId}/abandon")
+	public OnboardingRequestResponse abandon(@PathVariable UUID requestId) {
+		return resumeService.abandon(requestId);
 	}
 
 	@Operation(summary = "Paso 2: declara fuente y rango de ingresos",
@@ -102,15 +130,15 @@ public class OnboardingController {
 	}
 
 	@ApiResponse(responseCode = "200", description = "Resumen de la solicitud con el paso completado")
-	@Operation(summary = "Acepta el aviso de privacidad vigente",
-			description = "Registra la aceptación, incluida la captura de señales, y la IP desde la que se aceptó.")
-	@ApiResponse(responseCode = "400", description = "`signalsAccepted` debe ser `true`", content = @Content)
+	@Operation(summary = "Acepta el aviso de privacidad vigente y los términos y condiciones",
+			description = "Registra la aceptación (incluida la captura de señales y, si se envía, los términos y condiciones), la versión del aviso, la fecha y hora y la IP desde la que se aceptó.")
+	@ApiResponse(responseCode = "400", description = "`signalsAccepted` debe ser `true`, y `termsAccepted`, si se envía, también", content = @Content)
 	@ApiResponse(responseCode = "404", description = "La solicitud no existe", content = @Content)
 	@ApiResponse(responseCode = "409", description = "La solicitud ya no está en progreso o no hay aviso vigente", content = @Content)
 	@PutMapping("/{requestId}/privacy-consent")
 	public OnboardingRequestResponse acceptPrivacyNotice(@PathVariable UUID requestId,
 			@Valid @RequestBody PrivacyConsentRequest body, HttpServletRequest http) {
-		return onboardingService.acceptPrivacyNotice(requestId, clientIp(http));
+		return onboardingService.acceptPrivacyNotice(requestId, body.termsAccepted(), clientIp(http));
 	}
 
 	@ApiResponse(responseCode = "200", description = "Resumen de la solicitud con el paso completado")

@@ -14,12 +14,15 @@ export const API_URL =
 
 // ---- Contract types
 
+/** Location permission on the phone (VDI-73): granted with a city, declined, or granted without a city. */
+export type DeviceLocationStatus = "AVAILABLE" | "DENIED" | "UNAVAILABLE";
+
 export type Role = "KYC_LEAD" | "FRAUD_ANALYST" | "ADMIN";
 export type RiskLevel = "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
 export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ABANDONED";
 export type Criticality = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type AlertStatus = "UNASSIGNED" | "ASSIGNED" | "IN_REVIEW" | "CLOSED";
-export type Step = "PRIVACY_NOTICE" | "BASIC_DATA" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
+export type Step = "PRIVACY_NOTICE" | "BASIC_DATA" | "IDENTITY_DOCUMENT" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
 
 export type ConsoleUser = {
   id: string;
@@ -54,12 +57,27 @@ export type RequestSummary = {
   transactionTypeLabel: string | null;
   monthlyAmountRangeLabel: string | null;
   riskLevel: RiskLevel;
+  /** Score from 0 to 100 (VDI-84). Null without assessment or in the ones made by rule R-01; missing in older API versions. */
+  score?: number | null;
   status: RequestStatus;
   completedSteps: number;
 };
 
+/** What a signal added to the score. `points` is null when the signal was not available; `maxPoints` when it has no weight yet. */
+export type SignalContribution = {
+  signal: string;
+  name: string;
+  points: number | null;
+  maxPoints: number | null;
+  observation: string | null;
+};
+
 export type Assessment = {
   level: RiskLevel;
+  /** Score from 0 to 100, the model version and what each signal added. Null / empty in assessments made by rule R-01. */
+  score?: number | null;
+  modelVersion?: number | null;
+  signals?: SignalContribution[] | null;
   ruleCode: string | null;
   ruleName: string | null;
   ruleThreshold: number | null;
@@ -82,6 +100,40 @@ export type IpDetails = {
   asName: string | null;
   failure: string | null;
   lookedUpAt: string | null;
+};
+
+/** One version of the declared transactional profile (VDI-3). The API sends them oldest first; only the last is current. */
+export type ProfileVersion = {
+  version: number;
+  current: boolean;
+  transactionTypeCode: string;
+  transactionTypeLabel: string | null;
+  monthlyAmountRangeCode: string;
+  monthlyAmountRangeLabel: string | null;
+  /** Who declared it: CUSTOMER is the person, in the app, before submitting. */
+  changedBy: "CUSTOMER" | null;
+  declaredAt: string;
+};
+
+/** Data of a DUI, as read from the photo or as the person confirmed it. Plain dates come as "yyyy-mm-dd"; what was not read is null. */
+export type DuiData = {
+  dui: string | null;
+  firstNames: string | null;
+  lastNames: string | null;
+  birthDate: string | null;
+  issueDate?: string | null;
+  expiryDate: string | null;
+  gender?: string | null;
+};
+
+/** The DUI of a request (VDI-81): what was read, what the person confirmed and the fields they corrected. */
+export type IdentityDocument = {
+  ocrStatus: "READ" | "UNREADABLE" | "FAILED";
+  read: DuiData | null;
+  confirmed: DuiData | null;
+  confirmedAt: string | null;
+  /** Names of the fields the person changed from the reading: dui, firstNames, lastNames, birthDate, expiryDate. */
+  correctedFields: string[] | null;
 };
 
 export type RequestDetail = {
@@ -109,7 +161,11 @@ export type RequestDetail = {
     monthlyAmountRangeLabel: string | null;
     registeredAt: string;
     updatedAt: string | null;
+    /** Every version of the declared profile, oldest first. Missing in older API versions. */
+    versions?: ProfileVersion[] | null;
   } | null;
+  /** Null until the person reaches the DUI step; missing in older API versions. */
+  identityDocument?: IdentityDocument | null;
   risk: Assessment | null;
   signals: {
     ip: string | null;
@@ -121,6 +177,11 @@ export type RequestDetail = {
     ipDetails?: IpDetails | null;
     /** When the app last sent the signals (VDI-70). Missing in responses of older API versions. */
     capturedAt?: string | null;
+    /** Location permission on the phone (VDI-73). Null when the app did not send it; missing in older API versions. */
+    deviceLocationStatus?: DeviceLocationStatus | null;
+    /** "City, Country" reported by the phone, only with permission. */
+    deviceLocation?: string | null;
+    deviceCountryIso?: string | null;
     deviceFingerprint: string | null;
     device: string | null;
     nightTime: boolean | null;
@@ -143,20 +204,15 @@ export type RequestDetail = {
   timeline: { type: string; description: string | null; actor: string | null; occurredAt: string }[] | null;
 };
 
-export type ScoreRule = {
-  code: string;
+/** Score model in force: the ranges of each level and the points each signal can add (null: no weight yet). */
+export type ScoreModel = {
+  version: number;
   name: string;
-  description: string | null;
-  evaluatedField: string | null;
-  operator: string | null;
-  threshold: number | null;
-  currency: string | null;
-  resultIfMatched: RiskLevel;
-  resultIfNotMatched: RiskLevel | null;
-  status: "DRAFT" | "PROVISIONAL" | "CONFIRMED" | "RETIRED";
-  statusNote: string | null;
+  low: { from: number; to: number };
+  medium: { from: number; to: number };
+  high: { from: number; to: number };
   validFrom: string | null;
-  version: number | null;
+  weights: { signal: string; name: string; maxPoints: number | null }[];
 };
 
 export type Alert = {
@@ -237,4 +293,23 @@ export async function fetchAllRequests(token: string): Promise<RequestSummary[]>
     ),
   );
   return [firstPage, ...rest].flatMap((p) => p.content);
+}
+
+export type DocumentSide = "FRONT" | "BACK";
+
+/** Decrypted DUI photo of a request, as an image Blob (VDI-80). Every call is recorded in the access audit. */
+export async function fetchDocumentPhoto(requestId: string, side: DocumentSide, token: string): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/console/requests/${encodeURIComponent(requestId)}/identity-document/${side}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new ApiError(0, "Sin conexión", "No pudimos conectar con el servidor.");
+  }
+  if (!res.ok) {
+    const problem = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, problem.title ?? res.statusText, problem.detail);
+  }
+  return res.blob();
 }

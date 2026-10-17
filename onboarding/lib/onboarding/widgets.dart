@@ -5,16 +5,22 @@ import '../theme.dart';
 
 /// Yellow pill-shaped primary button (`.btn` in the design).
 class PrimaryButton extends StatelessWidget {
-  const PrimaryButton({super.key, required this.text, required this.onPressed});
+  const PrimaryButton({super.key, required this.text, required this.onPressed, this.ready = true});
 
   final String text;
   final VoidCallback? onPressed;
+
+  /// `false` while the screen is not complete: the button is gray, but it can still be tapped so the screen says what is
+  /// missing (a button that does nothing does not tell the person why).
+  final bool ready;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: FilledButton(
+      child: Semantics(
+        hint: ready ? null : 'Faltan datos por completar',
+        child: FilledButton(
         onPressed: onPressed,
         style: ButtonStyle(
           minimumSize: const WidgetStatePropertyAll(Size.fromHeight(52)),
@@ -22,18 +28,19 @@ class PrimaryButton extends StatelessWidget {
           shape: const WidgetStatePropertyAll(StadiumBorder()),
           elevation: const WidgetStatePropertyAll(0),
           backgroundColor: WidgetStateProperty.resolveWith((s) {
-            if (s.contains(WidgetState.disabled)) return AppColors.disabled;
+            if (!ready || s.contains(WidgetState.disabled)) return AppColors.disabled;
             if (s.contains(WidgetState.pressed) || s.contains(WidgetState.hovered)) return AppColors.brandHover;
             return AppColors.brand;
           }),
           foregroundColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.disabled) ? AppColors.muted : AppColors.ink,
+            (s) => !ready || s.contains(WidgetState.disabled) ? AppColors.muted : AppColors.ink,
           ),
           textStyle: const WidgetStatePropertyAll(
             TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.3),
           ),
         ),
-        child: Text(text.toUpperCase(), textAlign: TextAlign.center),
+        child: Text(text, textAlign: TextAlign.center),
+        ),
       ),
     );
   }
@@ -65,7 +72,7 @@ class SecondaryButton extends StatelessWidget {
           ),
           textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
         ),
-        child: Text(text.toUpperCase(), textAlign: TextAlign.center),
+        child: Text(text, textAlign: TextAlign.center),
       ),
     );
   }
@@ -143,7 +150,9 @@ class LabeledTextField extends StatelessWidget {
     required this.placeholder,
     required this.error,
     this.label,
+    this.helper,
     this.keyboardType = TextInputType.text,
+    this.textCapitalization = TextCapitalization.none,
     this.autofillHints,
     this.formatters = const [],
     this.onChanged,
@@ -151,9 +160,15 @@ class LabeledTextField extends StatelessWidget {
 
   final TextEditingController controller;
   final String? label;
+
+  /// Short hint under the field; it gives way to the error when there is one.
+  final String? helper;
   final String placeholder;
   final String error;
   final TextInputType keyboardType;
+
+  /// `words` for names: the keyboard starts every word with a capital letter, and the person can still change it.
+  final TextCapitalization textCapitalization;
   final Iterable<String>? autofillHints;
   final List<TextInputFormatter> formatters;
   final ValueChanged<String>? onChanged;
@@ -171,6 +186,7 @@ class LabeledTextField extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          textCapitalization: textCapitalization,
           autofillHints: autofillHints,
           inputFormatters: formatters,
           onChanged: onChanged,
@@ -184,7 +200,10 @@ class LabeledTextField extends StatelessWidget {
             focusedBorder: hasError ? line(AppColors.error, 2) : line(AppColors.blue, 2),
           ),
         ),
-        if (hasError) ErrorText(error),
+        if (hasError)
+          ErrorText(error)
+        else if (helper != null)
+          Padding(padding: const EdgeInsets.only(top: 6), child: Text(helper!, style: AppText.small)),
       ],
     );
   }
@@ -263,9 +282,9 @@ class OptionCard extends StatelessWidget {
   }
 }
 
-/// Segmented "Paso N de 4" progress bar.
+/// Segmented "Paso N de 5" progress bar.
 class StepProgress extends StatelessWidget {
-  const StepProgress({super.key, required this.step, this.total = 4});
+  const StepProgress({super.key, required this.step, this.total = 5});
 
   final int step;
   final int total;
@@ -355,10 +374,13 @@ class FullLogo extends StatelessWidget {
 
 /// Numbered black circle for step lists.
 class NumberBadge extends StatelessWidget {
-  const NumberBadge(this.n, {super.key, this.size = 32});
+  const NumberBadge(this.n, {super.key, this.size = 32, this.soft = false});
 
   final int n;
   final double size;
+
+  /// Light green circle with a dark number, for the steps that are not highlighted.
+  final bool soft;
 
   @override
   Widget build(BuildContext context) {
@@ -366,8 +388,8 @@ class NumberBadge extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(color: AppColors.ink, shape: BoxShape.circle),
-      child: Text('$n', style: AppText.heading(size >= 32 ? 16 : 14, color: Colors.white)),
+      decoration: BoxDecoration(color: soft ? AppColors.brandSoft : AppColors.ink, shape: BoxShape.circle),
+      child: Text('$n', style: AppText.heading(size >= 32 ? 16 : 14, color: soft ? AppColors.ink : Colors.white)),
     );
   }
 }
@@ -424,14 +446,15 @@ class ColorHeader extends StatelessWidget {
 
 /// Screen title (h1).
 class ScreenTitle extends StatelessWidget {
-  const ScreenTitle(this.text, {super.key, this.size = 28});
+  const ScreenTitle(this.text, {super.key, this.size = 28, this.color = AppColors.ink});
 
   final String text;
   final double size;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(header: true, child: Text(text, style: AppText.heading(size, height: 1.15)));
+    return Semantics(header: true, child: Text(text, style: AppText.heading(size, color: color, height: 1.15)));
   }
 }
 
@@ -473,6 +496,49 @@ class IconRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Message of a wait («Revisando tu DUI…») that covers the screen while something is sent or read. Title and detail are
+/// centered, also when the detail takes two lines, and keep a margin to the edges.
+class LoadingOverlay extends StatelessWidget {
+  const LoadingOverlay({super.key, required this.title, required this.detail});
+
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.white.withValues(alpha: 0.92),
+        child: Semantics(
+          liveRegion: true,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 5,
+                    color: AppColors.brandGreen,
+                    backgroundColor: AppColors.border,
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(title, style: AppText.heading(20), textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                Text(detail, style: AppText.bodyMuted, textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

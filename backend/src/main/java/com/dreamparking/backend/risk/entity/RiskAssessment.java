@@ -2,7 +2,10 @@ package com.dreamparking.backend.risk.entity;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,6 +16,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.CreationTimestamp;
@@ -62,6 +67,17 @@ public class RiskAssessment {
 
 	@Column(name = "is_current", nullable = false)
 	private Boolean current = true;
+
+	/** Score from 0 to 100 and the model version that produced it; null in assessments made by rule R-01. */
+	@Column(name = "score")
+	private Short score;
+
+	@Column(name = "model_version")
+	private Short modelVersion;
+
+	@OneToMany(mappedBy = "assessment", cascade = CascadeType.ALL)
+	@OrderBy("id")
+	private List<RiskAssessmentSignal> signals = new ArrayList<>();
 
 	public Long getId() {
 		return id;
@@ -125,6 +141,26 @@ public class RiskAssessment {
 
 	public void setCurrent(Boolean current) {
 		this.current = current;
+	}
+
+	public Short getScore() {
+		return score;
+	}
+
+	public Short getModelVersion() {
+		return modelVersion;
+	}
+
+	/** Records the score and what each signal added to it. */
+	public void setScore(int score, short modelVersion, List<RiskAssessmentSignal> contributions) {
+		this.score = (short) score;
+		this.modelVersion = modelVersion;
+		this.signals.clear();
+		this.signals.addAll(contributions);
+	}
+
+	public List<RiskAssessmentSignal> getSignals() {
+		return signals;
 	}
 
 }

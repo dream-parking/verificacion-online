@@ -1,6 +1,8 @@
 package com.dreamparking.backend.console.service;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,12 +15,22 @@ import com.dreamparking.backend.common.dto.PageResponse;
 import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.console.dto.ConsoleRequestDetail;
 import com.dreamparking.backend.console.dto.ConsoleRequestListItem;
+import com.dreamparking.backend.console.dto.ConsoleRequestLocation;
+import com.dreamparking.backend.identity.entity.IdentityDocument;
+import com.dreamparking.backend.identity.entity.enums.OcrStatus;
+import com.dreamparking.backend.identity.repository.IdentityDocumentImageRepository;
+import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
+import com.dreamparking.backend.identity.service.DuiValidator;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
+import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
+import com.dreamparking.backend.onboarding.entity.ExpectedActivityVersion;
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository;
+import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
+import com.dreamparking.backend.onboarding.repository.PrivacyConsentRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
 import com.dreamparking.backend.onboarding.repository.RequestSignalsRepository;
 import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
@@ -31,6 +43,9 @@ import com.dreamparking.backend.risk.service.RiskAssessmentService;
 public class ConsoleRequestService {
 
 	static final int MAX_PAGE_SIZE = 100;
+
+	/** Dates printed on the DUI are Salvadoran dates. */
+	static final ZoneId EL_SALVADOR = ZoneId.of("America/El_Salvador");
 
 	/** Console filters; a null parameter disables its filter. Fixed SQL: the values only travel as bind parameters. */
 	private static final String LIST_FILTER = """
@@ -51,6 +66,15 @@ public class ConsoleRequestService {
 
 	private static final String LIST_COUNT = "SELECT count(*) FROM v_request_list " + LIST_FILTER;
 
+	/** Same order as the list; the location is the one of the last session, as in the detail. */
+	private static final String LOCATIONS = """
+			SELECT l.id, l.number, l.name, l.risk_level, l.status, host(s.ip) AS ip, s.location_status,
+			       s.geo_latitude, s.geo_longitude, s.geo_city, s.geo_region_name, s.geo_country, s.approximate_location
+			FROM v_request_list l
+			LEFT JOIN LATERAL (SELECT x.* FROM onboarding_session x WHERE x.request_id = l.id
+			                   ORDER BY x.started_at DESC LIMIT 1) s ON true
+			ORDER BY l.activity_date DESC, l.id""";
+
 	private final NamedParameterJdbcTemplate jdbc;
 
 	private final OnboardingRequestRepository requests;
@@ -67,10 +91,20 @@ public class ConsoleRequestService {
 
 	private final RiskAssessmentService riskAssessments;
 
+	private final IdentityDocumentRepository identityDocuments;
+
+	private final IdentityDocumentImageRepository identityDocumentImages;
+
+	private final ExpectedActivityVersionRepository expectedActivityVersions;
+
+	private final PrivacyConsentRepository consents;
+
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
-			RiskAssessmentService riskAssessments) {
+			RiskAssessmentService riskAssessments, IdentityDocumentRepository identityDocuments,
+			IdentityDocumentImageRepository identityDocumentImages,
+			ExpectedActivityVersionRepository expectedActivityVersions, PrivacyConsentRepository consents) {
 		this.jdbc = jdbc;
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
@@ -79,6 +113,10 @@ public class ConsoleRequestService {
 		this.steps = steps;
 		this.events = events;
 		this.riskAssessments = riskAssessments;
+		this.identityDocuments = identityDocuments;
+		this.identityDocumentImages = identityDocumentImages;
+		this.expectedActivityVersions = expectedActivityVersions;
+		this.consents = consents;
 	}
 
 	/**
@@ -106,10 +144,12 @@ public class ConsoleRequestService {
 		List<ConsoleRequestListItem> content = jdbc.query(LIST_PAGE, params, (rs, row) -> {
 			total[0] = rs.getLong("total");
 			OffsetDateTime date = rs.getObject("activity_date", OffsetDateTime.class);
+			int score = rs.getInt("score");
 			return new ConsoleRequestListItem(rs.getObject("id", UUID.class), rs.getString("number"),
 					rs.getString("name"), date == null ? null : date.toInstant(), rs.getString("transaction_type_label"),
 					rs.getString("monthly_amount_range_label"), RiskLevel.valueOf(rs.getString("risk_level")),
-					RequestStatus.valueOf(rs.getString("status")), rs.getShort("completed_steps"));
+					rs.wasNull() ? null : score, RequestStatus.valueOf(rs.getString("status")),
+					rs.getShort("completed_steps"));
 		});
 		if (total[0] < 0) {
 			// Past the last page (or nothing matches): the window count came with no row.
@@ -119,12 +159,33 @@ public class ConsoleRequestService {
 		return new PageResponse<>(content, pageNumber, pageSize, total[0], totalPages);
 	}
 
+	/**
+	 * Location of every request, newest first, for the console map. One query instead of a detail per request: the
+	 * detail carries the DUI data and every read of it is audited.
+	 */
+	public List<ConsoleRequestLocation> locations() {
+		return jdbc.query(LOCATIONS, (rs, row) -> {
+			String locationStatus = rs.getString("location_status");
+			return new ConsoleRequestLocation(rs.getObject("id", UUID.class), rs.getString("number"),
+					rs.getString("name"), RiskLevel.valueOf(rs.getString("risk_level")),
+					RequestStatus.valueOf(rs.getString("status")), rs.getString("ip"),
+					locationStatus == null ? null : LocationStatus.valueOf(locationStatus),
+					rs.getBigDecimal("geo_latitude"), rs.getBigDecimal("geo_longitude"), rs.getString("geo_city"),
+					rs.getString("geo_region_name"), rs.getString("geo_country"), rs.getString("approximate_location"));
+		});
+	}
+
 	public ConsoleRequestDetail detail(UUID requestId) {
 		OnboardingRequest request = requests.findById(requestId)
 			.orElseThrow(() -> new NotFoundException("Onboarding request not found: " + requestId));
 
 		var applicant = new ConsoleRequestDetail.Applicant(request.getFirstNames(), request.getLastNames(),
 				request.getDui(), request.getMobilePhone());
+		var consent = consents.findById(requestId)
+			.map(c -> new ConsoleRequestDetail.Consent(c.getNotice().getVersion(), c.getAcceptedAt(),
+					Boolean.TRUE.equals(c.getSignalsAccepted()), c.getTermsAccepted()))
+			.orElse(null);
+		var identityDocument = identityDocuments.findById(requestId).map(this::toIdentityDocument).orElse(null);
 		var income = incomeDeclarations.findById(requestId)
 			.map(d -> new ConsoleRequestDetail.Income(d.getSource().getCode(), d.getSource().getLabel(),
 					d.getSourceDetail(), d.getRange().getCode(), d.getRange().getLabel(), d.getRegisteredAt(),
@@ -133,7 +194,9 @@ public class ConsoleRequestService {
 		var expectedActivity = expectedActivities.findById(requestId)
 			.map(a -> new ConsoleRequestDetail.ExpectedActivity(a.getTransactionType().getCode(),
 					a.getTransactionType().getLabel(), a.getMonthlyAmountRange().getCode(),
-					a.getMonthlyAmountRange().getLabel(), a.getRegisteredAt(), a.getUpdatedAt()))
+					a.getMonthlyAmountRange().getLabel(), List.copyOf(a.getExtraTransactionTypeCodes()),
+					a.getMonthlyAmountUsd(), a.getMonthlyTransactionCount(), a.getMonthlyOutflowUsd(),
+					a.getRegisteredAt(), a.getUpdatedAt(), profileVersions(requestId)))
 			.orElse(null);
 		var risk = riskAssessments.findCurrent(requestId).orElse(null);
 		var signalsView = signals.findById(requestId)
@@ -153,8 +216,36 @@ public class ConsoleRequestService {
 
 		return new ConsoleRequestDetail(request.getId(), request.getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
-				request.getSubmittedAt(), applicant, income, expectedActivity, risk, signalsView, stepTimes,
+				request.getSubmittedAt(), applicant, consent, identityDocument, income, expectedActivity, risk, signalsView, stepTimes,
 				timeline);
+	}
+
+	/** Every version of the declared profile, the oldest first; the last one is the one in force. */
+	private List<ConsoleRequestDetail.ProfileVersion> profileVersions(UUID requestId) {
+		List<ExpectedActivityVersion> versions = expectedActivityVersions.findByRequest_IdOrderByVersionAsc(requestId);
+		return versions.stream()
+			.map(v -> new ConsoleRequestDetail.ProfileVersion(v.getVersion(), v == versions.get(versions.size() - 1),
+					v.getTransactionType().getCode(), v.getTransactionType().getLabel(),
+					v.getMonthlyAmountRange().getCode(), v.getMonthlyAmountRange().getLabel(), v.getExtraTypeCodes(),
+					v.getMonthlyAmountUsd(), v.getMonthlyTransactionCount(), v.getMonthlyOutflowUsd(),
+					v.getChangedBy(), v.getDeclaredAt()))
+			.toList();
+	}
+
+	private ConsoleRequestDetail.IdentityDocument toIdentityDocument(IdentityDocument d) {
+		var read = d.getStatus() == OcrStatus.READ ? new ConsoleRequestDetail.DuiData(d.getDui(), d.getFirstNames(),
+				d.getLastNames(), d.getBirthDate(), d.getIssueDate(), d.getExpiryDate(), d.getGender()) : null;
+		var confirmed = d.isConfirmed() ? new ConsoleRequestDetail.DuiData(d.getConfirmedDui(),
+				d.getConfirmedFirstNames(), d.getConfirmedLastNames(), d.getConfirmedBirthDate(), null,
+				d.getConfirmedExpiryDate(), null) : null;
+		String dui = d.isConfirmed() ? d.getConfirmedDui() : d.getDui();
+		return new ConsoleRequestDetail.IdentityDocument(d.getStatus(), d.getModel(), d.getAttempts(),
+				d.getUnreadableReason(), d.getUnreadableSide(), d.getFailure(), read, confirmed, d.getConfirmedAt(),
+				d.getCorrectedFields(), d.getDuiMatchesDeclared(), d.getNamesMatchDeclared(),
+				dui == null ? null : DuiValidator.hasValidCheckDigit(dui),
+				d.effectiveExpiryDate() == null ? null : d.isExpired(LocalDate.now(EL_SALVADOR)), d.getLooksAuthentic(),
+				d.getConfidence(), identityDocumentImages.findSidesByRequestId(d.getRequestId()), d.getProcessedAt(),
+				d.getRejectedConfirmations(), d.getRejectionReasons(), d.isEverLookedInauthentic());
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {
@@ -167,7 +258,8 @@ public class ConsoleRequestService {
 				s.getApproximateLocation(), s.getDeviceFingerprint(), s.getDevice(), s.getTypingSpeedCpm(),
 				s.getTypingPace(), s.getNightTime(), s.getTotalDurationSeconds(), s.getRequestsFromSameDevice(),
 				geo == null ? null : geo.getStatus(), geo == null ? null : geo.getLatitude(),
-				geo == null ? null : geo.getLongitude(), ipDetails, s.getCapturedAt());
+				geo == null ? null : geo.getLongitude(), ipDetails, s.getCapturedAt(),
+				s.getDeviceLocationStatus(), s.getDeviceLocation(), s.getDeviceCountryIso());
 	}
 
 	private static String escapeLike(String text) {

@@ -885,8 +885,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const ScreenTitle(PrivacyNotice.title),
-          const SizedBox(height: 12),
-          const _VersionBadge(),
           const SizedBox(height: 16),
           const Text(PrivacyNotice.intro, style: AppText.body),
           const SizedBox(height: 20),
@@ -946,8 +944,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
                 children: [
                   const ScreenTitle(PrivacyNotice.fullTitle, size: 24),
-                  const SizedBox(height: 12),
-                  const _VersionBadge(),
                   const SizedBox(height: 16),
                   const Text(PrivacyNotice.fullIntro, style: AppText.body, textAlign: TextAlign.justify),
                   for (final section in PrivacyNotice.fullSections) ...[
@@ -955,7 +951,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     Semantics(header: true, child: Text(section.title, style: AppText.heading(18))),
                     for (final paragraph in section.paragraphs) ...[
                       const SizedBox(height: 8),
-                      Text(paragraph, style: AppText.body, textAlign: TextAlign.justify),
+                      Text.rich(PrivacyNotice.span(paragraph, AppText.body), textAlign: TextAlign.justify),
                     ],
                   ],
                 ],
@@ -1857,36 +1853,7 @@ class _MismatchWarning extends StatelessWidget {
   }
 }
 
-/// «Aviso aprobado por Legal · versión [X.Y]» (provisional until Legal approves the notice).
-class _VersionBadge extends StatelessWidget {
-  const _VersionBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: const ShapeDecoration(color: AppColors.brandSoft, shape: StadiumBorder()),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.verified_user_outlined, size: 18, color: AppColors.brandGreen),
-            SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                PrivacyNotice.badge,
-                style: TextStyle(fontSize: 14, height: 1.3, fontWeight: FontWeight.w700, color: AppColors.brandGreen),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Round icon of a data item of the notice; the DUI photos use the blue tint.
+/// Round green icon of a data item of the notice.
 class _NoticeIcon extends StatelessWidget {
   const _NoticeIcon(this.item);
 
@@ -1897,8 +1864,8 @@ class _NoticeIcon extends StatelessWidget {
     return Container(
       width: 44,
       height: 44,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: item.document ? AppColors.blueSoft : AppColors.brandSoft),
-      child: Icon(item.icon, size: 24, color: item.document ? AppColors.blue : AppColors.brandGreen),
+      decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.brandSoft),
+      child: Icon(item.icon, size: 24, color: AppColors.brandGreen),
     );
   }
 }

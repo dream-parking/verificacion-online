@@ -162,15 +162,16 @@ export function RequestsView() {
           <div role="columnheader">Tipo de dinero</div>
           <div role="columnheader">Monto mensual</div>
           <div role="columnheader">Nivel de riesgo</div>
+          <div role="columnheader">Score</div>
           <div role="columnheader">Estado</div>
         </div>
 
         {requests.loading && (
           <Loading
             label="solicitudes"
-            className="md:min-w-[1100px]"
+            className="md:min-w-[1190px]"
             grid="g-requests"
-            widths={["110px", "70%", "90px", "110px", "60px", "120px", "90px"]}
+            widths={["110px", "70%", "90px", "110px", "60px", "120px", "40px", "90px"]}
           />
         )}
         {requests.error && (
@@ -227,6 +228,18 @@ export function RequestsView() {
               </div>
               <div role="cell" data-label="Nivel de riesgo">
                 <span className={`badge ${riskBadge.cls}`}>{riskBadge.label}</span>
+              </div>
+              <div role="cell" data-label="Score" className="font-semibold">
+                {r.score != null ? (
+                  <>
+                    {r.score}
+                    <span className="font-normal text-muted"> / 100</span>
+                  </>
+                ) : (
+                  <span className="font-normal text-muted" title="Sin score del modelo">
+                    —
+                  </span>
+                )}
               </div>
               <div role="cell" data-label="Estado">
                 <span className={`badge ${state.cls}`}>{state.label}</span>

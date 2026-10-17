@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consola · Solicitudes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&amp;family=Nunito:wght@700;800&amp;family=Open+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f4f4f4}
+a{color:#00448c}a:hover{color:#1e376e}
+</style>
+
+</head>
+<body>
+<div style="min-height: 980px; display: flex; flex-wrap: wrap; background: #f4f4f4; color: #1a1b1a; font-family: 'Open Sans', sans-serif">
+  <nav aria-label="Navegación principal" style="flex: 1 1 248px; max-width: 100%; background: #2c2a29; color: #ffffff; display: flex; flex-direction: column; padding: 20px 0">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 20px 22px">
+      <img src="../assets/emblem.png" alt="" style="width: 44px; height: 44px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 0 2px #9ddfa6">
+      <div style="display: flex; flex-direction: column; line-height: 1">
+        <span style="font-family: 'Cinzel', serif; font-size: 10px; font-weight: 600; letter-spacing: 0.32em; color: #9ddfa6">BANCO</span>
+        <span style="font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700">TANGAMANDAPIO</span>
+      </div>
+    </div>
+    <a href="Solicitudes.html" aria-current="page" style="display: flex; align-items: center; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid #9ddfa6; background: #ffffff; color: #1a1b1a; font-weight: 600; text-decoration: none">Solicitudes</a>
+    <a href="#alertas" style="display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid transparent; color: #ffffff; font-weight: 600; text-decoration: none">Bandeja de alertas <span style="min-width: 24px; height: 24px; padding: 0 7px; box-sizing: border-box; border-radius: 50px; background: #9ddfa6; color: #1a1b1a; font-weight: 800; font-size: 13px; display: inline-flex; align-items: center; justify-content: center">3</span></a>
+    <a href="#mapa" style="display: flex; align-items: center; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid transparent; color: #ffffff; font-weight: 600; text-decoration: none">Mapa de ubicaciones</a>
+    <a href="#modelo" style="display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid transparent; color: #ffffff; font-weight: 600; text-decoration: none">Modelo de score <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 8px; border-radius: 50px; border: 1px solid #9ddfa6; color: #9ddfa6">Nuevo</span></a>
+    <a href="#usuarios" style="display: flex; align-items: center; min-height: 48px; padding: 0 20px 0 16px; border-left: 4px solid transparent; color: #ffffff; font-weight: 600; text-decoration: none">Usuarios</a>
+  </nav>
+  <main style="flex: 999 1 560px; min-width: 0; padding: 32px 36px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px">
+      <div>
+        <h1 style="margin: 0 0 4px; font-family: 'Nunito', sans-serif; font-size: 30px; line-height: 1.1; font-weight: 800">Solicitudes</h1>
+        <p style="margin: 0; font-size: 16px; color: #4a4a4a">Cada solicitud tiene un score de 0 a 100 que combina todas sus señales. Más alto, más riesgo.</p>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <button type="button" aria-pressed="true" style="min-height: 40px; padding: 0 16px; border-radius: 50px; border: 1px solid #1a1b1a; background: #1a1b1a; color: #ffffff; font: inherit; font-weight: 700; font-size: 14px">Todas</button>
+        <button type="button" aria-pressed="false" style="min-height: 40px; padding: 0 16px; border-radius: 50px; border: 1px solid #1a1b1a; background: #ffffff; color: #1a1b1a; font: inherit; font-weight: 700; font-size: 14px">Score alto</button>
+        <button type="button" aria-pressed="false" style="min-height: 40px; padding: 0 16px; border-radius: 50px; border: 1px solid #1a1b1a; background: #ffffff; color: #1a1b1a; font: inherit; font-weight: 700; font-size: 14px">En progreso</button>
+        <button type="button" aria-pressed="false" style="min-height: 40px; padding: 0 16px; border-radius: 50px; border: 1px solid #1a1b1a; background: #ffffff; color: #1a1b1a; font: inherit; font-weight: 700; font-size: 14px">Abandonadas</button>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+      <div style="background: #ffffff; border: 1px solid #e1e1e1; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 14px; color: #5b5b5b; font-weight: 600">Score bajo · 0 a 39</span>
+        <span style="font-family: 'Nunito', sans-serif; font-size: 28px; font-weight: 800">5</span>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e1e1e1; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 14px; color: #5b5b5b; font-weight: 600">Score medio · 40 a 69</span>
+        <span style="font-family: 'Nunito', sans-serif; font-size: 28px; font-weight: 800">2</span>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e1e1e1; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 14px; color: #5b5b5b; font-weight: 600">Score alto · 70 a 100</span>
+        <span style="font-family: 'Nunito', sans-serif; font-size: 28px; font-weight: 800; color: #b24a00">1</span>
+      </div>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e1e1e1; overflow-x: auto">
+      <div role="table" aria-label="Solicitudes" style="min-width: 980px">
+        <div role="row" style="display: grid; grid-template-columns: 150px 1.4fr 110px 1.1fr 1fr 230px 150px; gap: 16px; align-items: center; padding: 12px 20px; background: #f5f7f9; border-bottom: 1px solid #989696; font-size: 13px; font-weight: 700; color: #5b5b5b">
+          <div role="columnheader">Solicitud</div>
+          <div role="columnheader">Nombre</div>
+          <div role="columnheader">Fecha</div>
+          <div role="columnheader">Ciudad</div>
+          <div role="columnheader">Monto mensual</div>
+          <div role="columnheader">Score de riesgo</div>
+          <div role="columnheader">Estado</div>
+        </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 150px 1.4fr 110px 1.1fr 1fr 230px 150px; gap: 16px; align-items: center; padding: 0 20px; min-height: 60px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+            <div role="cell"><a href="Detalle.html" style="font-weight: 700">SOL-2026-00418</a></div>
+            <div role="cell" style="font-weight: 600">Marta Alejandra Rivas Cruz</div>
+            <div role="cell" style="color: #4a4a4a">09/10/2026</div>
+            <div role="cell" style="color: #1a1b1a">San Salvador, El Salvador</div>
+            <div role="cell">$500 a $1,000</div>
+            <div role="cell" style="display: flex; align-items: center; gap: 10px">
+              
+                <span style="font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px; width: 30px; text-align: right">34</span>
+                <span style="flex: 0 0 70px; height: 6px; border-radius: 3px; background: #e8e8e8; overflow: hidden; display: flex"><span style="width: 34%; background: #00448c"></span></span>
+                <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #00448c; background: #e3edf8; color: #00448c">● Bajo</span>
+              
+              
+            </div>
+            <div role="cell"><span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #e2f5ec; background: #e2f5ec; color: #0b6b4a">✓ Completada</span></div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 150px 1.4fr 110px 1.1fr 1fr 230px 150px; gap: 16px; align-items: center; padding: 0 20px; min-height: 60px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+            <div role="cell"><a href="Detalle.html" style="font-weight: 700">SOL-2026-00417</a></div>
+            <div role="cell" style="font-weight: 600">José Ernesto Hernández</div>
+            <div role="cell" style="color: #4a4a4a">09/10/2026</div>
+            <div role="cell" style="color: #5b5b5b">Ubicación no disponible</div>
+            <div role="cell">Más de $5,000</div>
+            <div role="cell" style="display: flex; align-items: center; gap: 10px">
+              
+                <span style="font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px; width: 30px; text-align: right">78</span>
+                <span style="flex: 0 0 70px; height: 6px; border-radius: 3px; background: #e8e8e8; overflow: hidden; display: flex"><span style="width: 78%; background: #b24a00"></span></span>
+                <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #b24a00; background: #b24a00; color: #ffffff">▲ Alto</span>
+              
+              
+            </div>
+            <div role="cell"><span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #e2f5ec; background: #e2f5ec; color: #0b6b4a">✓ Completada</span></div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 150px 1.4fr 110px 1.1fr 1fr 230px 150px; gap: 16px; align-items: center; padding: 0 20px; min-height: 60px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+            <div role="cell"><a href="Detalle.html" style="font-weight: 700">SOL-2026-00415</a></div>
+            <div role="cell" style="font-weight: 600">Karla Beatriz Mejía</div>
+            <div role="cell" style="color: #4a4a4a">08/10/2026</div>
+            <div role="cell" style="color: #1a1b1a">Santa Ana, El Salvador</div>
+            <div role="cell">Menos de $500</div>
+            <div role="cell" style="display: flex; align-items: center; gap: 10px">
+              
+                <span style="font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px; width: 30px; text-align: right">12</span>
+                <span style="flex: 0 0 70px; height: 6px; border-radius: 3px; background: #e8e8e8; overflow: hidden; display: flex"><span style="width: 12%; background: #00448c"></span></span>
+                <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #00448c; background: #e3edf8; color: #00448c">● Bajo</span>
+              
+              
+            </div>
+            <div role="cell"><span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #e2f5ec; background: #e2f5ec; color: #0b6b4a">✓ Completada</span></div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 150px 1.4fr 110px 1.1fr 1fr 230px 150px; gap: 16px; align-items: center; padding: 0 20px; min-height: 60px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+            <div role="cell"><a href="Detalle.html" style="font-weight: 700">SOL-2026-00412</a></div>
+            <div role="cell" style="font-weight: 600">Luis Alberto Portillo</div>
+            <div role="cell" style="color: #4a4a4a">08/10/2026</div>
+            <div role="cell" style="color: #1a1b1a">Guatemala, Guatemala</div>
+            <div role="cell">$1,000 a $5,000</div>
+            <div role="cell" style="display: flex; align-items: center; gap: 10px">
+              
+                <span style="font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px; width: 30px; text-align: right">56</span>
+                <span style="flex: 0 0 70px; height: 6px; border-radius: 3px; background: #e8e8e8; overflow: hidden; display: flex"><span style="width: 56%; background: #7a4b00"></span></span>
+                <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #7a4b00; background: #fff0c2; color: #1a1b1a">■ Medio</span>
+              
+              
+            </div>
+            <div role="cell"><span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #e2f5ec; background: #e2f5ec; color: #0b6b4a">✓ Completada</span></div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 150px 1.4fr 110px 1.1fr 1fr 230px 150px; gap: 16px; align-items: center; padding: 0 20px; min-height: 60px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+            <div role="cell"><a href="Detalle.html" style="font-weight: 700">SOL-2026-00410</a></div>
+            <div role="cell" style="font-weight: 600">Ana Sofía Guevara</div>
+            <div role="cell" style="color: #4a4a4a">07/10/2026</div>
+            <div role="cell" style="color: #1a1b1a">San Miguel, El Salvador</div>
+            <div role="cell">$500 a $1,000</div>
+            <div role="cell" style="display: flex; align-items: center; gap: 10px">
+              
+                <span style="font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px; width: 30px; text-align: right">27</span>
+                <span style="flex: 0 0 70px; height: 6px; border-radius: 3px; background: #e8e8e8; overflow: hidden; display: flex"><span style="width: 27%; background: #00448c"></span></span>
+                <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #00448c; background: #e3edf8; color: #00448c">● Bajo</span>
+              
+              
+            </div>
+            <div role="cell"><span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #e2f5ec; background: #e2f5ec; color: #0b6b4a">✓ Completada</span></div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 150px 1.4fr 110px 1.1fr 1fr 230px 150px; gap: 16px; align-items: center; padding: 0 20px; min-height: 60px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+            <div role="cell"><a href="Detalle.html" style="font-weight: 700">SOL-2026-00409</a></div>
+            <div role="cell" style="font-weight: 600">Carlos Mauricio Flores</div>
+            <div role="cell" style="color: #4a4a4a">07/10/2026</div>
+            <div role="cell" style="color: #1a1b1a">Soyapango, El Salvador</div>
+            <div role="cell">$1,000 a $5,000</div>
+            <div role="cell" style="display: flex; align-items: center; gap: 10px">
+              
+                <span style="font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px; width: 30px; text-align: right">44</span>
+                <span style="flex: 0 0 70px; height: 6px; border-radius: 3px; background: #e8e8e8; overflow: hidden; display: flex"><span style="width: 44%; background: #7a4b00"></span></span>
+                <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #7a4b00; background: #fff0c2; color: #1a1b1a">■ Medio</span>
+              
+              
+            </div>
+            <div role="cell"><span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #989696; background: #f4f4f4; color: #4a4a4a">… En progreso</span></div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 150px 1.4fr 110px 1.1fr 1fr 230px 150px; gap: 16px; align-items: center; padding: 0 20px; min-height: 60px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+            <div role="cell"><a href="Detalle.html" style="font-weight: 700">SOL-2026-00406</a></div>
+            <div role="cell" style="font-weight: 600">Rosa Elena Martínez</div>
+            <div role="cell" style="color: #4a4a4a">06/10/2026</div>
+            <div role="cell" style="color: #1a1b1a">La Libertad, El Salvador</div>
+            <div role="cell">Menos de $500</div>
+            <div role="cell" style="display: flex; align-items: center; gap: 10px">
+              
+                <span style="font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px; width: 30px; text-align: right">18</span>
+                <span style="flex: 0 0 70px; height: 6px; border-radius: 3px; background: #e8e8e8; overflow: hidden; display: flex"><span style="width: 18%; background: #00448c"></span></span>
+                <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #00448c; background: #e3edf8; color: #00448c">● Bajo</span>
+              
+              
+            </div>
+            <div role="cell"><span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #e2f5ec; background: #e2f5ec; color: #0b6b4a">✓ Completada</span></div>
+          </div>
+        
+          <div role="row" style="display: grid; grid-template-columns: 150px 1.4fr 110px 1.1fr 1fr 230px 150px; gap: 16px; align-items: center; padding: 0 20px; min-height: 60px; border-bottom: 1px solid #e8e8e8; font-size: 15px">
+            <div role="cell"><a href="Detalle.html" style="font-weight: 700">SOL-2026-00401</a></div>
+            <div role="cell" style="font-weight: 600">Sin nombre aún</div>
+            <div role="cell" style="color: #4a4a4a">05/10/2026</div>
+            <div role="cell" style="color: #1a1b1a">San Salvador, El Salvador</div>
+            <div role="cell">—</div>
+            <div role="cell" style="display: flex; align-items: center; gap: 10px">
+              
+              
+                <span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; background: #ffffff; color: #5b5b5b; border: 1px dashed #989696">○ Sin señales suficientes</span>
+              
+            </div>
+            <div role="cell"><span style="display: inline-flex; align-items: center; border-radius: 50px; padding: 2px 10px; font-weight: 700; font-size: 13px; line-height: 18px; white-space: nowrap; border: 1px solid #8c1d18; background: #fbeaea; color: #8c1d18">✕ Abandonada</span></div>
+          </div>
+        
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

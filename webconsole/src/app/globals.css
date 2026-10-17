@@ -224,8 +224,8 @@
     background: var(--color-soft);
   }
   .g-requests {
-    grid-template-columns: 150px minmax(210px, 1.6fr) 150px 180px 140px 200px 130px;
-    min-width: 1100px;
+    grid-template-columns: 150px minmax(210px, 1.6fr) 150px 180px 140px 200px 90px 130px;
+    min-width: 1190px;
   }
   .g-alerts {
     grid-template-columns: 120px 105px minmax(200px, 1fr) 130px 140px 130px 100px;

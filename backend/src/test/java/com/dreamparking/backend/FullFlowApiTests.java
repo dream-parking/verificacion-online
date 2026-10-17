@@ -77,6 +77,7 @@ class FullFlowApiTests {
 				{"dui": "01234567-8", "firstNames": "Ana Sofía", "lastNames": "Pérez López", "mobilePhone": "7123-4567"}
 				"""))
 			.andExpect(jsonPath("$.completedSteps").value(2));
+		DuiStep.complete(app, requestId, "01234567-8", "Ana Sofía", "Pérez López");
 		perform(app, put("/api/onboarding/requests/{id}/income", requestId).content("""
 				{"sourceCode": "SALARIO", "rangeCode": "HASTA_500"}
 				"""))
@@ -88,13 +89,17 @@ class FullFlowApiTests {
 		perform(app, post("/api/onboarding/requests/{id}/submit", requestId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("COMPLETED"))
-			.andExpect(jsonPath("$.completedSteps").value(5))
+			.andExpect(jsonPath("$.completedSteps").value(6))
 			.andExpect(jsonPath("$.number").value(matchesPattern("SOL-\\d{4}-\\d{5}")));
 
 		// ---- console: the detail has the whole file
 		perform(app, get("/api/console/requests/{id}", requestId))
 			.andExpect(jsonPath("$.status").value("COMPLETED"))
 			.andExpect(jsonPath("$.applicant.dui").value("01234567-8"))
+			.andExpect(jsonPath("$.consent.noticeVersion").isNotEmpty())
+			.andExpect(jsonPath("$.consent.acceptedAt").isNotEmpty())
+			.andExpect(jsonPath("$.consent.signalsAccepted").value(true))
+			.andExpect(jsonPath("$.consent.termsAccepted").doesNotExist())
 			.andExpect(jsonPath("$.timeline[*].type").value(hasItem("REQUEST_SUBMITTED")));
 
 		// ---- account opened in the core for the submitted request
@@ -159,6 +164,27 @@ class FullFlowApiTests {
 				{"signalsAccepted": false}
 				"""))
 			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void theConsentRecordsTheTermsAndConditions() throws Exception {
+		MockMvc app = auth.mockMvcAs(context, admin);
+		String requestId = read(perform(app, post("/api/onboarding/requests")), "$.id");
+		perform(app, get("/api/console/requests/{id}", requestId)).andExpect(jsonPath("$.consent").doesNotExist());
+
+		perform(app, put("/api/onboarding/requests/{id}/privacy-consent", requestId).content("""
+				{"signalsAccepted": true, "termsAccepted": false}
+				"""))
+			.andExpect(status().isBadRequest());
+		perform(app, put("/api/onboarding/requests/{id}/privacy-consent", requestId).content("""
+				{"signalsAccepted": true, "termsAccepted": true}
+				"""))
+			.andExpect(jsonPath("$.completedSteps").value(1));
+		perform(app, get("/api/console/requests/{id}", requestId))
+			.andExpect(jsonPath("$.consent.noticeVersion").isNotEmpty())
+			.andExpect(jsonPath("$.consent.acceptedAt").isNotEmpty())
+			.andExpect(jsonPath("$.consent.signalsAccepted").value(true))
+			.andExpect(jsonPath("$.consent.termsAccepted").value(true));
 	}
 
 	@Test

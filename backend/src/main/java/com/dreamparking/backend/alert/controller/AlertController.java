@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -56,7 +58,8 @@ public class AlertController {
 	@ApiResponse(responseCode = "400", description = "Filtro inválido", content = @Content)
 	@GetMapping("/alerts")
 	public List<AlertResponse> list(@RequestParam(required = false) AlertStatus status,
-			@RequestParam(required = false) UUID assigneeId, @RequestParam(required = false) String account,
+			@RequestParam(required = false) UUID assigneeId,
+			@RequestParam(required = false) @Size(max = 30) @Pattern(regexp = "[0-9 *-]*") String account,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 		return service.inbox(status, assigneeId, account, from, to);

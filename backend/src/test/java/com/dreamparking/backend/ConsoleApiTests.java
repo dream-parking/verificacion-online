@@ -154,14 +154,29 @@ class ConsoleApiTests {
 	// ---- Rules
 
 	@Test
-	void showsTheRuleInForce() throws Exception {
-		mvc.perform(get("/api/console/score-rules"))
+	void ruleR01IsRetiredSoNoRuleIsInForce() throws Exception {
+		mvc.perform(get("/api/console/score-rules")).andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
+	}
+
+	@Test
+	void showsTheScoreModelInForce() throws Exception {
+		mvc.perform(get("/api/console/score-model"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$[0].code").value("R-01"))
-			.andExpect(jsonPath("$[0].threshold").value(500))
-			.andExpect(jsonPath("$[0].operator").value("<="))
-			.andExpect(jsonPath("$[0].resultIfMatched").value("LOW"))
-			.andExpect(jsonPath("$[0].status").value("PROVISIONAL"));
+			.andExpect(jsonPath("$.version").value(1))
+			.andExpect(jsonPath("$.low.from").value(0))
+			.andExpect(jsonPath("$.low.to").value(39))
+			.andExpect(jsonPath("$.medium.from").value(40))
+			.andExpect(jsonPath("$.medium.to").value(69))
+			.andExpect(jsonPath("$.high.from").value(70))
+			.andExpect(jsonPath("$.high.to").value(100))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'AMOUNT')].maxPoints").value(25))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'IDENTITY_DOCUMENT')].maxPoints").value(20))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'TYPING_PACE')].maxPoints").value(15))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'DEVICE')].maxPoints").value(10))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'TIME_OF_DAY')].maxPoints").value(10))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'CITY')].maxPoints").value(20))
+			.andExpect(jsonPath("$.weights[6].signal").value("RNPN"))
+			.andExpect(jsonPath("$.weights[6].maxPoints").isEmpty());
 	}
 
 	// ---- Alerts

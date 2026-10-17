@@ -1,6 +1,15 @@
 // Labels and formats the console shows from the API data.
 
-import type { Criticality, AlertStatus, RequestStatus, RiskLevel, Step, ScoreRule, Role } from "./api";
+import type {
+  Criticality,
+  AlertStatus,
+  DeviceLocationStatus,
+  ProfileVersion,
+  RequestStatus,
+  RiskLevel,
+  Step,
+  Role,
+} from "./api";
 
 export type Badge = { cls: string; label: string };
 
@@ -44,17 +53,11 @@ export const canTakeAlerts = (role: Role) => role === "FRAUD_ANALYST" || role ==
 export const STEPS: { step: Step; name: string }[] = [
   { step: "PRIVACY_NOTICE", name: "Aviso de privacidad" },
   { step: "BASIC_DATA", name: "Datos básicos" },
+  { step: "IDENTITY_DOCUMENT", name: "DUI" },
   { step: "INCOME", name: "Ingresos" },
   { step: "EXPECTED_ACTIVITY", name: "Movimiento esperado" },
   { step: "REVIEW", name: "Revisión" },
 ];
-
-export const RULE_STATUS: Record<ScoreRule["status"], string> = {
-  DRAFT: "Borrador",
-  PROVISIONAL: "Provisional",
-  CONFIRMED: "Confirmada",
-  RETIRED: "Retirada",
-};
 
 export const TYPING_PACE: Record<"SLOW" | "NORMAL" | "FAST", string> = {
   SLOW: "Pausado",
@@ -73,6 +76,26 @@ export function locationFailureText(failure: string | null | undefined): string 
     return "El proveedor de ubicación no respondió o alcanzó su límite de consultas. Se puede reintentar más tarde.";
   }
   return "No se pudo ubicar esta dirección IP.";
+}
+
+/**
+ * "Ciudad de la solicitud" (VDI-73): the city the phone reported. Without permission, or when the phone could not
+ * find it, the console shows «Ubicación no disponible» and the request goes on.
+ */
+export function deviceLocationText(
+  status: DeviceLocationStatus | null | undefined,
+  location: string | null | undefined,
+): string {
+  switch (status) {
+    case "AVAILABLE":
+      return location || "Ubicación sin nombre";
+    case "DENIED":
+      return "Ubicación no disponible · la persona no dio permiso";
+    case "UNAVAILABLE":
+      return "Ubicación no disponible · el teléfono no pudo obtenerla";
+    default:
+      return "Sin dato · la app no la envió";
+  }
 }
 
 // ---- Dates: always in El Salvador time (UTC−6, no daylight saving) and in 12-hour format
@@ -127,3 +150,32 @@ export const minSec = (s: number) => `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 export const duration = (s: number) => `${Math.floor(s / 60)} min ${pad2(s % 60)} s`;
 
 export const usd = (n: number, currency = "USD") => `${currency} ${n.toLocaleString("en-US")}`;
+
+/** What the declared profile card says when the person has not declared the expected movement yet. */
+export const NO_PROFILE = "Sin declaración de movimiento";
+
+export type ProfileEntry = {
+  version: number;
+  /** Only the newest version is the one in force, whatever the API says for the others. */
+  current: boolean;
+  /** "09/10/2026 · 9:51 a. m.", plus who changed it from version 2 on. */
+  when: string;
+  transactionType: string;
+  monthlyAmount: string;
+};
+
+/** The versions of the declared profile for the console: newest first (the API sends them the other way around). */
+export function profileTimeline(versions: ProfileVersion[] | null | undefined): ProfileEntry[] {
+  const newest = Math.max(0, ...(versions ?? []).map((v) => v.version));
+  return [...(versions ?? [])]
+    .sort((a, b) => b.version - a.version)
+    .map((v) => ({
+      version: v.version,
+      current: v.version === newest,
+      when: `${formatDate(v.declaredAt)} · ${formatTime(v.declaredAt)}${
+        v.version >= 2 && v.changedBy === "CUSTOMER" ? " · cambiada por la persona antes de enviar" : ""
+      }`,
+      transactionType: v.transactionTypeLabel ?? v.transactionTypeCode,
+      monthlyAmount: v.monthlyAmountRangeLabel ?? v.monthlyAmountRangeCode,
+    }));
+}

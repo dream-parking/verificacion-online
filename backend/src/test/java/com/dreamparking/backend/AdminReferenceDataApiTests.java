@@ -164,11 +164,13 @@ class AdminReferenceDataApiTests {
 	}
 
 	@Test
-	void aNewRuleVersionChangesTheThresholdForNewAssessmentsOnly() throws Exception {
+	void aNewRuleVersionIsPublishedAndTheOldOnesStayAsHistory() throws Exception {
+		// R-01 was retired by the score model (V16): no version is in force until one is published
+		mvc.perform(get("/api/console/score-rules")).andExpect(jsonPath("$.length()").value(0));
 		send(mvc, post("/api/console/admin/score-rules/R-01/versions"), """
 				{"threshold": 150, "status": "DRAFT"}
 				""").andExpect(jsonPath("$.version").value(2));
-		mvc.perform(get("/api/console/score-rules")).andExpect(jsonPath("$[0].threshold").value(500));
+		mvc.perform(get("/api/console/score-rules")).andExpect(jsonPath("$.length()").value(0));
 
 		send(mvc, post("/api/console/admin/score-rules/R-01/versions"), """
 				{"threshold": 200, "status": "CONFIRMED", "statusNote": "Umbral confirmado"}
@@ -184,9 +186,8 @@ class AdminReferenceDataApiTests {
 			.andExpect(jsonPath("$[2].version").value(1))
 			.andExpect(jsonPath("$[2].validTo").isNotEmpty());
 
-		// 200_500 tops at 500 > 200 → no longer low; HASTA_200 tops at 200 → still low
-		assertThat(score("200_500")).isEqualTo("PENDING_REVIEW");
-		assertThat(score("HASTA_200")).isEqualTo("LOW");
+		// The score comes from the model, not from the rule: the new threshold does not change it
+		assertThat(score("200_500")).isEqualTo("LOW");
 		// The demo request scored with v1 keeps its assessment
 		assertThat(jdbc.queryForObject("""
 				select r.rule_version from risk_assessment a join score_rule r on r.id = a.rule_id

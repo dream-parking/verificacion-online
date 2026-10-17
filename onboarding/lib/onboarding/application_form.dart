@@ -1,5 +1,18 @@
+import '../identity/identity_document.dart';
+
 /// Flow screens, in order.
-enum Screen { welcome, privacy, basicData, income, expectedActivity, review, confirmation }
+enum Screen {
+  welcome,
+  privacy,
+  location,
+  basicData,
+  identityDocument,
+  identityConfirmation,
+  income,
+  expectedActivity,
+  review,
+  confirmation,
+}
 
 /// A catalog option (income source, income range, transaction type, amount range).
 class Option {
@@ -25,18 +38,56 @@ const transactionTypeDescriptions = {
 /// Longest first or last names the API accepts (`BasicDataRequest`).
 const maxNameLength = 100;
 
-/// Same rule as the API (`Customer.NAME_PATTERN`): letters (accents and ñ included) in words separated by one space.
-final _namePattern = RegExp(r'^\p{L}+( \p{L}+)*$', unicode: true);
+/// Letters (accents and ñ included) in words joined by one space, hyphen or apostrophe, each between two letters:
+/// «Rivas-Cruz», «D'Aubuisson». VDI-88 makes the API accept the same.
+final _namePattern = RegExp(r"^\p{L}+([ '\-]\p{L}+)*$", unicode: true);
 
 /// Trims the name and leaves a single space between words, as the API expects it.
 String normalizeName(String raw) => raw.trim().replaceAll(RegExp(r'\s+'), ' ');
 
-/// Error message for first or last names; [missing] is shown when there is nothing to check yet.
-String _nameMessage(String raw, String missing) {
-  final name = normalizeName(raw);
+/// One field where the declared data and the DUI say different things.
+class IdentityMismatch {
+  const IdentityMismatch(this.label, this.declared, this.read);
+
+  /// «Número de DUI», «Nombres» or «Apellidos».
+  final String label;
+
+  /// What the person wrote in the basic data.
+  final String declared;
+
+  /// What the DUI says, as confirmed.
+  final String read;
+}
+
+const _accents = {
+  'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a', 'ā': 'a',
+  'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'ē': 'e',
+  'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i', 'ī': 'i',
+  'ó': 'o', 'ò': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', 'ō': 'o',
+  'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u', 'ū': 'u',
+  'ñ': 'n', 'ç': 'c', 'ý': 'y', 'ÿ': 'y', 'š': 's', 'ž': 'z', 'č': 'c',
+};
+
+/// A name as the API compares it (`IdentityDocument.comparable`): without accents (the ñ too), in lowercase and
+/// with a single space between words.
+String comparableName(String raw) {
+  final lower = normalizePersonName(raw).toLowerCase();
+  return lower.split('').map((c) => _accents[c] ?? c).join();
+}
+
+/// Trims the name, leaves a single space between words and writes every typographic apostrophe
+/// (the phone keyboards type ’) as the plain one the API expects.
+String normalizePersonName(String raw) => normalizeName(raw.replaceAll(RegExp('[’‘ʼ]'), "'"));
+
+/// Error message for first or last names ([what] is `nombres` or `apellidos`); [missing] is shown when there is
+/// nothing to check yet.
+String _nameMessage(String raw, String missing, String what) {
+  final name = normalizePersonName(raw);
   if (name.length < 2) return missing;
   if (name.length > maxNameLength) return 'Usa como máximo $maxNameLength caracteres.';
-  if (!_namePattern.hasMatch(name)) return 'Usa solo letras y espacios, sin números ni símbolos.';
+  if (!_namePattern.hasMatch(name)) {
+    return "Escribe tus $what solo con letras. También puedes usar espacios, apóstrofo (') o guion (-).";
+  }
   return '';
 }
 
@@ -80,31 +131,145 @@ class ApplicationForm {
   String lastNames = '';
   String dui = '';
   String phone = '';
+
+  /// What the API read from the DUI photos (VDI-77); the person confirms or corrects it (VDI-78).
+  IdentityReading? identityReading;
+
+  // Data of the DUI as the person confirms or corrects it (VDI-78), in the format of the screen.
+  String idDui = '';
+  String idFirstNames = '';
+  String idLastNames = '';
+  String idBirthDate = '';
+  String idExpiryDate = '';
+
+  /// Fields of the DUI the reader did not read clearly: the screen marks them to be reviewed.
+  final idUnclear = <String>{};
+
+  /// Fields of the DUI the person typed: a new reading (after repeating a photo) does not overwrite them.
+  final _idEdited = <String>{};
+
+  /// The reader was not available: the person types all the data and nothing is marked.
+  bool readerFailed = false;
+
+  static const idFields = ['idDui', 'idFirstNames', 'idLastNames', 'idBirthDate', 'idExpiryDate'];
+
+  /// Puts what the reader found in the DUI fields. A value that is missing or does not pass the same checks the
+  /// person's own input does is marked to be reviewed. What the person already corrected is kept.
+  void applyReading(IdentityReading r) {
+    readerFailed = r.status == ReadingStatus.failed;
+    final read = {
+      'idDui': r.dui,
+      'idFirstNames': r.firstNames,
+      'idLastNames': r.lastNames,
+      'idBirthDate': r.birthDate == null ? null : formatDateOf(r.birthDate!),
+      'idExpiryDate': r.expiryDate == null ? null : formatDateOf(r.expiryDate!),
+    };
+    for (final MapEntry(key: field, value: value) in read.entries) {
+      if (!_idEdited.contains(field)) _setId(field, readerFailed ? '' : value ?? '');
+    }
+    idUnclear.clear();
+    if (readerFailed) return;
+    final m = messages();
+    idUnclear.addAll([
+      for (final field in idFields)
+        // An expired date was read fine: the document is the problem, not the reading.
+        if (!_idEdited.contains(field) && (field == 'idExpiryDate' ? _expiryDateFormatMessage() : m[field]!).isNotEmpty)
+          field,
+    ]);
+  }
+
+  /// Differences between what the person wrote in the basic data and what the DUI says (confirmed), compared as the
+  /// API does: without accents, capitals or extra spaces. DUI first. Empty when it is the same identity.
+  List<IdentityMismatch> identityMismatches() => [
+        if (dui != idDui) IdentityMismatch('Número de DUI', dui, idDui),
+        if (comparableName(firstNames) != comparableName(idFirstNames))
+          IdentityMismatch('Nombres', normalizePersonName(firstNames), normalizePersonName(idFirstNames)),
+        if (comparableName(lastNames) != comparableName(idLastNames))
+          IdentityMismatch('Apellidos', normalizePersonName(lastNames), normalizePersonName(idLastNames)),
+      ];
+
+  /// Identifies these differences, so a warning that was accepted is not asked again for the same data.
+  String get identityDifferenceSignature => identityMismatches()
+      .map((m) => '${m.label}:${m.label == 'Número de DUI' ? m.declared : comparableName(m.declared)}|'
+          '${m.label == 'Número de DUI' ? m.read : comparableName(m.read)}')
+      .join(';');
+
+  /// The person typed in [field]: it is no longer marked and later readings do not overwrite it.
+  void markEdited(String field) {
+    _idEdited.add(field);
+    idUnclear.remove(field);
+  }
+
+  void _setId(String field, String value) {
+    switch (field) {
+      case 'idDui':
+        idDui = value;
+      case 'idFirstNames':
+        idFirstNames = value;
+      case 'idLastNames':
+        idLastNames = value;
+      case 'idBirthDate':
+        idBirthDate = value;
+      case 'idExpiryDate':
+        idExpiryDate = value;
+    }
+  }
   String incomeSource = '';
   String incomeSourceDetail = '';
   String incomeRange = '';
   String transactionType = '';
   String amountRange = '';
 
-  String get fullName => normalizeName('$firstNames $lastNames');
+  String get fullName => normalizePersonName('$firstNames $lastNames');
 
   /// Error message per field; empty string when the field is valid.
   Map<String, String> messages() {
     return {
       'accepted': _acceptanceMessage(),
-      'firstNames': _nameMessage(firstNames, 'Escribe tus nombres.'),
-      'lastNames': _nameMessage(lastNames, 'Escribe tus apellidos.'),
+      'firstNames': _nameMessage(firstNames, 'Escribe tus nombres.', 'nombres'),
+      'lastNames': _nameMessage(lastNames, 'Escribe tus apellidos.', 'apellidos'),
       'dui': RegExp(r'^\d{8}-\d$').hasMatch(dui) ? '' : 'Escribe tu DUI con el formato 00000000-0.',
       // Mobile numbers in El Salvador start with 6 or 7 (those starting with 2 are landlines), same as the API.
       'phone': RegExp(r'^[67]\d{3}-\d{4}$').hasMatch(phone)
           ? ''
           : 'Escribe un celular de 8 dígitos que empiece con 6 o 7, por ejemplo 7845-2310.',
+      'idDui': RegExp(r'^\d{8}-\d$').hasMatch(idDui) ? '' : 'Escribe tu DUI con el formato 00000000-0.',
+      'idFirstNames': _nameMessage(idFirstNames, 'Escribe tus nombres.', 'nombres'),
+      'idLastNames': _nameMessage(idLastNames, 'Escribe tus apellidos.', 'apellidos'),
+      'idBirthDate': _birthDateMessage(),
+      'idExpiryDate': _expiryDateMessage(),
       'incomeSource': incomeSource.isNotEmpty ? '' : 'Elige de dónde vienen tus ingresos.',
       'incomeSourceDetail': incomeSource == otherIncomeSource ? _incomeDetailMessage(incomeSourceDetail) : '',
       'incomeRange': incomeRange.isNotEmpty ? '' : 'Elige tu nivel de ingresos mensuales.',
       'transactionType': transactionType.isNotEmpty ? '' : 'Elige qué tipo de dinero manejarás.',
       'amountRange': amountRange.isNotEmpty ? '' : 'Elige cuánto dinero moverás al mes.',
     };
+  }
+
+  String _birthDateMessage() {
+    final birth = parseDate(idBirthDate);
+    if (birth == null) return 'Escribe tu fecha de nacimiento como día/mes/año, por ejemplo 14/03/1991.';
+    final now = DateTime.now();
+    return birth.isBefore(DateTime(now.year, now.month, now.day)) ? '' : 'La fecha de nacimiento debe ser anterior a hoy.';
+  }
+
+  /// Checks of the expiry date that tell the reader got it wrong or the person mistyped it.
+  String _expiryDateFormatMessage() {
+    final expiry = parseDate(idExpiryDate);
+    if (expiry == null) return 'Escribe la fecha de vencimiento como día/mes/año, por ejemplo 22/07/2031.';
+    final birth = parseDate(idBirthDate);
+    return birth != null && !expiry.isAfter(birth) ? 'La fecha de vencimiento debe ser posterior a la de nacimiento.' : '';
+  }
+
+  /// A DUI that already expired is not accepted; one that expires today is still valid. The message names the date
+  /// so the person can tell a misread date from an expired document.
+  String _expiryDateMessage() {
+    final problem = _expiryDateFormatMessage();
+    if (problem.isNotEmpty) return problem;
+    final now = DateTime.now();
+    return parseDate(idExpiryDate)!.isBefore(DateTime(now.year, now.month, now.day))
+        ? 'Tu DUI venció el $idExpiryDate. Para abrir tu cuenta necesitamos un DUI vigente.'
+        : '';
   }
 
   /// One message for both checkboxes of the privacy screen, naming what is missing.
@@ -119,6 +284,7 @@ class ApplicationForm {
   static List<String> fieldsOf(Screen s) => switch (s) {
         Screen.privacy => ['accepted'],
         Screen.basicData => ['firstNames', 'lastNames', 'dui', 'phone'],
+        Screen.identityConfirmation => idFields,
         Screen.income => ['incomeSource', 'incomeSourceDetail', 'incomeRange'],
         Screen.expectedActivity => ['transactionType', 'amountRange'],
         _ => [],
@@ -143,3 +309,32 @@ String formatPhone(String raw) {
   final s = d.length > 8 ? d.substring(0, 8) : d;
   return s.length > 4 ? '${s.substring(0, 4)}-${s.substring(4)}' : s;
 }
+
+/// Applies the dd/mm/aaaa mask, keeping digits only.
+String formatDate(String raw) {
+  final d = raw.replaceAll(RegExp(r'\D'), '');
+  final s = d.length > 8 ? d.substring(0, 8) : d;
+  final day = s.length > 2 ? '${s.substring(0, 2)}/' : s;
+  if (s.length <= 2) return day;
+  final month = s.length > 4 ? '${s.substring(2, 4)}/${s.substring(4)}' : s.substring(2);
+  return '$day$month';
+}
+
+/// Reads a dd/mm/aaaa date; `null` if it is not complete or not a real date (31/02 is not rolled over to March).
+DateTime? parseDate(String text) {
+  final m = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(text);
+  if (m == null) return null;
+  final year = int.parse(m[3]!);
+  final month = int.parse(m[2]!);
+  final day = int.parse(m[1]!);
+  final date = DateTime(year, month, day);
+  return date.year == year && date.month == month && date.day == day ? date : null;
+}
+
+/// dd/mm/aaaa, as the screen shows it.
+String formatDateOf(DateTime d) => '${_two(d.day)}/${_two(d.month)}/${d.year.toString().padLeft(4, '0')}';
+
+/// aaaa-mm-dd, as the API expects it.
+String dateForApi(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${_two(d.month)}-${_two(d.day)}';
+
+String _two(int n) => n.toString().padLeft(2, '0');

@@ -2,14 +2,21 @@ package com.dreamparking.backend.console.dto;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import com.dreamparking.backend.onboarding.entity.ExpectedActivity;
+import com.dreamparking.backend.identity.entity.enums.DocumentSide;
+import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
+import com.dreamparking.backend.identity.entity.enums.OcrStatus;
+import com.dreamparking.backend.identity.entity.enums.UnreadableReason;
+import com.dreamparking.backend.identity.entity.enums.UnreadableSide;
+import com.dreamparking.backend.onboarding.entity.enums.DeviceLocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
 import com.dreamparking.backend.onboarding.entity.enums.OnboardingStep;
+import com.dreamparking.backend.onboarding.entity.enums.ProfileChangedBy;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
@@ -17,17 +24,48 @@ import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
 /**
- * Everything the console's request detail screen shows. {@code income}, {@code expectedActivity}, {@code risk} and
- * {@code signals} are null until the customer reaches that point of the flow.
+ * Everything the console's request detail screen shows. {@code consent}, {@code identityDocument}, {@code income},
+ * {@code expectedActivity}, {@code risk} and {@code signals} are null until the customer reaches that point of the flow.
  */
 public record ConsoleRequestDetail(UUID id, String number, RequestStatus status, short completedSteps,
-		RiskLevel riskLevel, Instant startedAt, Instant submittedAt, Applicant applicant, Income income,
-		ExpectedActivity expectedActivity, RiskAssessmentResponse risk, Signals signals, List<StepTime> steps,
-		List<TimelineEntry> timeline) {
+		RiskLevel riskLevel, Instant startedAt, Instant submittedAt, Applicant applicant, Consent consent,
+		IdentityDocument identityDocument, Income income, ExpectedActivity expectedActivity,
+		RiskAssessmentResponse risk, Signals signals, List<StepTime> steps, List<TimelineEntry> timeline) {
 
 	/** Personal data as declared; internal use only. */
 	@Schema(name = "ConsoleRequestApplicant")
 	public record Applicant(String firstNames, String lastNames, String dui, String mobilePhone) {
+	}
+
+	/** The privacy notice the customer accepted (VDI-93): its version, when, and whether the terms were accepted. */
+	@Schema(name = "ConsoleRequestConsent")
+	public record Consent(@Schema(description = "Versión del aviso aceptado", example = "2026.1") String noticeVersion,
+			Instant acceptedAt,
+			@Schema(description = "Aceptó la captura de señales (siempre `true`: sin ella no se avanza)") boolean signalsAccepted,
+			@Schema(description = "Aceptó los términos y condiciones; null si no se registró (solicitudes anteriores o una app que aún no lo envía)") Boolean termsAccepted) {
+	}
+
+	/**
+	 * The DUI (VDI-79, VDI-81): what was read from the photos next to what the customer confirmed, the fields the
+	 * customer corrected, and how the confirmed data compares with the basic data. The photos are downloaded one by
+	 * one from {@code /identity-document/{side}}; {@code photos} lists the sides on file. {@code confirmed} is null
+	 * until the customer confirms. {@code checkDigitValid} and {@code expired} use the confirmed data, else the read one.
+	 * {@code rejectedConfirmations}, {@code rejectionReasons} and {@code everLookedInauthentic} cover every attempt of
+	 * the request, not only the last capture, and count in the score.
+	 */
+	@Schema(name = "ConsoleRequestIdentityDocument")
+	public record IdentityDocument(OcrStatus ocrStatus, String ocrModel, short attempts,
+			UnreadableReason unreadableReason, UnreadableSide unreadableSide, String failure, DuiData read,
+			DuiData confirmed, Instant confirmedAt, List<String> correctedFields, Boolean duiMatchesDeclared,
+			Boolean namesMatchDeclared, Boolean checkDigitValid, Boolean expired, Boolean looksAuthentic,
+			BigDecimal confidence, List<DocumentSide> photos, Instant processedAt,
+			short rejectedConfirmations, List<DuiDateProblem> rejectionReasons, boolean everLookedInauthentic) {
+	}
+
+	/** Data of a DUI, as read or as confirmed. Fields not read are null. */
+	@Schema(name = "ConsoleRequestDuiData")
+	public record DuiData(String dui, String firstNames, String lastNames, LocalDate birthDate, LocalDate issueDate,
+			LocalDate expiryDate, String gender) {
 	}
 
 	/** Declared income (VDI-23). {@code registeredAt} is the original declaration time and never changes. */
@@ -36,10 +74,28 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			String rangeLabel, Instant registeredAt, Instant updatedAt) {
 	}
 
-	/** Declared expected activity (VDI-24). */
+	/**
+	 * Declared expected activity (VDI-24), the baseline the account movements are compared against (VDI-3): the
+	 * version in force, and in {@code versions} every version the customer declared, the oldest first.
+	 */
 	@Schema(name = "ConsoleRequestExpectedActivity")
 	public record ExpectedActivity(String transactionTypeCode, String transactionTypeLabel,
-			String monthlyAmountRangeCode, String monthlyAmountRangeLabel, Instant registeredAt, Instant updatedAt) {
+			String monthlyAmountRangeCode, String monthlyAmountRangeLabel,
+			@Schema(description = "Otros tipos de dinero declarados además del principal") List<String> additionalTransactionTypeCodes,
+			@Schema(description = "Monto mensual estimado en USD (null si no lo declaró)") BigDecimal monthlyAmountUsd,
+			@Schema(description = "Depósitos o pagos recibidos al mes (null si no lo declaró)") Short monthlyTransactionCount,
+			@Schema(description = "Salidas de dinero al mes en USD (null si no lo declaró)") BigDecimal monthlyOutflowUsd,
+			Instant registeredAt, Instant updatedAt,
+			@Schema(description = "Todas las versiones del perfil declarado, de la más antigua a la vigente") List<ProfileVersion> versions) {
+	}
+
+	/** One version of the declared profile (VDI-3); only the last one is {@code current}. */
+	@Schema(name = "ConsoleRequestProfileVersion")
+	public record ProfileVersion(int version, boolean current, String transactionTypeCode, String transactionTypeLabel,
+			String monthlyAmountRangeCode, String monthlyAmountRangeLabel, List<String> additionalTransactionTypeCodes,
+			BigDecimal monthlyAmountUsd, Short monthlyTransactionCount, BigDecimal monthlyOutflowUsd,
+			@Schema(description = "Quién la declaró: CUSTOMER = la persona, antes de enviar la solicitud") ProfileChangedBy changedBy,
+			Instant declaredAt) {
 	}
 
 	/**
@@ -51,7 +107,10 @@ public record ConsoleRequestDetail(UUID id, String number, RequestStatus status,
 			Short typingSpeedCpm, TypingPace typingPace, Boolean nightTime, Long totalDurationSeconds,
 			Long requestsFromSameDevice, LocationStatus locationStatus, BigDecimal latitude, BigDecimal longitude,
 			IpDetails ipDetails,
-			@Schema(description = "Fecha y hora en que la app envió las señales por última vez") Instant capturedAt) {
+			@Schema(description = "Fecha y hora en que la app envió las señales por última vez") Instant capturedAt,
+			@Schema(description = "Permiso de ubicación del teléfono: `DENIED` o `UNAVAILABLE` se muestran como «Ubicación no disponible»; null si la app no lo envió") DeviceLocationStatus deviceLocationStatus,
+			@Schema(description = "Ciudad y país que reportó el teléfono (solo con permiso)", example = "San Salvador, El Salvador") String deviceLocation,
+			@Schema(description = "País que reportó el teléfono, ISO 3166-1 alfa-2", example = "SV") String deviceCountryIso) {
 	}
 
 	/**

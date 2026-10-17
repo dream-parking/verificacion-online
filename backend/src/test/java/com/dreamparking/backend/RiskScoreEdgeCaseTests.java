@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -28,18 +29,21 @@ import com.dreamparking.backend.risk.service.RiskAssessmentService;
 import com.jayway.jsonpath.JsonPath;
 
 /**
- * VDI-58: edge cases of rule R-01. The range that ends exactly at the threshold (USD 500) is low risk; the next
- * one up and the open-ended one stay pending; no data means not evaluated; invalid input leaves no score.
+ * VDI-58, VDI-82: edge cases of the score. Each amount range adds its points (an open-ended one the most); with
+ * only the amount known the score is low; no data means not evaluated; invalid input leaves no score.
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")
 @Transactional
-class RiskRuleEdgeCaseTests {
+class RiskScoreEdgeCaseTests {
 
 	@Autowired
 	MockMvc mvc;
+
+	@Autowired
+	JdbcTemplate jdbc;
 
 	@Autowired
 	OnboardingRequestRepository requests;
@@ -48,27 +52,24 @@ class RiskRuleEdgeCaseTests {
 	RiskAssessmentService riskAssessments;
 
 	@Test
-	void rangesThatEndAtOrBelowTheThresholdAreLowRisk() throws Exception {
-		assertScore("HASTA_200", "LOW", "R-01", 200);
-		assertScore("200_500", "LOW", "R-01", 500);
+	void eachRangeAddsMorePointsThanTheOneBelow() throws Exception {
+		assertScore("HASTA_200", 0, 200);
+		assertScore("200_500", 4, 500);
+		assertScore("500_1000", 8, 1000);
+		assertScore("MAS_1000", 20, 1000.01);
 	}
 
 	@Test
-	void rangesAboveTheThresholdStayPending() throws Exception {
-		assertScore("500_1000", "PENDING_REVIEW", null, 1000);
-		assertScore("MAS_1000", "PENDING_REVIEW", null, 1000.01);
-	}
-
-	@Test
-	void theAppliedRuleKeepsItsThresholdForTheExplanation() throws Exception {
+	void theAssessmentExplainsEachSignalAndDoesNotUseARule() throws Exception {
 		String id = startRequest();
 		registerRange(id, "PAGO_SALARIO", "200_500");
 
 		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id))
-			.andExpect(jsonPath("$.ruleCode").value("R-01"))
-			.andExpect(jsonPath("$.ruleName").value("Monto mensual bajo"))
-			.andExpect(jsonPath("$.ruleThreshold").value(500))
-			.andExpect(jsonPath("$.evaluatedValue").value(500));
+			.andExpect(jsonPath("$.ruleCode").isEmpty())
+			.andExpect(jsonPath("$.ruleThreshold").isEmpty())
+			.andExpect(jsonPath("$.evaluatedValue").value(500))
+			.andExpect(jsonPath("$.signals.length()").value(9))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'RNPN')].points[0]").isEmpty());
 	}
 
 	@Test
@@ -80,7 +81,8 @@ class RiskRuleEdgeCaseTests {
 		OnboardingRequest request = requests.findById(UUID.fromString(id)).orElseThrow();
 		RiskAssessmentResponse response = riskAssessments.evaluate(request, null);
 		assertThat(response.level()).isEqualTo(RiskLevel.NOT_EVALUATED);
-		assertThat(response.ruleCode()).isNull();
+		assertThat(response.score()).isNull();
+		assertThat(response.signals()).isEmpty();
 		assertThat(response.evaluatedValue()).isNull();
 	}
 
@@ -108,23 +110,61 @@ class RiskRuleEdgeCaseTests {
 	void correctingTheRangeMovesTheScoreBothWays() throws Exception {
 		String id = startRequest();
 		registerRange(id, "PAGO_SALARIO", "HASTA_200");
-		registerRange(id, "PAGO_SALARIO", "500_1000");
-		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.riskLevel").value("PENDING_REVIEW"));
+		registerRange(id, "PAGO_SALARIO", "MAS_1000");
+		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id)).andExpect(jsonPath("$.score").value(20));
 		registerRange(id, "PAGO_SALARIO", "200_500");
+		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id)).andExpect(jsonPath("$.score").value(4));
 		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.riskLevel").value("LOW"));
 	}
 
-	private void assertScore(String rangeCode, String level, String ruleCode, double evaluatedValue) throws Exception {
+	@Test
+	void theRangesOfTheModelInForceSetTheLevel() throws Exception {
+		// Model v2 with narrower ranges: low up to 3, medium up to 6, high above; v1 stops being in force
+		publishModel(3, 6);
+		assertLevel("HASTA_200", "LOW", 0);
+		assertLevel("200_500", "MEDIUM", 4);
+		assertLevel("500_1000", "HIGH", 8);
+
 		String id = startRequest();
-		ResultActions result = registerRange(id, "PAGO_SALARIO", rangeCode).andExpect(status().isOk())
-			.andExpect(jsonPath("$.level").value(level))
+		registerRange(id, "PAGO_SALARIO", "500_1000");
+		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id))
+			.andExpect(jsonPath("$.modelVersion").value(2))
+			.andExpect(jsonPath("$.explanation").value(
+					"Score 8 de 100, riesgo alto (Modelo de score v2): suman sobre todo monto declarado (8)."));
+	}
+
+	@Test
+	void withoutAModelInForceTheRequestCannotBeScored() throws Exception {
+		jdbc.update("update score_model set valid_to = now() + interval '1 second' where valid_to is null");
+		jdbc.update("update score_model set valid_to = now() where valid_to is not null");
+		String id = startRequest();
+
+		registerRange(id, "PAGO_SALARIO", "HASTA_200").andExpect(status().isConflict());
+	}
+
+	private void assertScore(String rangeCode, int score, double evaluatedValue) throws Exception {
+		String id = startRequest();
+		registerRange(id, "PAGO_SALARIO", rangeCode).andExpect(status().isOk())
+			.andExpect(jsonPath("$.level").value("LOW"))
+			.andExpect(jsonPath("$.score").value(score))
 			.andExpect(jsonPath("$.evaluatedValue").value(evaluatedValue));
-		if (ruleCode == null) {
-			result.andExpect(jsonPath("$.ruleCode").isEmpty());
-		}
-		else {
-			result.andExpect(jsonPath("$.ruleCode").value(ruleCode));
-		}
+	}
+
+	private void assertLevel(String rangeCode, String level, int score) throws Exception {
+		String id = startRequest();
+		registerRange(id, "PAGO_SALARIO", rangeCode).andExpect(status().isOk())
+			.andExpect(jsonPath("$.level").value(level))
+			.andExpect(jsonPath("$.score").value(score));
+		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.riskLevel").value(level));
+	}
+
+	/** Replaces model v1 with a v2 that has the same weights and these ranges. */
+	private void publishModel(int lowMax, int mediumMax) {
+		jdbc.update("update score_model set valid_to = now() where version = 1");
+		jdbc.update("insert into score_model (version, name, low_max, medium_max, valid_from)"
+				+ " values (2, 'Modelo de score v2', ?, ?, now())", lowMax, mediumMax);
+		jdbc.update("insert into score_model_weight (model_version, signal, max_points)"
+				+ " select 2, signal, max_points from score_model_weight where model_version = 1");
 	}
 
 	private ResultActions registerRange(String id, String type, String rangeCode) throws Exception {

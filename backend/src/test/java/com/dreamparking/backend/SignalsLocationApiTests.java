@@ -1,5 +1,7 @@
 package com.dreamparking.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,7 +35,10 @@ import com.dreamparking.backend.onboarding.geo.IpGeolocation;
 import com.dreamparking.backend.onboarding.geo.IpGeolocationClient;
 import com.jayway.jsonpath.JsonPath;
 
-/** VDI-67: the server resolves latitude and longitude from the client IP and marks them «unavailable» otherwise. */
+/**
+ * VDI-67: the server resolves latitude and longitude from the client IP and marks them «unavailable» otherwise.
+ * VDI-73: the city the phone reports is kept apart, and only with the customer's permission.
+ */
 @Import({ TestcontainersConfiguration.class, TestAuth.class })
 @SpringBootTest
 @ActiveProfiles("dev")
@@ -102,7 +107,8 @@ class SignalsLocationApiTests {
 		when(geolocation.locate(any())).thenThrow(new GeolocationException("provider error: HttpClientErrorException"));
 		String id = startRequest();
 
-		capture(id, "{\"deviceFingerprint\": \"fp-ubicacion\", \"approximateLocation\": \"Santa Ana\", \"typingSpeedCpm\": 150}",
+		capture(id, "{\"deviceFingerprint\": \"fp-ubicacion\", \"approximateLocation\": \"Santa Ana\","
+				+ " \"deviceLocationStatus\": \"AVAILABLE\", \"typingSpeedCpm\": 150}",
 				PUBLIC_IP, 204);
 
 		flushAndClear();
@@ -114,6 +120,99 @@ class SignalsLocationApiTests {
 			.andExpect(jsonPath("$.signals.approximateLocation").value("Santa Ana"))
 			.andExpect(jsonPath("$.signals.typingPace").value("NORMAL"))
 			.andExpect(jsonPath("$.signals.ip").value(PUBLIC_IP));
+	}
+
+	@Test
+	void theCityOfThePhoneIsKeptApartFromTheIpLocation() throws Exception {
+		when(geolocation.locate(any())).thenReturn(sansalvador());
+		String id = startRequest();
+
+		capture(id, "{\"deviceFingerprint\": \"fp-ubicacion\", \"approximateLocation\": \"Santa Ana, El Salvador\","
+				+ " \"countryIso\": \"sv\", \"deviceLocationStatus\": \"AVAILABLE\"}", PUBLIC_IP, 204);
+
+		flushAndClear();
+		mvc.perform(get("/api/console/requests/{id}", id))
+			.andExpect(jsonPath("$.signals.deviceLocationStatus").value("AVAILABLE"))
+			.andExpect(jsonPath("$.signals.deviceLocation").value("Santa Ana, El Salvador"))
+			.andExpect(jsonPath("$.signals.deviceCountryIso").value("SV"))
+			.andExpect(jsonPath("$.signals.approximateLocation").value("San Salvador, El Salvador"))
+			.andExpect(jsonPath("$.signals.ipDetails.city").value("San Salvador"));
+	}
+
+	/** VDI-109: the map reads every location in one call instead of the detail (and its audit) of each request. */
+	@Test
+	void theMapReadsTheLocationOfEveryRequestInOneCall() throws Exception {
+		when(geolocation.locate(any())).thenReturn(sansalvador());
+		String located = startRequest();
+		capture(located, BODY, PUBLIC_IP, 204);
+		String privateIp = startRequest();
+		capture(privateIp, BODY, "192.168.1.20", 204);
+		String withoutSignals = startRequest();
+
+		flushAndClear();
+		mvc.perform(get("/api/console/requests/locations"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[?(@.id == '%s')].ip", located).value(PUBLIC_IP))
+			.andExpect(jsonPath("$[?(@.id == '%s')].locationStatus", located).value("AVAILABLE"))
+			.andExpect(jsonPath("$[?(@.id == '%s')].latitude", located).value(13.6929))
+			.andExpect(jsonPath("$[?(@.id == '%s')].longitude", located).value(-89.2182))
+			.andExpect(jsonPath("$[?(@.id == '%s')].city", located).value("San Salvador"))
+			.andExpect(jsonPath("$[?(@.id == '%s')].country", located).value("El Salvador"))
+			.andExpect(jsonPath("$[?(@.id == '%s')].riskLevel", located).value("NOT_EVALUATED"))
+			.andExpect(jsonPath("$[?(@.id == '%s')].status", located).value("IN_PROGRESS"))
+			.andExpect(jsonPath("$[?(@.id == '%s')].ip", privateIp).value("192.168.1.20"))
+			.andExpect(jsonPath("$[?(@.id == '%s')].locationStatus", privateIp).value("UNAVAILABLE"))
+			.andExpect(jsonPath("$[?(@.id == '%s')].latitude", privateIp).value(contains((Object) null)))
+			.andExpect(jsonPath("$[?(@.id == '%s')].locationStatus", withoutSignals).value(contains((Object) null)))
+			.andExpect(jsonPath("$[?(@.id == '%s')].ip", withoutSignals).value(contains((Object) null)));
+
+		Number audits = (Number) em.createNativeQuery("select count(*) from access_audit"
+				+ " where action = 'VIEW_REQUEST_DETAIL'").getSingleResult();
+		assertThat(audits.intValue()).isZero();
+	}
+
+	/** CP-41: without the location permission the request goes on and the location is stored as unavailable. */
+	@Test
+	void withoutPermissionTheLocationOfThePhoneIsStoredAsUnavailable() throws Exception {
+		when(geolocation.locate(any())).thenReturn(sansalvador());
+		String id = startRequest();
+
+		// Even if a city travels, without permission it is not kept.
+		capture(id, "{\"deviceFingerprint\": \"fp-ubicacion\", \"approximateLocation\": \"Santa Ana\","
+				+ " \"countryIso\": \"SV\", \"deviceLocationStatus\": \"DENIED\", \"typingSpeedCpm\": 150}",
+				PUBLIC_IP, 204);
+
+		flushAndClear();
+		mvc.perform(get("/api/console/requests/{id}", id))
+			.andExpect(jsonPath("$.signals.deviceLocationStatus").value("DENIED"))
+			.andExpect(jsonPath("$.signals.deviceLocation").doesNotExist())
+			.andExpect(jsonPath("$.signals.deviceCountryIso").doesNotExist())
+			.andExpect(jsonPath("$.signals.typingPace").value("NORMAL"))
+			.andExpect(jsonPath("$.signals.ipDetails.city").value("San Salvador"));
+		Object[] row = (Object[]) em.createNativeQuery("select device_location_status, device_location"
+				+ " from onboarding_session where request_id = cast(:id as uuid)").setParameter("id", id).getSingleResult();
+		assertThat(row[0]).isEqualTo("DENIED");
+		assertThat(row[1]).isNull();
+	}
+
+	@Test
+	void permissionGrantedButNoCityIsStoredAsUnavailable() throws Exception {
+		String id = startRequest();
+
+		capture(id, "{\"deviceFingerprint\": \"fp-ubicacion\", \"deviceLocationStatus\": \"UNAVAILABLE\"}",
+				"192.168.1.20", 204);
+
+		flushAndClear();
+		mvc.perform(get("/api/console/requests/{id}", id))
+			.andExpect(jsonPath("$.signals.deviceLocationStatus").value("UNAVAILABLE"))
+			.andExpect(jsonPath("$.signals.deviceLocation").doesNotExist())
+			.andExpect(jsonPath("$.signals.approximateLocation").doesNotExist());
+	}
+
+	@Test
+	void anUnknownLocationStatusIsRejected() throws Exception {
+		capture(startRequest(), "{\"deviceFingerprint\": \"fp\", \"deviceLocationStatus\": \"MAYBE\"}",
+				PUBLIC_IP, 400);
 	}
 
 	@Test

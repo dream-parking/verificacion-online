@@ -54,6 +54,13 @@ Reglas:
 - **Paso obligatorio:** la app ya tiene la captura (VDI-77), así que `APP_IDENTITY_DOCUMENT_REQUIRED` vale `true` por defecto y los ingresos no se pueden declarar sin confirmar el DUI. Con `false` los ingresos saltan el paso y la solicitud se envía sin DUI: solo para pruebas o uso local, nunca en Dev, QA ni producción.
 - **Configuración:** `APP_OCR_ENABLED=true`, `OPENAI_API_KEY` y `APP_DOCUMENT_KEY` (`openssl rand -base64 32`) como secrets de la Container App. Sin `APP_DOCUMENT_KEY` la aplicación no arranca, salvo con el perfil `dev`, que usa una llave temporal (las fotos guardadas así no se pueden leer después de un reinicio).
 
+### Prueba de vida (VDI-114)
+
+- **Endpoint:** `PUT /api/onboarding/requests/{id}/liveness`, multipart con `selfie` (JPEG o PNG, hasta 5 MB). Responde `{ status, attempts }`: `CHECKED` si el proveedor contestó, `FAILED` si no estuvo disponible. En ambos casos la solicitud sigue; con `FAILED` la señal no suma ni resta. Se puede repetir mientras la solicitud está en progreso y cada intento cuenta en `attempts`. La app **no** recibe el nivel de confianza: es una señal de riesgo y se queda en el expediente.
+- **Resultado:** en `liveness_check`, un registro por solicitud con el **nivel de confianza** (0 a 1, nunca un sí o no), el proveedor, el número de intentos y la fecha y hora del último intento. La selfie se guarda cifrada con AES-256-GCM (`DocumentCipher`, la misma llave `APP_DOCUMENT_KEY`) con su SHA-256; después del envío la base de datos impide cambiarla o borrarla. En la línea de tiempo queda el evento `LIVENESS_CHECKED`.
+- **Proveedor:** `APP_LIVENESS_PROVIDER`. Por defecto `openai`: un modelo de visión (`gpt-6-astra`, `APP_LIVENESS_MODEL`) por la Responses API, con la respuesta forzada a un esquema JSON y `store: false`, igual que el DUI. Usa la misma `OPENAI_API_KEY` y se enciende con `APP_LIVENESS_ENABLED=true`; sin eso la prueba queda `FAILED`. **Limitación:** un modelo de visión mira una sola imagen, así que detecta peor una foto de pantalla, una impresión o una máscara que un servicio de prueba de vida dedicado (por ejemplo Azure AI Face, de acceso limitado). Por eso el nivel de confianza es una señal para el score, nunca una decisión. Con `simulated` el cliente contesta siempre `APP_LIVENESS_SIMULATED_CONFIDENCE` (0.90 por defecto): solo para desarrollo, nunca en Dev, QA ni producción reales. Un proveedor nuevo es otra implementación de `LivenessClient`, sin tocar el endpoint ni el expediente.
+- **Score:** el aporte al score llega con VDI-115; este paso solo entrega el nivel de confianza.
+
 ## Consola web — `/api/console` (requiere sesión)
 
 1. `POST /api/console/auth/login` con `{ email, password }` devuelve `accessToken` (vigencia `expiresIn` segundos, 8 h) y el usuario.

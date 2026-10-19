@@ -13,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.util.Arrays;
 
+import jakarta.persistence.EntityManager;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +58,9 @@ class LivenessApiTests {
 
 	@Autowired
 	TestAuth auth;
+
+	@Autowired
+	EntityManager em;
 
 	@Autowired
 	JdbcTemplate jdbc;
@@ -103,6 +108,7 @@ class LivenessApiTests {
 
 		upload(id, SELFIE, "image/jpeg").andExpect(jsonPath("$.attempts").value(1));
 		upload(id, PNG, "image/png").andExpect(status().isOk()).andExpect(jsonPath("$.attempts").value(2));
+		em.flush();
 
 		assertThat(jdbc.queryForObject("select count(*) from liveness_check where request_id = ?::uuid",
 				Integer.class, id)).isEqualTo(1);
@@ -151,12 +157,15 @@ class LivenessApiTests {
 		String id = startRequest();
 		upload(id, SELFIE, "image/jpeg").andExpect(status().isOk());
 
+		em.flush();
 		jdbc.update("update onboarding_request set status = 'ABANDONED', number = null, submitted_at = null "
 				+ "where id = ?::uuid", id);
+		em.clear();
 
+		upload(id, SELFIE, "image/jpeg").andExpect(status().isConflict());
+		// Last on purpose: a statement the database rejects aborts the transaction of the test.
 		assertThatThrownBy(() -> jdbc.update("update liveness_check set confidence = 1 where request_id = ?::uuid", id))
 			.hasMessageContaining("cannot be modified or deleted");
-		upload(id, SELFIE, "image/jpeg").andExpect(status().isConflict());
 	}
 
 	@Test
@@ -164,6 +173,7 @@ class LivenessApiTests {
 		when(liveness.check(any())).thenReturn(new LivenessResult(new BigDecimal("0.91")));
 		String id = startRequest();
 		upload(id, SELFIE, "image/jpeg").andExpect(status().isOk());
+		em.flush();
 
 		assertThatThrownBy(() -> jdbc.update("update liveness_check set confidence = 1.5 where request_id = ?::uuid", id))
 			.hasMessageContaining("ck_liveness_check_confidence");

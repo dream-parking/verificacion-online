@@ -227,7 +227,7 @@ public class IdentityDocumentService {
 	}
 
 	/** Checks the photo is a JPEG or PNG by its first bytes; the declared content type is not trusted. */
-	static DocumentPhoto photo(String part, byte[] content) {
+	public static DocumentPhoto photo(String part, byte[] content) {
 		if (content == null || content.length == 0) {
 			throw new InvalidInputException("The " + part + " photo is empty");
 		}

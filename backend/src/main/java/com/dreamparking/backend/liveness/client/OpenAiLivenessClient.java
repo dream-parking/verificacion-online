@@ -1,27 +1,23 @@
 package com.dreamparking.backend.liveness.client;
 
 import java.math.BigDecimal;
-import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
+import com.dreamparking.backend.common.openai.OpenAiResponses;
+import com.dreamparking.backend.common.openai.OpenAiResponses.OpenAiResponsesException;
 import com.dreamparking.backend.identity.ocr.DocumentPhoto;
 
 /**
@@ -83,10 +79,7 @@ public class OpenAiLivenessClient implements LivenessClient {
 		this.apiKey = apiKey;
 		this.model = model;
 		this.reasoningEffort = reasoningEffort;
-		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
-				HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build());
-		factory.setReadTimeout(timeout);
-		this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
+		this.http = OpenAiResponses.restClient(baseUrl, timeout);
 	}
 
 	@Override
@@ -102,21 +95,14 @@ public class OpenAiLivenessClient implements LivenessClient {
 		if (apiKey.isBlank()) {
 			throw new LivenessException("Liveness API key is not configured");
 		}
-		ResponsesApiResponse response;
+		String text;
 		try {
-			response = http.post()
-				.uri("/responses")
-				.header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-				.contentType(MediaType.APPLICATION_JSON)
-				.body(requestBody(selfie))
-				.retrieve()
-				.body(ResponsesApiResponse.class);
+			text = OpenAiResponses.textOf(http, apiKey, requestBody(selfie), "provider refused to assess the selfie",
+					"provider returned no assessment");
 		}
-		catch (RestClientException ex) {
-			// Includes timeouts, connection errors and HTTP 4xx/5xx (401 = wrong key, 429 = rate or budget limit).
-			throw new LivenessException("provider error: " + ex.getClass().getSimpleName(), ex);
+		catch (OpenAiResponsesException ex) {
+			throw new LivenessException(ex.getMessage(), ex.getCause());
 		}
-		String text = outputText(response);
 		try {
 			return JSON.readValue(text, ModelOutput.class).toResult();
 		}
@@ -128,38 +114,8 @@ public class OpenAiLivenessClient implements LivenessClient {
 	Map<String, Object> requestBody(DocumentPhoto selfie) {
 		List<Map<String, Object>> content = List.of(Map.of("type", "input_text", "text", "Selfie of the customer:"),
 				Map.of("type", "input_image", "image_url", selfie.dataUrl(), "detail", "high"));
-		Map<String, Object> body = new LinkedHashMap<>();
-		body.put("model", model);
-		body.put("store", false);
-		body.put("instructions", INSTRUCTIONS);
-		body.put("input", List.of(Map.of("role", "user", "content", content)));
-		body.put("reasoning", Map.of("effort", reasoningEffort));
-		body.put("max_output_tokens", MAX_OUTPUT_TOKENS);
-		body.put("text", Map.of("format",
-				Map.of("type", "json_schema", "name", "liveness_assessment", "strict", true, "schema", SCHEMA)));
-		return body;
-	}
-
-	/** The JSON text of the answer; a refusal or an incomplete answer is a provider error. */
-	private static String outputText(ResponsesApiResponse response) throws LivenessException {
-		if (response == null) {
-			throw new LivenessException("provider returned no data");
-		}
-		if (!"completed".equals(response.status())) {
-			String reason = response.incompleteDetails() == null ? "" : " (" + response.incompleteDetails().reason() + ")";
-			throw new LivenessException("provider response is " + response.status() + reason);
-		}
-		for (OutputItem item : response.output() == null ? List.<OutputItem>of() : response.output()) {
-			for (OutputContent part : item.content() == null ? List.<OutputContent>of() : item.content()) {
-				if ("refusal".equals(part.type())) {
-					throw new LivenessException("provider refused to assess the selfie");
-				}
-				if ("output_text".equals(part.type()) && part.text() != null) {
-					return part.text();
-				}
-			}
-		}
-		throw new LivenessException("provider returned no assessment");
+		return OpenAiResponses.body(model, INSTRUCTIONS, reasoningEffort, MAX_OUTPUT_TOKENS, content, "liveness_assessment",
+				SCHEMA);
 	}
 
 	private static Map<String, Object> schema() {
@@ -168,23 +124,6 @@ public class OpenAiLivenessClient implements LivenessClient {
 		properties.put("confidence", Map.of("type", "number"));
 		return Map.of("type", "object", "additionalProperties", false, "required", List.copyOf(properties.keySet()),
 				"properties", properties);
-	}
-
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	record ResponsesApiResponse(String status, List<OutputItem> output,
-			@JsonProperty("incomplete_details") IncompleteDetails incompleteDetails) {
-	}
-
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	record IncompleteDetails(String reason) {
-	}
-
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	record OutputItem(String type, List<OutputContent> content) {
-	}
-
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	record OutputContent(String type, String text) {
 	}
 
 	/** The answer as the schema defines it; checked again here, since a model can still be wrong. */

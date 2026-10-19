@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.dreamparking.backend.identity.entity.EncryptedImage;
 import com.dreamparking.backend.identity.ocr.DocumentPhoto;
 import com.dreamparking.backend.identity.service.DocumentCipher;
 import com.dreamparking.backend.identity.service.IdentityDocumentService;
@@ -88,8 +89,8 @@ public class LivenessService {
 		BigDecimal confidence = result == null ? null : result.confidence();
 
 		LivenessCheck check = checks.findById(requestId).orElseGet(() -> new LivenessCheck(request));
-		check.record(status, client.provider(), confidence, failure, selfie.contentType(), sealed.iv(),
-				sealed.ciphertext(), sealed.keyVersion(), sha256(content), content.length, now);
+		check.record(status, client.provider(), confidence, failure, new EncryptedImage(selfie.contentType(), sealed.iv(),
+				sealed.ciphertext(), sealed.keyVersion(), sha256(content), content.length), now);
 		checks.save(check);
 
 		onboardingService.recordLivenessChecked(request, status);

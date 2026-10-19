@@ -22,6 +22,7 @@ import com.dreamparking.backend.common.exception.InvalidStateException;
 import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.identity.dto.ConfirmIdentityDocumentRequest;
 import com.dreamparking.backend.identity.dto.IdentityDocumentResponse;
+import com.dreamparking.backend.identity.entity.EncryptedImage;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
 import com.dreamparking.backend.identity.entity.IdentityDocumentImage;
 import com.dreamparking.backend.identity.entity.enums.DocumentSide;
@@ -211,8 +212,8 @@ public class IdentityDocumentService {
 				IdentityDocumentImage.associatedData(request.getId(), side));
 		IdentityDocumentImage image = images.findByRequestIdAndSide(request.getId(), side)
 			.orElseGet(() -> new IdentityDocumentImage(request, side));
-		image.store(photo.contentType(), sealed.iv(), sealed.ciphertext(), sealed.keyVersion(), sha256(content),
-				content.length, now);
+		image.store(new EncryptedImage(photo.contentType(), sealed.iv(), sealed.ciphertext(), sealed.keyVersion(),
+				sha256(content), content.length), now);
 		images.save(image);
 	}
 
@@ -221,9 +222,10 @@ public class IdentityDocumentService {
 	public Photo photo(UUID requestId, DocumentSide side) {
 		IdentityDocumentImage image = images.findByRequestIdAndSide(requestId, side)
 			.orElseThrow(() -> new NotFoundException("Request " + requestId + " has no " + side + " photo of its DUI"));
-		byte[] content = cipher.decrypt(image.getIv(), image.getCiphertext(), image.getKeyVersion(),
+		EncryptedImage stored = image.getImage();
+		byte[] content = cipher.decrypt(stored.getIv(), stored.getCiphertext(), stored.getKeyVersion(),
 				IdentityDocumentImage.associatedData(requestId, side));
-		return new Photo(image.getContentType(), content);
+		return new Photo(stored.getContentType(), content);
 	}
 
 	/** Checks the photo is a JPEG or PNG by its first bytes; the declared content type is not trusted. */

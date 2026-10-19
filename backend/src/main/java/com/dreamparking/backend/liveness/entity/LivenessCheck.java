@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -16,10 +17,9 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
 
+import com.dreamparking.backend.identity.entity.EncryptedImage;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 
 /**
@@ -57,24 +57,8 @@ public class LivenessCheck {
 	@Column(name = "failure", length = 250)
 	private String failure;
 
-	@Column(name = "content_type", nullable = false, length = 20)
-	private String contentType;
-
-	@Column(name = "ciphertext", nullable = false)
-	private byte[] ciphertext;
-
-	@Column(name = "iv", nullable = false)
-	private byte[] iv;
-
-	@Column(name = "key_version", nullable = false)
-	private short keyVersion;
-
-	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(name = "sha256", nullable = false, length = 64)
-	private String sha256;
-
-	@Column(name = "size_bytes", nullable = false)
-	private int sizeBytes;
+	@Embedded
+	private EncryptedImage selfie;
 
 	@Column(name = "checked_at", nullable = false)
 	private Instant checkedAt;
@@ -101,19 +85,13 @@ public class LivenessCheck {
 
 	/** Records an attempt: replaces the answer and the selfie, and counts one more try. */
 	public void record(LivenessStatus status, String provider, BigDecimal confidence, String failure,
-			String contentType, byte[] iv, byte[] ciphertext, short keyVersion, String sha256, int sizeBytes,
-			Instant now) {
+			EncryptedImage selfie, Instant now) {
 		this.attempts = (short) (this.attempts + 1);
 		this.status = status;
 		this.provider = provider;
 		this.confidence = confidence;
 		this.failure = failure == null || failure.length() <= 250 ? failure : failure.substring(0, 250);
-		this.contentType = contentType;
-		this.iv = iv.clone();
-		this.ciphertext = ciphertext.clone();
-		this.keyVersion = keyVersion;
-		this.sha256 = sha256;
-		this.sizeBytes = sizeBytes;
+		this.selfie = selfie;
 		this.checkedAt = now;
 	}
 
@@ -145,28 +123,8 @@ public class LivenessCheck {
 		return failure;
 	}
 
-	public String getContentType() {
-		return contentType;
-	}
-
-	public byte[] getCiphertext() {
-		return ciphertext.clone();
-	}
-
-	public byte[] getIv() {
-		return iv.clone();
-	}
-
-	public short getKeyVersion() {
-		return keyVersion;
-	}
-
-	public String getSha256() {
-		return sha256;
-	}
-
-	public int getSizeBytes() {
-		return sizeBytes;
+	public EncryptedImage getSelfie() {
+		return selfie;
 	}
 
 	public Instant getCheckedAt() {

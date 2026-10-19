@@ -26,6 +26,7 @@ import com.dreamparking.backend.customer.service.CustomerService;
 import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
+import com.dreamparking.backend.liveness.entity.LivenessStatus;
 import com.dreamparking.backend.onboarding.dto.BasicDataRequest;
 import com.dreamparking.backend.onboarding.dto.ExpectedActivityRequest;
 import com.dreamparking.backend.onboarding.dto.IncomeDeclarationRequest;
@@ -172,6 +173,14 @@ public class OnboardingService {
 		};
 		recordEvent(request, RequestEventType.IDENTITY_DOCUMENT_CAPTURED, description,
 				Map.of("ocrStatus", ocrStatus.name()));
+	}
+
+	/** The selfie of the request went through the liveness check (VDI-114); the confidence stays in the file, not in the timeline. */
+	@Transactional
+	public void recordLivenessChecked(OnboardingRequest request, LivenessStatus status) {
+		String description = status == LivenessStatus.CHECKED ? "Prueba de vida realizada"
+				: "Prueba de vida capturada; el proveedor no estuvo disponible";
+		recordEvent(request, RequestEventType.LIVENESS_CHECKED, description, Map.of("livenessStatus", status.name()));
 	}
 
 	/** The customer tried to confirm an expired DUI or dates that do not agree; the step does not advance. */

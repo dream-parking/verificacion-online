@@ -1825,6 +1825,22 @@
         "required" : [ "textHash", "version" ],
         "type" : "object"
       },
+      "PublishScoreModelVersionRequest" : {
+        "properties" : {
+          "lowMax" : {
+            "description" : "Último puntaje del nivel Bajo (entero, desde 0)",
+            "example" : 39,
+            "type" : "number"
+          },
+          "mediumMax" : {
+            "description" : "Último puntaje del nivel Medio (entero, menor que 100). Arriba de este valor el nivel es Alto y la solicitud pasa a revisión reforzada",
+            "example" : 69,
+            "type" : "number"
+          }
+        },
+        "required" : [ "lowMax", "mediumMax" ],
+        "type" : "object"
+      },
       "PublishScoreRuleVersionRequest" : {
         "properties" : {
           "status" : {
@@ -2186,6 +2202,9 @@
           "high" : {
             "$ref" : "#/components/schemas/Range"
           },
+          "inForce" : {
+            "type" : "boolean"
+          },
           "low" : {
             "$ref" : "#/components/schemas/Range"
           },
@@ -2195,7 +2214,14 @@
           "name" : {
             "type" : "string"
           },
+          "publishedBy" : {
+            "type" : "string"
+          },
           "validFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "validTo" : {
             "format" : "date-time",
             "type" : "string"
           },
@@ -3391,6 +3417,123 @@
         } ],
         "summary" : "Publica una versión nueva del aviso de privacidad",
         "tags" : [ "Consola · Administración de catálogos" ]
+      }
+    },
+    "/api/console/admin/score-model/versions" : {
+      "get" : {
+        "description" : "Cada versión trae sus umbrales, quién la publicó (`publishedBy`, vacío si la publicó una migración) y cuándo (`validFrom`). La vigente es la que no tiene `validTo` (`inForce: true`).",
+        "operationId" : "scoreModelAdminVersions",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ScoreModelResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Versiones, de la más reciente a la más antigua"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Historial de versiones del modelo de score",
+        "tags" : [ "Consola · Administración del modelo de score" ]
+      },
+      "post" : {
+        "description" : "Copia los pesos de la versión vigente, la cierra y aplica los umbrales nuevos a las evaluaciones siguientes, sin desplegar código. Las evaluaciones ya hechas conservan la versión con la que se calcularon. Los umbrales deben ser enteros con 0 ≤ `lowMax` < `mediumMax` < 100.",
+        "operationId" : "scoreModelAdminPublish",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PublishScoreModelVersionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ScoreModelResponse"
+                }
+              }
+            },
+            "description" : "Versión publicada"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Umbral inválido o sin cambios: `errors` dice por qué, en español, y no se guarda nada"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No hay un modelo vigente, o el vigente empieza en el futuro"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Publica una versión nueva del modelo de score con otros umbrales",
+        "tags" : [ "Consola · Administración del modelo de score" ]
       }
     },
     "/api/console/admin/score-rules/{code}/versions" : {
@@ -5888,6 +6031,9 @@
   }, {
     "description" : "Cuentas abiertas a partir de solicitudes enviadas",
     "name" : "Consola · Cuentas"
+  }, {
+    "description" : "Umbrales y versiones del modelo de score (administradores)",
+    "name" : "Consola · Administración del modelo de score"
   }, {
     "description" : "Catálogos de la app y aviso de privacidad (administradores)",
     "name" : "Consola · Administración de catálogos"

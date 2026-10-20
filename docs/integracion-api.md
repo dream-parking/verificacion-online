@@ -75,12 +75,24 @@ Reglas:
 | `GET /requests/{id}` (DUI leído y confirmado con los campos corregidos, ingresos, movimiento, score con el aporte de cada señal, señales, pasos, línea de tiempo): sin caché; cada consulta queda en la auditoría de accesos (`VIEW_REQUEST_DETAIL`) | cualquiera | VDI-44, 49, 53, 56, 81, 109 |
 | `GET /requests/{id}/identity-document/{side}` (`FRONT` o `BACK`): la foto descifrada, sin caché; cada consulta queda en la auditoría de accesos | cualquiera | VDI-80, VDI-81 |
 | `GET /score-model` (rangos y pesos del modelo vigente) | cualquiera | VDI-82 |
+| `GET /admin/score-model/versions` (historial de versiones del modelo: umbrales, `publishedBy`, `validFrom`, `validTo` e `inForce`) | `ADMIN` | VDI-120 |
+| `POST /admin/score-model/versions` con `{ lowMax, mediumMax }` (publica una versión nueva con los umbrales nuevos y los pesos de la vigente) | `ADMIN` | VDI-120 |
 | `GET /score-rules` (reglas vigentes; R-01 está retirada) | cualquiera | VDI-57 |
 | `GET /alerts?status=&assigneeId=&account=&from=&to=` | cualquiera | VDI-62 |
 | `POST /alerts/{id}/take` (la toma el usuario de la sesión) | `FRAUD_ANALYST`, `ADMIN` | VDI-61 |
 | `GET /auth/me`, `POST /auth/change-password` | cualquiera | |
 | `GET /users` (activos; `includeInactive=true` solo `ADMIN`) | cualquiera | |
 | `POST /users`, `PUT /users/{id}`, `POST /users/{id}/password` | `ADMIN` | |
+
+### Umbrales del score configurables (VDI-120)
+
+Un administrador cambia dónde terminan los niveles del score sin desplegar código: `POST /api/console/admin/score-model/versions` con `{ "lowMax": 39, "mediumMax": 69 }` (fin del nivel Bajo y fin del nivel Medio; arriba de `mediumMax` el nivel es Alto y, con VDI-117, la solicitud pasa a revisión reforzada).
+
+- **Nunca se edita una versión.** El cambio cierra la versión vigente (`validTo`), publica la siguiente copiando sus pesos y se aplica a las evaluaciones que vengan después. Las evaluaciones ya hechas conservan la versión con la que se calcularon (`modelVersion`).
+- **Validación:** enteros con 0 ≤ `lowMax` < `mediumMax` < 100, y distintos de los vigentes. Si no se cumple responde `400` con `errors` por campo (`lowMax`, `mediumMax`) y un mensaje en español, y no se guarda nada.
+- **Bitácora:** cada versión guarda quién la publicó (`publishedBy`, el nombre del usuario de la consola; vacío en las versiones publicadas por una migración) y cuándo (`validFrom`). `GET /api/console/admin/score-model/versions` las devuelve de la más reciente a la más antigua, con la vigente en `inForce: true`. Cada publicación también queda en la auditoría de accesos (`SCORE_MODEL_PUBLISH`).
+- **Permisos:** solo `ADMIN`; un analista recibe `403` (puede seguir leyendo el modelo vigente con `GET /api/console/score-model`).
+- **Pesos:** este endpoint no los cambia. Un cambio de pesos es una versión publicada por una migración, como el v2 de VDI-115.
 
 ## Usuarios y primer acceso
 

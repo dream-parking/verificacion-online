@@ -134,6 +134,25 @@ class LivenessApiTests {
 	}
 
 	@Test
+	void theLivenessConfidenceCountsInTheScoreOfTheRequest() throws Exception {
+		when(liveness.check(any())).thenReturn(new LivenessResult(new BigDecimal("0.20")));
+		String id = startRequest();
+		upload(id, SELFIE, "image/jpeg").andExpect(status().isOk());
+
+		perform(put("/api/onboarding/requests/{id}/expected-activity", id)
+			.content("{\"transactionTypeCode\": \"PAGO_SALARIO\", \"monthlyAmountRangeCode\": \"HASTA_200\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.modelVersion").value(2))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].points").value(8))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].maxPoints").value(10))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].observation")
+				.value("Confianza de la prueba de vida: 20 %"))
+			// no signal rejects by itself: the worst liveness only moves the score, and the request goes on
+			.andExpect(jsonPath("$.score").value(8))
+			.andExpect(jsonPath("$.level").value("LOW"));
+	}
+
+	@Test
 	void rejectsAnEmptyOrNonImageSelfie() throws Exception {
 		String id = startRequest();
 

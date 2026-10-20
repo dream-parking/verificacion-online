@@ -226,7 +226,8 @@ public class ConsoleRequestService {
 					e.getOccurredAt()))
 			.toList();
 
-		return new ConsoleRequestDetail(request.getId(), request.getNumber(), request.getStatus(),
+		return new ConsoleRequestDetail(request.getId(), request.getNumber(),
+				request.getCustomer() == null ? null : request.getCustomer().getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
 				request.getSubmittedAt(), applicant, consent, identityDocument, income, expectedActivity, risk,
 				riskDecisions.log(requestId), rnpn, signalsView, stepTimes, timeline);

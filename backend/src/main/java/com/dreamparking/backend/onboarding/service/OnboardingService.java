@@ -348,6 +348,10 @@ public class OnboardingService {
 		request.setSubmittedAt(now);
 		recordEvent(request, RequestEventType.REQUEST_SUBMITTED, "Solicitud enviada",
 				Map.of("number", request.getNumber()));
+		// The customer gets their permanent number with the first request they submit; a customer that has one keeps it.
+		if (request.getCustomer() != null) {
+			customerService.assignNumber(request.getCustomer().getId());
+		}
 		if (rnpnAnswer != null) {
 			recordRnpnCheck(request, rnpnAnswer);
 		}

@@ -31,11 +31,12 @@ import com.dreamparking.backend.rnpn.entity.enums.RnpnOutcome;
  * {@code expectedActivity}, {@code risk} and {@code signals} are null until the customer reaches that point of the flow.
  * {@code riskDecisions} is the audit log of the decisions taken when the request was submitted (VDI-117), the oldest
  * first; it is empty until then. {@code rnpn} is the last check of the DUI data against the RNPN (VDI-111), null until
- * the request is submitted.
+ * the request is submitted. {@code customerNumber} is the customer number of the applicant (CLI-0000001, VDI-122), null
+ * until the customer submits the first request.
  */
-public record ConsoleRequestDetail(UUID id, String number, RequestStatus status, short completedSteps,
-		RiskLevel riskLevel, Instant startedAt, Instant submittedAt, Applicant applicant, Consent consent,
-		IdentityDocument identityDocument, Income income, ExpectedActivity expectedActivity,
+public record ConsoleRequestDetail(UUID id, String number, String customerNumber, RequestStatus status,
+		short completedSteps, RiskLevel riskLevel, Instant startedAt, Instant submittedAt, Applicant applicant,
+		Consent consent, IdentityDocument identityDocument, Income income, ExpectedActivity expectedActivity,
 		RiskAssessmentResponse risk, List<RiskDecisionResponse> riskDecisions, Rnpn rnpn, Signals signals,
 		List<StepTime> steps, List<TimelineEntry> timeline) {
 

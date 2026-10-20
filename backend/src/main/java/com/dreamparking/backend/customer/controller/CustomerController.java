@@ -2,6 +2,9 @@ package com.dreamparking.backend.customer.controller;
 
 import java.util.UUID;
 
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,6 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.dreamparking.backend.common.validation.Dui;
 import com.dreamparking.backend.customer.dto.CustomerResponse;
+import com.dreamparking.backend.customer.dto.CustomerRiskHistoryResponse;
+import com.dreamparking.backend.customer.service.CustomerRiskService;
 import com.dreamparking.backend.customer.service.CustomerService;
 
 @RestController
@@ -26,8 +31,11 @@ public class CustomerController {
 
 	private final CustomerService customerService;
 
-	public CustomerController(CustomerService customerService) {
+	private final CustomerRiskService customerRiskService;
+
+	public CustomerController(CustomerService customerService, CustomerRiskService customerRiskService) {
 		this.customerService = customerService;
+		this.customerRiskService = customerRiskService;
 	}
 
 	@ApiResponse(responseCode = "200", description = "Cliente")
@@ -36,6 +44,17 @@ public class CustomerController {
 	@GetMapping("/{customerId}")
 	public CustomerResponse get(@PathVariable UUID customerId) {
 		return customerService.get(customerId);
+	}
+
+	@ApiResponse(responseCode = "200", description = "Señales de riesgo del cliente")
+	@Operation(summary = "Señales de riesgo de un cliente, por su número de cliente",
+			description = "Formato CLI-0000001. Por cada solicitud del cliente, de la más antigua a la más reciente, trae "
+					+ "las evaluaciones del score y las decisiones de revisión reforzada.")
+	@ApiResponse(responseCode = "404", description = "No hay cliente con ese número", content = @Content)
+	@GetMapping("/risk-history")
+	public CustomerRiskHistoryResponse riskHistory(
+			@RequestParam @Pattern(regexp = "CLI-[0-9]{7,}") @Size(max = 20) String number) {
+		return customerRiskService.byNumber(number);
 	}
 
 	@ApiResponse(responseCode = "200", description = "Cliente")

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
+import { RiskDecisionLog } from "@/components/console/RiskDecisionLog";
 import { LocationMap } from "./LocationMap";
 import { DocumentPhotos } from "./DocumentPhotos";
 import { ProfileVersions } from "./ProfileVersions";
@@ -15,6 +16,7 @@ import {
   formatDate,
   formatDateTime,
   formatTime,
+  isSubmitted,
   deviceLocationText,
   locationFailureText,
   minSec,
@@ -119,7 +121,8 @@ export function RequestDetailView({ id }: { id: string }) {
   const name = [r.applicant?.firstNames, r.applicant?.lastNames].filter(Boolean).join(" ") || "Sin nombre aún";
   const risk = RISK[r.riskLevel];
   const status = REQUEST_STATUS[r.status];
-  const sent = r.status === "COMPLETED" && r.submittedAt;
+  const sent = isSubmitted(r.status) && r.submittedAt;
+  const lastDecision = r.riskDecisions?.at(-1);
   const s = r.signals;
 
   const score = r.risk?.score;
@@ -248,6 +251,23 @@ export function RequestDetailView({ id }: { id: string }) {
         </div>
       </div>
 
+      {r.status === "ENHANCED_REVIEW" && (
+        <div role="alert" className="flex items-start gap-3 border border-[#7a4b00] bg-[#fff0c2] px-4 py-3 text-[15px] leading-[22px] text-[#3d2600]">
+          <span aria-hidden="true" className="text-lg leading-[22px]">
+            ⚑
+          </span>
+          <span>
+            <strong>Solicitud en revisión reforzada.</strong> No se aprueba en automático: una persona debe revisarla antes
+            de abrir la cuenta.
+            {lastDecision?.decision === "ENHANCED_REVIEW" &&
+              ` El score ${lastDecision.score} supera el umbral de ${lastDecision.threshold} (modelo de score v${lastDecision.modelVersion}).`}{" "}
+            <a href="#h-decisiones" className="font-semibold underline">
+              Ver decisiones
+            </a>
+          </span>
+        </div>
+      )}
+
       <div className="anim-stagger flex flex-wrap items-start gap-5">
         <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-5">
           <Card id="h-basicos" title="Datos básicos">
@@ -326,6 +346,14 @@ export function RequestDetailView({ id }: { id: string }) {
           </Card>
         </div>
       </div>
+
+      <Card
+        id="h-decisiones"
+        title="Decisiones"
+        help="Bitácora de lo que decidió la regla de riesgo al enviar la solicitud. Es de solo lectura: ninguna decisión se edita ni se borra."
+      >
+        <RiskDecisionLog decisions={r.riskDecisions} />
+      </Card>
 
       <Card
         id="h-perfil"

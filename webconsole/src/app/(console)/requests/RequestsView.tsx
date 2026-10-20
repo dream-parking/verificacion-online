@@ -150,6 +150,7 @@ export function RequestsView() {
             { value: "IN_PROGRESS", label: "En progreso" },
             { value: "COMPLETED", label: "Completada" },
             { value: "ENHANCED_REVIEW", label: "Revisión reforzada" },
+            { value: "AWAITING_RNPN", label: "En espera" },
             { value: "ABANDONED", label: "Abandonada" },
           ]}
         />

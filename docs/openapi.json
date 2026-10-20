@@ -1148,7 +1148,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1485,6 +1485,22 @@
           }
         },
         "required" : [ "rangeCode", "sourceCode" ],
+        "type" : "object"
+      },
+      "LivenessCheckResponse" : {
+        "properties" : {
+          "attempts" : {
+            "description" : "Pruebas hechas en esta solicitud",
+            "example" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "description" : "`CHECKED`: la prueba se hizo. `FAILED`: el proveedor no está disponible; la solicitud sigue y esta señal no cuenta en el score",
+            "enum" : [ "CHECKED", "FAILED" ],
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "LoginRequest" : {
@@ -5453,6 +5469,91 @@
           }
         },
         "summary" : "Paso 2: declara fuente y rango de ingresos",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}/liveness" : {
+      "put" : {
+        "description" : "Multipart con `selfie`, JPEG o PNG de hasta 5 MB. Guarda la selfie cifrada en el expediente y registra el nivel de confianza (de 0 a 1) que da el proveedor; ese número no se devuelve a la app, lo usan el score y la consola. Si el proveedor no está disponible responde `status: FAILED` y la solicitud sigue: esa señal no suma ni resta. Se puede repetir mientras la solicitud está en progreso; cada intento cuenta en `attempts`.",
+        "operationId" : "livenessCheck",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "selfie" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "selfie" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LivenessCheckResponse"
+                }
+              }
+            },
+            "description" : "La prueba quedó registrada en el expediente"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta la selfie, está vacía o no es JPEG ni PNG"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud ya no está en progreso"
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La selfie pasa de 5 MB"
+          }
+        },
+        "summary" : "Prueba de vida: selfie de la persona",
         "tags" : [ "Onboarding" ]
       }
     },

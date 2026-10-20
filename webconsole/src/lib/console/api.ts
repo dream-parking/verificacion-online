@@ -175,6 +175,8 @@ export type RnpnCheck = {
 export type RequestDetail = {
   id: string;
   number: string | null;
+  /** Customer number such as CLI-0000001 (VDI-122). Null until the first request of the customer is submitted. */
+  customerNumber?: string | null;
   status: RequestStatus;
   riskLevel: RiskLevel;
   completedSteps: number;

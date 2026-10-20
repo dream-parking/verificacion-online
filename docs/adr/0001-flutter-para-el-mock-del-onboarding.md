@@ -20,11 +20,15 @@ cambiar de tecnología después implicaría reescribirlo.
 ## Consecuencias
 + Un solo código para Android e iOS: los avances se muestran en ambos
   sistemas sin trabajo duplicado.
+
 + El proyecto (`onboarding/`) ya incluye las carpetas `android` e `ios`,
   listo para correr en ambas plataformas.
+
 − Es difícil dar marcha atrás: cambiar de tecnología implica reescribir
   el mock.
+
 − El código del mock no se reutiliza directamente si la banca móvil real
   usa otra tecnología.
+
 − El equipo debe mantener el toolchain de Flutter y de ambos sistemas
   (Android Studio y Xcode).

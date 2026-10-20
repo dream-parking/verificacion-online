@@ -19,8 +19,11 @@ export type DeviceLocationStatus = "AVAILABLE" | "DENIED" | "UNAVAILABLE";
 
 export type Role = "KYC_LEAD" | "FRAUD_ANALYST" | "ADMIN";
 export type RiskLevel = "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
-/** ENHANCED_REVIEW: submitted, but the score went above the threshold, so it is not approved automatically (VDI-117). */
-export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "ABANDONED";
+/**
+ * ENHANCED_REVIEW: submitted, but the score went above the threshold (VDI-117). AWAITING_RNPN: submitted, but the RNPN
+ * did not answer after the retries (VDI-111). Neither is approved automatically.
+ */
+export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
 export type Criticality = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type AlertStatus = "UNASSIGNED" | "ASSIGNED" | "IN_REVIEW" | "CLOSED";
 export type Step = "PRIVACY_NOTICE" | "BASIC_DATA" | "IDENTITY_DOCUMENT" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
@@ -153,6 +156,22 @@ export type RiskDecision = {
   decidedAt: string;
 };
 
+export type RnpnOutcome = "MATCH" | "NO_MATCH" | "UNAVAILABLE";
+export type RnpnField = "DUI" | "FIRST_NAMES" | "LAST_NAMES" | "BIRTH_DATE";
+
+/**
+ * Last check of the confirmed DUI data against the RNPN (VDI-111). `simulated` is true while the RNPN is the stand-in
+ * service; `mismatchedFields` is empty unless the outcome is NO_MATCH; `attempts` also counts the unanswered tries.
+ */
+export type RnpnCheck = {
+  outcome: RnpnOutcome;
+  simulated: boolean;
+  provider: string | null;
+  attempts: number;
+  mismatchedFields: RnpnField[] | null;
+  checkedAt: string;
+};
+
 export type RequestDetail = {
   id: string;
   number: string | null;
@@ -186,6 +205,8 @@ export type RequestDetail = {
   risk: Assessment | null;
   /** Audit log of risk decisions, oldest first. Missing in older API versions. */
   riskDecisions?: RiskDecision[] | null;
+  /** Null until the request is submitted; missing in older API versions. */
+  rnpn?: RnpnCheck | null;
   signals: {
     ip: string | null;
     approximateLocation: string | null;

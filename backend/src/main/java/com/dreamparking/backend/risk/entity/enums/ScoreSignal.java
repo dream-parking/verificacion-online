@@ -1,8 +1,8 @@
 package com.dreamparking.backend.risk.entity.enums;
 
 /**
- * A signal the score model combines. {@link #CITY}, {@link #RNPN}, {@link #LIVENESS} and {@link #INTERNAL_LISTS} are
- * not available yet: they show up in the breakdown as such and add nothing to the score.
+ * A signal the score model combines. {@link #CITY}, {@link #RNPN} and {@link #INTERNAL_LISTS} are not available
+ * yet: they show up in the breakdown as such and add nothing to the score.
  */
 public enum ScoreSignal {
 

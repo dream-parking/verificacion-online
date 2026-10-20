@@ -17,11 +17,38 @@ class SimulatedLivenessClientTests {
 
 	@Test
 	void alwaysAnswersTheConfiguredConfidence() {
-		SimulatedLivenessClient client = new SimulatedLivenessClient(new BigDecimal("0.35"));
+		SimulatedLivenessClient client = new SimulatedLivenessClient(new BigDecimal("0.35"), "");
 
 		assertThat(client.check(SELFIE).confidence()).isEqualByComparingTo("0.35");
 		assertThat(client.check(SELFIE).confidence()).isEqualByComparingTo("0.35");
 		assertThat(client.provider()).isEqualTo("simulated");
+	}
+
+	@Test
+	void withAProblemConfiguredEverySelfieIsUnusableForThatReason() {
+		SimulatedLivenessClient client = new SimulatedLivenessClient(new BigDecimal("0.90"), " TOO_DARK ");
+
+		LivenessResult result = client.check(SELFIE);
+
+		assertThat(result.isUsable()).isFalse();
+		assertThat(result.problem()).isEqualTo(SelfieProblem.TOO_DARK);
+		assertThat(result.confidence()).isNull();
+		assertThat(new SimulatedLivenessClient(new BigDecimal("0.90"), null).check(SELFIE).isUsable()).isTrue();
+	}
+
+	@Test
+	void anUnknownProblemStopsTheApplicationAtStart() {
+		assertThatThrownBy(() -> new SimulatedLivenessClient(new BigDecimal("0.90"), "NO_SUCH_PROBLEM"))
+			.isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
+	void aSelfieThatCannotBeJudgedHasNoConfidenceEvenIfOneIsGiven() {
+		LivenessResult result = new LivenessResult(new BigDecimal("0.9"), SelfieProblem.BLURRY);
+
+		assertThat(result.confidence()).isNull();
+		assertThat(result.isUsable()).isFalse();
+		assertThatThrownBy(() -> LivenessResult.unusable(null)).isInstanceOf(NullPointerException.class);
 	}
 
 	@Test

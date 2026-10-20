@@ -37,11 +37,15 @@ public class LivenessController {
 					+ "registra el nivel de confianza (de 0 a 1) que da el proveedor; ese número no se devuelve a la app, "
 					+ "lo usan el score y la consola. Si el proveedor no está disponible responde `status: FAILED` y la "
 					+ "solicitud sigue: esa señal no suma ni resta. Se puede repetir mientras la solicitud está en "
-					+ "progreso; cada intento cuenta en `attempts`.")
+					+ "progreso; cada intento cuenta en `attempts`. Si la foto no sirve por cómo se tomó (poca luz, borrosa, sin "
+					+ "rostro visible…) responde 422 con el motivo y no se guarda nada; nunca da motivos de sospecha.")
 	@ApiResponse(responseCode = "400", description = "Falta la selfie, está vacía o no es JPEG ni PNG", content = @Content)
 	@ApiResponse(responseCode = "404", description = "La solicitud no existe", content = @Content)
 	@ApiResponse(responseCode = "409", description = "La solicitud ya no está en progreso", content = @Content)
 	@ApiResponse(responseCode = "413", description = "La selfie pasa de 5 MB", content = @Content)
+	@ApiResponse(responseCode = "422", description = "La selfie no se puede juzgar por cómo se tomó: `reason` dice por qué "
+			+ "(BLURRY, TOO_DARK, GLARE, FACE_NOT_VISIBLE, MULTIPLE_FACES, OTHER) y la app pide repetirla. No se guarda ni "
+			+ "cuenta como intento", content = @Content)
 	@PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public LivenessCheckResponse check(@PathVariable UUID requestId, @RequestPart("selfie") MultipartFile selfie) {
 		return service.check(requestId, bytes(selfie));

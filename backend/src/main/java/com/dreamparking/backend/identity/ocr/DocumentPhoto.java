@@ -27,7 +27,7 @@ public final class DocumentPhoto {
 	}
 
 	/** {@code data:} URL, the way the provider receives inline images. */
-	String dataUrl() {
+	public String dataUrl() {
 		return "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(content);
 	}
 

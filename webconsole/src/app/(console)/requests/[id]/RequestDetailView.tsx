@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
 import { LocationMap } from "./LocationMap";
 import { DocumentPhotos } from "./DocumentPhotos";
-import { DuiDataTable } from "./DuiDataTable";
 import { ProfileVersions } from "./ProfileVersions";
+import { DuiDataTable } from "./DuiDataTable";
 import { errorMessage, useLoad } from "@/lib/console/hooks";
 import { apiFetch, type RequestDetail } from "@/lib/console/api";
 import {

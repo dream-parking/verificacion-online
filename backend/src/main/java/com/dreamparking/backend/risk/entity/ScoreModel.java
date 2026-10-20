@@ -79,6 +79,15 @@ public class ScoreModel {
 		return weight == null ? null : weight.intValue();
 	}
 
+	/** Score above which a submitted request is held for enhanced review: where the high range begins (VDI-117). */
+	public short reviewThreshold() {
+		return mediumMax;
+	}
+
+	public boolean requiresEnhancedReview(int score) {
+		return score > mediumMax;
+	}
+
 	/** Risk level of a score: low up to {@code lowMax}, medium up to {@code mediumMax}, high above that. */
 	public RiskLevel levelOf(int score) {
 		if (score <= lowMax) {

@@ -352,6 +352,7 @@
   .s-progress { background: #f4f4f4; color: #4a4a4a; border-color: #989696; }
   .s-abandoned { background: #fbeaea; color: #8c1d18; border-color: #8c1d18; }
   .s-enhanced { background: #fff0c2; color: #5c3900; border-color: #7a4b00; }
+  .s-waiting { background: #e3edf8; color: #00448c; border: 1px dashed #00448c; }
 
   /* Key / value pairs */
   .kv {

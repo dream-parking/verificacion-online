@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
 import { RiskDecisionLog } from "@/components/console/RiskDecisionLog";
+import { RnpnCheckCard } from "@/components/console/RnpnCheckCard";
 import { LocationMap } from "./LocationMap";
 import { DocumentPhotos } from "./DocumentPhotos";
 import { ProfileVersions } from "./ProfileVersions";
@@ -291,7 +292,7 @@ export function RequestDetailView({ id }: { id: string }) {
           </Card>
         </div>
 
-        <div className="min-w-0 flex-[1_1_420px]">
+        <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-5">
           <Card id="h-score" title="Score de riesgo">
             <div className="mb-3 flex flex-wrap items-center gap-3">
               {score != null && (
@@ -343,6 +344,14 @@ export function RequestDetailView({ id }: { id: string }) {
             {r.risk?.evaluatedAt && (
               <p className="mt-3 mb-0 text-sm text-muted">Evaluado el {formatDateTime(r.risk.evaluatedAt)}</p>
             )}
+          </Card>
+
+          <Card
+            id="h-rnpn"
+            title="Cotejo RNPN"
+            help="Los datos del DUI que confirmó la persona, comparados con el Registro Nacional de las Personas Naturales."
+          >
+            <RnpnCheckCard check={r.rnpn} />
           </Card>
         </div>
       </div>

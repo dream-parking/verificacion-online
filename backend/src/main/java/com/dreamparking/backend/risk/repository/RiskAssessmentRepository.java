@@ -1,5 +1,6 @@
 package com.dreamparking.backend.risk.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,6 +13,9 @@ import com.dreamparking.backend.risk.entity.RiskAssessment;
 public interface RiskAssessmentRepository extends JpaRepository<RiskAssessment, Long> {
 
 	Optional<RiskAssessment> findByRequestIdAndCurrentTrue(UUID requestId);
+
+	/** Every assessment of every request of the customer, the oldest first (VDI-122). */
+	List<RiskAssessment> findByRequestCustomerIdOrderByEvaluatedAtAscIdAsc(UUID customerId);
 
 	/**
 	 * Marks the current assessment as superseded. Runs as a bulk update so it reaches the database before

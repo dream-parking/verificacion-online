@@ -75,7 +75,11 @@ public class RiskDecisionService {
 			.save(new RiskDecision(request, assessment, type, reason(model, assessment, held), model.reviewThreshold()));
 
 		if (held) {
-			request.setStatus(RequestStatus.ENHANCED_REVIEW);
+			// A request already waiting for the RNPN keeps that status: the decision is logged and the event is in the
+			// timeline, and the review goes on from there once the RNPN answers.
+			if (request.getStatus() == RequestStatus.COMPLETED) {
+				request.setStatus(RequestStatus.ENHANCED_REVIEW);
+			}
 			RequestEvent event = new RequestEvent();
 			event.setRequest(request);
 			event.setType(RequestEventType.ENHANCED_REVIEW_REQUIRED);

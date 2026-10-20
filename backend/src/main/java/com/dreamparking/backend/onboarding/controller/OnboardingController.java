@@ -35,6 +35,7 @@ import com.dreamparking.backend.onboarding.dto.PrivacyConsentRequest;
 import com.dreamparking.backend.onboarding.service.OnboardingService;
 import com.dreamparking.backend.onboarding.service.ResumeService;
 import com.dreamparking.backend.onboarding.service.SignalsService;
+import com.dreamparking.backend.onboarding.service.SubmissionService;
 import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 
 @RestController
@@ -48,11 +49,14 @@ public class OnboardingController {
 
 	private final ResumeService resumeService;
 
+	private final SubmissionService submissionService;
+
 	public OnboardingController(OnboardingService onboardingService, SignalsService signalsService,
-			ResumeService resumeService) {
+			ResumeService resumeService, SubmissionService submissionService) {
 		this.onboardingService = onboardingService;
 		this.signalsService = signalsService;
 		this.resumeService = resumeService;
+		this.submissionService = submissionService;
 	}
 
 	@Operation(summary = "Inicia una solicitud de onboarding")
@@ -160,7 +164,7 @@ public class OnboardingController {
 	@ApiResponse(responseCode = "409", description = "Faltan pasos o la solicitud ya no está en progreso", content = @Content)
 	@PostMapping("/{requestId}/submit")
 	public OnboardingRequestResponse submit(@PathVariable UUID requestId) {
-		return onboardingService.submit(requestId);
+		return submissionService.submit(requestId);
 	}
 
 	/** Client address as seen by the servlet container (a literal IP, so no DNS lookup happens). */

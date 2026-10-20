@@ -28,6 +28,7 @@ import com.dreamparking.backend.risk.entity.ScoreModel;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 import com.dreamparking.backend.risk.repository.RiskAssessmentRepository;
 import com.dreamparking.backend.risk.repository.ScoreModelRepository;
+import com.dreamparking.backend.rnpn.repository.RnpnCheckRepository;
 
 /**
  * Risk score engine. Scores a request from every signal available at that moment with the {@link ScoreModel} in force
@@ -51,15 +52,18 @@ public class RiskAssessmentService {
 
 	private final LivenessCheckRepository livenessChecks;
 
+	private final RnpnCheckRepository rnpnChecks;
+
 	public RiskAssessmentService(ScoreModelRepository models, RiskAssessmentRepository assessments,
 			RequestEventRepository events, IdentityDocumentRepository identityDocuments,
-			RequestSignalsRepository signals, LivenessCheckRepository livenessChecks) {
+			RequestSignalsRepository signals, LivenessCheckRepository livenessChecks, RnpnCheckRepository rnpnChecks) {
 		this.models = models;
 		this.assessments = assessments;
 		this.events = events;
 		this.identityDocuments = identityDocuments;
 		this.signals = signals;
 		this.livenessChecks = livenessChecks;
+		this.rnpnChecks = rnpnChecks;
 	}
 
 	/**
@@ -80,7 +84,8 @@ public class RiskAssessmentService {
 				.orElseThrow(() -> new InvalidStateException("There is no score model in force"));
 			var inputs = new ScoreEngine.Inputs(range, identityDocuments.findById(request.getId()).orElse(null),
 					signals.findById(request.getId()).orElse(null), livenessChecks.findById(request.getId()).orElse(null),
-					LocalDate.now(EL_SALVADOR));
+					rnpnChecks.findFirstByRequestIdOrderByCheckedAtDescIdDesc(request.getId()).orElse(null),
+						LocalDate.now(EL_SALVADOR));
 			ScoreEngine.Result result = ScoreEngine.score(model, inputs);
 			RiskLevel level = model.levelOf(result.score());
 			assessment.setLevel(level);

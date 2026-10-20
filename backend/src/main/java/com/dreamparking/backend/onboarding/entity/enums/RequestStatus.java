@@ -5,6 +5,10 @@ public enum RequestStatus {
 
 	IN_PROGRESS,
 	COMPLETED,
+
+	/** Submitted, but its score went above the threshold: it is not approved automatically (VDI-117). */
+	ENHANCED_REVIEW,
+
 	ABANDONED
 
 }

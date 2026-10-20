@@ -36,6 +36,7 @@ import com.dreamparking.backend.onboarding.repository.RequestSignalsRepository;
 import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 import com.dreamparking.backend.risk.service.RiskAssessmentService;
+import com.dreamparking.backend.risk.service.RiskDecisionService;
 
 /** Read side of the console: request list and detail. */
 @Service
@@ -91,6 +92,8 @@ public class ConsoleRequestService {
 
 	private final RiskAssessmentService riskAssessments;
 
+	private final RiskDecisionService riskDecisions;
+
 	private final IdentityDocumentRepository identityDocuments;
 
 	private final IdentityDocumentImageRepository identityDocumentImages;
@@ -102,8 +105,8 @@ public class ConsoleRequestService {
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
-			RiskAssessmentService riskAssessments, IdentityDocumentRepository identityDocuments,
-			IdentityDocumentImageRepository identityDocumentImages,
+			RiskAssessmentService riskAssessments, RiskDecisionService riskDecisions,
+			IdentityDocumentRepository identityDocuments, IdentityDocumentImageRepository identityDocumentImages,
 			ExpectedActivityVersionRepository expectedActivityVersions, PrivacyConsentRepository consents) {
 		this.jdbc = jdbc;
 		this.requests = requests;
@@ -113,6 +116,7 @@ public class ConsoleRequestService {
 		this.steps = steps;
 		this.events = events;
 		this.riskAssessments = riskAssessments;
+		this.riskDecisions = riskDecisions;
 		this.identityDocuments = identityDocuments;
 		this.identityDocumentImages = identityDocumentImages;
 		this.expectedActivityVersions = expectedActivityVersions;
@@ -216,8 +220,8 @@ public class ConsoleRequestService {
 
 		return new ConsoleRequestDetail(request.getId(), request.getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
-				request.getSubmittedAt(), applicant, consent, identityDocument, income, expectedActivity, risk, signalsView, stepTimes,
-				timeline);
+				request.getSubmittedAt(), applicant, consent, identityDocument, income, expectedActivity, risk,
+				riskDecisions.log(requestId), signalsView, stepTimes, timeline);
 	}
 
 	/** Every version of the declared profile, the oldest first; the last one is the one in force. */

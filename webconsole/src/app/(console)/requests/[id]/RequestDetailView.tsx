@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
 import { RiskDecisionLog } from "@/components/console/RiskDecisionLog";
 import { RnpnCheckCard } from "@/components/console/RnpnCheckCard";
+import { CustomerNumber } from "@/components/console/CustomerNumber";
 import { LocationMap } from "./LocationMap";
 import { DocumentPhotos } from "./DocumentPhotos";
 import { ProfileVersions } from "./ProfileVersions";
@@ -142,6 +143,7 @@ export function RequestDetailView({ id }: { id: string }) {
 
   const basic: Pair[] = [
     { k: "Nombre completo", v: name },
+    { k: "Número de cliente", v: <CustomerNumber value={r.customerNumber} /> },
     { k: "DUI", v: noData(r.applicant?.dui) },
     { k: "Teléfono celular", v: noData(r.applicant?.mobilePhone) },
     { k: "Fecha de solicitud", v: formatDate(r.startedAt) },

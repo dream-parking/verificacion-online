@@ -215,6 +215,13 @@ export type ScoreModel = {
   weights: { signal: string; name: string; maxPoints: number | null }[];
 };
 
+/** A version in the score model history (VDI-120). `publishedBy` is null when a migration published it. */
+export type ScoreModelVersion = ScoreModel & {
+  validTo: string | null;
+  inForce: boolean;
+  publishedBy: string | null;
+};
+
 export type Alert = {
   id: string;
   account: string;
@@ -236,13 +243,17 @@ export type Catalogs = {
 
 // ---- Requests
 
-/** API error (application/problem+json body) or network error (status 0). */
+/**
+ * API error (application/problem+json body) or network error (status 0). A 400 for invalid fields
+ * also lists each field with its message, in Spanish, under `errors`.
+ */
 export class ApiError extends Error {
   constructor(
     public status: number,
     public title: string,
     public detail?: string,
     public retryAfterSeconds?: number,
+    public errors?: Record<string, string>,
   ) {
     super(detail || title);
   }
@@ -269,7 +280,8 @@ export async function apiFetch<T>(
   if (!res.ok) {
     const problem = await res.json().catch(() => ({}));
     const retry = Number(res.headers.get("Retry-After"));
-    throw new ApiError(res.status, problem.title ?? res.statusText, problem.detail, retry || undefined);
+    const errors = problem.errors && typeof problem.errors === "object" ? problem.errors : undefined;
+    throw new ApiError(res.status, problem.title ?? res.statusText, problem.detail, retry || undefined, errors);
   }
   return res.status === 204 ? (undefined as T) : res.json();
 }

@@ -162,21 +162,25 @@ class ConsoleApiTests {
 	void showsTheScoreModelInForce() throws Exception {
 		mvc.perform(get("/api/console/score-model"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.version").value(1))
+			.andExpect(jsonPath("$.version").value(2))
 			.andExpect(jsonPath("$.low.from").value(0))
 			.andExpect(jsonPath("$.low.to").value(39))
 			.andExpect(jsonPath("$.medium.from").value(40))
 			.andExpect(jsonPath("$.medium.to").value(69))
 			.andExpect(jsonPath("$.high.from").value(70))
 			.andExpect(jsonPath("$.high.to").value(100))
-			.andExpect(jsonPath("$.weights[?(@.signal == 'AMOUNT')].maxPoints").value(25))
-			.andExpect(jsonPath("$.weights[?(@.signal == 'IDENTITY_DOCUMENT')].maxPoints").value(20))
-			.andExpect(jsonPath("$.weights[?(@.signal == 'TYPING_PACE')].maxPoints").value(15))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'AMOUNT')].maxPoints").value(20))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'IDENTITY_DOCUMENT')].maxPoints").value(15))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'TYPING_PACE')].maxPoints").value(10))
 			.andExpect(jsonPath("$.weights[?(@.signal == 'DEVICE')].maxPoints").value(10))
-			.andExpect(jsonPath("$.weights[?(@.signal == 'TIME_OF_DAY')].maxPoints").value(10))
-			.andExpect(jsonPath("$.weights[?(@.signal == 'CITY')].maxPoints").value(20))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'TIME_OF_DAY')].maxPoints").value(5))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'CITY')].maxPoints").value(15))
 			.andExpect(jsonPath("$.weights[6].signal").value("RNPN"))
-			.andExpect(jsonPath("$.weights[6].maxPoints").isEmpty());
+			.andExpect(jsonPath("$.weights[6].maxPoints").value(15))
+			.andExpect(jsonPath("$.weights[7].signal").value("LIVENESS"))
+			.andExpect(jsonPath("$.weights[7].maxPoints").value(10))
+			.andExpect(jsonPath("$.weights[8].signal").value("INTERNAL_LISTS"))
+			.andExpect(jsonPath("$.weights[8].maxPoints").isEmpty());
 	}
 
 	// ---- Alerts

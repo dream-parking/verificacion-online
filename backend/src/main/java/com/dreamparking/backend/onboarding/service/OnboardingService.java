@@ -49,6 +49,7 @@ import com.dreamparking.backend.onboarding.repository.PrivacyConsentRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
 import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 import com.dreamparking.backend.risk.service.RiskAssessmentService;
+import com.dreamparking.backend.risk.service.RiskDecisionService;
 
 /**
  * Steps of the mobile onboarding flow: privacy notice → basic data → identity document (DUI) → income → expected
@@ -81,6 +82,8 @@ public class OnboardingService {
 
 	private final RiskAssessmentService riskAssessmentService;
 
+	private final RiskDecisionService riskDecisionService;
+
 	private final IdentityDocumentRepository identityDocuments;
 
 	private final ExpectedActivityVersionRepository profileVersions;
@@ -91,8 +94,8 @@ public class OnboardingService {
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestEventRepository events, CatalogService catalogService,
 			PrivacyNoticeService privacyNoticeService, CustomerService customerService,
-			RiskAssessmentService riskAssessmentService, IdentityDocumentRepository identityDocuments,
-			ExpectedActivityVersionRepository profileVersions,
+			RiskAssessmentService riskAssessmentService, RiskDecisionService riskDecisionService,
+			IdentityDocumentRepository identityDocuments, ExpectedActivityVersionRepository profileVersions,
 			@Value("${app.onboarding.identity-document-required:true}") boolean identityDocumentRequired) {
 		this.requests = requests;
 		this.consents = consents;
@@ -103,6 +106,7 @@ public class OnboardingService {
 		this.privacyNoticeService = privacyNoticeService;
 		this.customerService = customerService;
 		this.riskAssessmentService = riskAssessmentService;
+		this.riskDecisionService = riskDecisionService;
 		this.identityDocuments = identityDocuments;
 		this.profileVersions = profileVersions;
 		this.identityDocumentRequired = identityDocumentRequired;
@@ -321,6 +325,8 @@ public class OnboardingService {
 		// The signals captured after the amount was declared (telemetry, DUI) count in the final score.
 		expectedActivities.findById(requestId)
 			.ifPresent(activity -> riskAssessmentService.evaluate(request, activity.getMonthlyAmountRange()));
+		// Above the threshold of the score model the request is not approved automatically (VDI-117).
+		riskDecisionService.decideOnSubmission(request);
 		return OnboardingRequestResponse.of(request);
 	}
 

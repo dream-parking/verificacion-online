@@ -622,6 +622,12 @@
           "risk" : {
             "$ref" : "#/components/schemas/RiskAssessmentResponse"
           },
+          "riskDecisions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RiskDecisionResponse"
+            },
+            "type" : "array"
+          },
           "riskLevel" : {
             "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
             "type" : "string"
@@ -634,7 +640,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "ABANDONED" ],
             "type" : "string"
           },
           "steps" : {
@@ -925,7 +931,7 @@
             "type" : "integer"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "ABANDONED" ],
             "type" : "string"
           },
           "transactionTypeLabel" : {
@@ -983,7 +989,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1148,7 +1154,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1605,7 +1611,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "ABANDONED" ],
             "type" : "string"
           },
           "submittedAt" : {
@@ -2135,6 +2141,42 @@
               "$ref" : "#/components/schemas/SignalContribution"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "RiskDecisionResponse" : {
+        "properties" : {
+          "decidedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decidedBy" : {
+            "description" : "Who decided: SYSTEM for the automatic rule",
+            "type" : "string"
+          },
+          "decision" : {
+            "enum" : [ "AUTOMATIC_FLOW", "ENHANCED_REVIEW" ],
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "modelVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "score" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "threshold" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -4329,7 +4371,7 @@
           "name" : "status",
           "required" : false,
           "schema" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "ABANDONED" ],
             "type" : "string"
           }
         }, {

@@ -1,6 +1,7 @@
 package com.dreamparking.backend.onboarding.repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,6 +13,9 @@ import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 public interface OnboardingRequestRepository extends JpaRepository<OnboardingRequest, UUID> {
 
 	Optional<OnboardingRequest> findByNumber(String number);
+
+	/** Every request of the customer, the oldest first. */
+	List<OnboardingRequest> findByCustomerIdOrderByStartedAtAscIdAsc(UUID customerId);
 
 	/** Next SOL-YYYY-NNNNN number; the database function keeps a gap-free yearly counter under concurrency. */
 	@Query(value = "select next_request_number(:at)", nativeQuery = true)

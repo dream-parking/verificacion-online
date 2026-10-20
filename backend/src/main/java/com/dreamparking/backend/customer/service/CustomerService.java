@@ -1,5 +1,6 @@
 package com.dreamparking.backend.customer.service;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -57,6 +58,26 @@ public class CustomerService {
 		return customer.getFirstNames().equalsIgnoreCase(firstNames)
 				&& customer.getLastNames().equalsIgnoreCase(lastNames)
 				&& customer.getMobilePhone().equals(mobilePhone);
+	}
+
+	/**
+	 * Gives the customer their number when they have none, and returns it (VDI-122). A customer keeps the number they
+	 * got, whatever request they submit later. The customer's row is locked first, so two submissions of the same
+	 * customer at the same time end with the same number, and the sequence makes numbers of different customers
+	 * differ.
+	 * @throws NotFoundException when the customer does not exist
+	 */
+	@Transactional
+	public String assignNumber(UUID customerId) {
+		Optional<String> current = customers.lockAndReadNumber(customerId);
+		if (current.isPresent()) {
+			return current.get();
+		}
+		String number = customers.nextNumber();
+		if (customers.assignNumber(customerId, number) != 1) {
+			throw new NotFoundException("Customer not found: " + customerId);
+		}
+		return number;
 	}
 
 	@Transactional(readOnly = true)

@@ -6,6 +6,8 @@ import {
   formatDateTime,
   formatShortDate,
   formatTime,
+  isSubmitted,
+  REQUEST_STATUS,
   deviceLocationText,
   locationFailureText,
   minSec,
@@ -47,6 +49,18 @@ describe("usd", () => {
   it("separa miles y usa USD por defecto", () => {
     expect(usd(12500)).toBe("USD 12,500");
     expect(usd(300, "EUR")).toBe("EUR 300");
+  });
+});
+
+describe("estado de la solicitud", () => {
+  it("la revisión reforzada tiene texto y símbolo, no solo color", () => {
+    expect(REQUEST_STATUS.ENHANCED_REVIEW).toEqual({ cls: "s-enhanced", label: "⚑ Revisión reforzada" });
+  });
+  it("una solicitud en revisión reforzada ya se envió", () => {
+    expect(isSubmitted("COMPLETED")).toBe(true);
+    expect(isSubmitted("ENHANCED_REVIEW")).toBe(true);
+    expect(isSubmitted("IN_PROGRESS")).toBe(false);
+    expect(isSubmitted("ABANDONED")).toBe(false);
   });
 });
 

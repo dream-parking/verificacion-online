@@ -149,6 +149,7 @@ export function RequestsView() {
             { value: "all", label: "Todos" },
             { value: "IN_PROGRESS", label: "En progreso" },
             { value: "COMPLETED", label: "Completada" },
+            { value: "ENHANCED_REVIEW", label: "Revisión reforzada" },
             { value: "ABANDONED", label: "Abandonada" },
           ]}
         />

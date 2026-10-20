@@ -13,9 +13,11 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapKeyEnumerated;
 import jakarta.persistence.Table;
 
+import com.dreamparking.backend.console.entity.ConsoleUser;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 import com.dreamparking.backend.risk.entity.enums.ScoreSignal;
 
@@ -46,6 +48,11 @@ public class ScoreModel {
 	@Column(name = "valid_to")
 	private Instant validTo;
 
+	/** Console user who published this version; null for the versions published by a migration. */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "published_by")
+	private ConsoleUser publishedBy;
+
 	@ElementCollection(fetch = FetchType.EAGER)
 	@CollectionTable(name = "score_model_weight", joinColumns = @JoinColumn(name = "model_version"))
 	@MapKeyColumn(name = "signal")
@@ -71,6 +78,33 @@ public class ScoreModel {
 
 	public Instant getValidFrom() {
 		return validFrom;
+	}
+
+	/** When this version stopped being in force; null while it is. */
+	public Instant getValidTo() {
+		return validTo;
+	}
+
+	public ConsoleUser getPublishedBy() {
+		return publishedBy;
+	}
+
+	/** Stops this version from applying to the evaluations that come after {@code now}. */
+	public void close(Instant now) {
+		this.validTo = now;
+	}
+
+	/** The version that replaces this one: the same weights, new ranges, in force from {@code now}. */
+	public ScoreModel nextVersion(int newLowMax, int newMediumMax, Instant now, ConsoleUser publisher) {
+		ScoreModel next = new ScoreModel();
+		next.version = (short) (version + 1);
+		next.name = "Modelo de score v" + next.version;
+		next.lowMax = (short) newLowMax;
+		next.mediumMax = (short) newMediumMax;
+		next.validFrom = now;
+		next.publishedBy = publisher;
+		next.weights = new EnumMap<>(weights);
+		return next;
 	}
 
 	/** Points the signal can add at most, or {@code null} when the model gives it no weight. */

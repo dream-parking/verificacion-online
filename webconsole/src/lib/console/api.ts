@@ -19,7 +19,8 @@ export type DeviceLocationStatus = "AVAILABLE" | "DENIED" | "UNAVAILABLE";
 
 export type Role = "KYC_LEAD" | "FRAUD_ANALYST" | "ADMIN";
 export type RiskLevel = "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
-export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ABANDONED";
+/** ENHANCED_REVIEW: submitted, but the score went above the threshold, so it is not approved automatically (VDI-117). */
+export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "ABANDONED";
 export type Criticality = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type AlertStatus = "UNASSIGNED" | "ASSIGNED" | "IN_REVIEW" | "CLOSED";
 export type Step = "PRIVACY_NOTICE" | "BASIC_DATA" | "IDENTITY_DOCUMENT" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
@@ -136,6 +137,22 @@ export type IdentityDocument = {
   correctedFields: string[] | null;
 };
 
+/**
+ * Entry of the audit log of risk decisions (VDI-117), taken when the request was submitted. The score, the threshold and
+ * the model version are the ones used at that moment; `reason` comes in English. Entries are never edited or deleted.
+ */
+export type RiskDecision = {
+  id: number;
+  decision: "AUTOMATIC_FLOW" | "ENHANCED_REVIEW";
+  reason: string | null;
+  score: number;
+  threshold: number;
+  modelVersion: number;
+  /** SYSTEM for the automatic rule. */
+  decidedBy: string | null;
+  decidedAt: string;
+};
+
 export type RequestDetail = {
   id: string;
   number: string | null;
@@ -167,6 +184,8 @@ export type RequestDetail = {
   /** Null until the person reaches the DUI step; missing in older API versions. */
   identityDocument?: IdentityDocument | null;
   risk: Assessment | null;
+  /** Audit log of risk decisions, oldest first. Missing in older API versions. */
+  riskDecisions?: RiskDecision[] | null;
   signals: {
     ip: string | null;
     approximateLocation: string | null;

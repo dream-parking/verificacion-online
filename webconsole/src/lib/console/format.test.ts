@@ -56,9 +56,13 @@ describe("estado de la solicitud", () => {
   it("la revisión reforzada tiene texto y símbolo, no solo color", () => {
     expect(REQUEST_STATUS.ENHANCED_REVIEW).toEqual({ cls: "s-enhanced", label: "⚑ Revisión reforzada" });
   });
+  it("la espera del RNPN se muestra como «En espera», con símbolo", () => {
+    expect(REQUEST_STATUS.AWAITING_RNPN).toEqual({ cls: "s-waiting", label: "◷ En espera" });
+  });
   it("una solicitud en revisión reforzada ya se envió", () => {
     expect(isSubmitted("COMPLETED")).toBe(true);
     expect(isSubmitted("ENHANCED_REVIEW")).toBe(true);
+    expect(isSubmitted("AWAITING_RNPN")).toBe(true);
     expect(isSubmitted("IN_PROGRESS")).toBe(false);
     expect(isSubmitted("ABANDONED")).toBe(false);
   });

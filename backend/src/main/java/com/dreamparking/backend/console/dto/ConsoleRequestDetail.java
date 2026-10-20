@@ -21,16 +21,20 @@ import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
+import com.dreamparking.backend.risk.dto.RiskDecisionResponse;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
 /**
  * Everything the console's request detail screen shows. {@code consent}, {@code identityDocument}, {@code income},
  * {@code expectedActivity}, {@code risk} and {@code signals} are null until the customer reaches that point of the flow.
+ * {@code riskDecisions} is the audit log of the decisions taken when the request was submitted (VDI-117), the oldest
+ * first; it is empty until then.
  */
 public record ConsoleRequestDetail(UUID id, String number, RequestStatus status, short completedSteps,
 		RiskLevel riskLevel, Instant startedAt, Instant submittedAt, Applicant applicant, Consent consent,
 		IdentityDocument identityDocument, Income income, ExpectedActivity expectedActivity,
-		RiskAssessmentResponse risk, Signals signals, List<StepTime> steps, List<TimelineEntry> timeline) {
+		RiskAssessmentResponse risk, List<RiskDecisionResponse> riskDecisions, Signals signals, List<StepTime> steps,
+		List<TimelineEntry> timeline) {
 
 	/** Personal data as declared; internal use only. */
 	@Schema(name = "ConsoleRequestApplicant")

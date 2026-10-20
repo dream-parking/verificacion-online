@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import jakarta.persistence.EntityManager;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +51,9 @@ class EnhancedReviewApiTests {
 
 	@Autowired
 	JdbcTemplate jdbc;
+
+	@Autowired
+	EntityManager em;
 
 	@Autowired
 	OnboardingRequestRepository requests;
@@ -93,6 +98,8 @@ class EnhancedReviewApiTests {
 				""".formatted(requestId)))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.detail").value(containsString("enhanced review")));
+		// The console list reads with plain JDBC: write the pending status change first (a real request commits it).
+		em.flush();
 		perform(get("/api/console/requests").param("status", "ENHANCED_REVIEW"))
 			.andExpect(jsonPath("$.content[*].id").value(hasItem(requestId)));
 		perform(get("/api/console/requests").param("status", "COMPLETED"))

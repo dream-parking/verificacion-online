@@ -5,7 +5,8 @@
 -- 1. A submitted request held for enhanced review has its own status. Only COMPLETED requests can open an account, so
 --    a held request cannot reach one until a person clears it.
 -- 2. The timeline gets an event for the moment a request is held.
--- 3. risk_decision_log: one row per decision taken when a request is submitted, whether it was held or not, so the log
+-- 3. The rule that ties the status to the submission data (ck_request_completed) accepts the new status.
+-- 4. risk_decision_log: one row per decision taken when a request is submitted, whether it was held or not, so the log
 --    also proves that the rule ran. The values that explain the decision (score, threshold, model version) are copied
 --    into the row, because the score model keeps evolving.
 --
@@ -13,6 +14,14 @@
 
 ALTER TYPE request_status ADD VALUE 'ENHANCED_REVIEW' AFTER 'COMPLETED';
 ALTER TYPE request_event_type ADD VALUE 'ENHANCED_REVIEW_REQUIRED' AFTER 'SCORE_ASSIGNED';
+
+-- A request held for enhanced review is a submitted one: like COMPLETED it has all the steps, its number and its
+-- submission date. ck_request_completed (V15) only allowed that for COMPLETED, so it is rewritten around what is
+-- not submitted (IN_PROGRESS and ABANDONED), which keeps the new value out of the constraint.
+ALTER TABLE onboarding_request DROP CONSTRAINT ck_request_completed;
+ALTER TABLE onboarding_request ADD CONSTRAINT ck_request_completed CHECK (
+  (status NOT IN ('IN_PROGRESS', 'ABANDONED') AND completed_steps = 6 AND number IS NOT NULL AND submitted_at IS NOT NULL)
+  OR (status IN ('IN_PROGRESS', 'ABANDONED') AND number IS NULL AND submitted_at IS NULL));
 
 CREATE TABLE risk_decision_log (
   id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

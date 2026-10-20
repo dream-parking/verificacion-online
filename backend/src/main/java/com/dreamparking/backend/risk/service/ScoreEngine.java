@@ -17,6 +17,8 @@ import com.dreamparking.backend.onboarding.entity.RequestSignals;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 import com.dreamparking.backend.risk.entity.ScoreModel;
 import com.dreamparking.backend.risk.entity.enums.ScoreSignal;
+import com.dreamparking.backend.rnpn.entity.RnpnCheck;
+import com.dreamparking.backend.rnpn.entity.enums.RnpnField;
 
 /**
  * Scores a request with a {@link ScoreModel}. Each signal is read as a severity from 0 (nothing unusual) to 1 (as
@@ -27,8 +29,7 @@ import com.dreamparking.backend.risk.entity.enums.ScoreSignal;
 public final class ScoreEngine {
 
 	/** Signals with no way to be read yet; they are listed in the breakdown as not available. */
-	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.CITY, ScoreSignal.RNPN,
-			ScoreSignal.INTERNAL_LISTS);
+	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.CITY, ScoreSignal.INTERNAL_LISTS);
 
 	private static final BigDecimal LOW_CONFIDENCE = new BigDecimal("0.70");
 
@@ -39,6 +40,9 @@ public final class ScoreEngine {
 	private static final int REPEATED_LIVENESS_TRIES = 3;
 
 	private static final double REPEATED_TRIES_SEVERITY = 0.5;
+
+	/** An RNPN that did not answer is neither good nor bad news: half of the points of the signal. */
+	private static final double RNPN_UNAVAILABLE_SEVERITY = 0.5;
 
 	/** Highest ceiling (USD) of the declared monthly range for each severity step: up to 200, 500 and 1,000. */
 	private static final int[] AMOUNT_CEILINGS = { 200, 500, 1000 };
@@ -58,7 +62,7 @@ public final class ScoreEngine {
 
 	/** Everything the signals are read from; any part can be null while it has not been captured. */
 	public record Inputs(MonthlyAmountRange amountRange, IdentityDocument document, RequestSignals signals,
-			LivenessCheck liveness, LocalDate today) {
+			LivenessCheck liveness, RnpnCheck rnpn, LocalDate today) {
 	}
 
 	public static Result score(ScoreModel model, Inputs inputs) {
@@ -69,6 +73,7 @@ public final class ScoreEngine {
 		contributions.add(device(model, inputs.signals()));
 		contributions.add(timeOfDay(model, inputs.signals()));
 		contributions.add(liveness(model, inputs.liveness()));
+		contributions.add(rnpn(model, inputs.rnpn()));
 		for (ScoreSignal signal : PENDING) {
 			String note = signal == ScoreSignal.CITY ? "Aún no disponible: llega con la ubicación de la solicitud"
 					: "Aún no disponible: llega en otro sprint";
@@ -205,6 +210,28 @@ public final class ScoreEngine {
 			observation += "; selfie tomada %d veces".formatted(check.getAttempts());
 		}
 		return contribution(model, ScoreSignal.LIVENESS, severity, observation);
+	}
+
+	/**
+	 * The last RNPN check read as a severity (VDI-111): no points when the data matches, all of them when it does not,
+	 * and half when the RNPN did not answer. It adds to the score without deciding anything by itself.
+	 */
+	private static Contribution rnpn(ScoreModel model, RnpnCheck check) {
+		if (check == null) {
+			return unavailable(model, ScoreSignal.RNPN, "The RNPN has not been checked yet");
+		}
+		String source = check.isSimulated() ? "RNPN check (simulated)" : "RNPN check";
+		return switch (check.getOutcome()) {
+			case MATCH -> contribution(model, ScoreSignal.RNPN, 0.0, source + ": the data matches");
+			case NO_MATCH -> contribution(model, ScoreSignal.RNPN, 1.0, source + ": the data does not match ("
+					+ String.join(", ", check.getMismatchedFields().stream().map(ScoreEngine::fieldName).toList()) + ")");
+			case UNAVAILABLE -> contribution(model, ScoreSignal.RNPN, RNPN_UNAVAILABLE_SEVERITY,
+					source + ": the RNPN did not answer after %d tries".formatted(check.getAttempts()));
+		};
+	}
+
+	private static String fieldName(RnpnField field) {
+		return field.name().toLowerCase().replace('_', ' ');
 	}
 
 	private static Contribution contribution(ScoreModel model, ScoreSignal signal, double severity, String observation) {

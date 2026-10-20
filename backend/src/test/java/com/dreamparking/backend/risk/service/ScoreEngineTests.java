@@ -29,6 +29,9 @@ import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 import com.dreamparking.backend.risk.entity.ScoreModel;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 import com.dreamparking.backend.risk.entity.enums.ScoreSignal;
+import com.dreamparking.backend.rnpn.entity.RnpnCheck;
+import com.dreamparking.backend.rnpn.entity.enums.RnpnField;
+import com.dreamparking.backend.rnpn.entity.enums.RnpnOutcome;
 import com.dreamparking.backend.risk.service.ScoreEngine.Contribution;
 import com.dreamparking.backend.risk.service.ScoreEngine.Inputs;
 import com.dreamparking.backend.risk.service.ScoreEngine.Result;
@@ -71,12 +74,59 @@ class ScoreEngineTests {
 		// Not available yet: the city (weight, but nothing to read it from) and the signals with no weight
 		assertThat(contribution(result, ScoreSignal.CITY).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.CITY).maxPoints()).isEqualTo(20);
-		for (ScoreSignal pending : new ScoreSignal[] { ScoreSignal.RNPN, ScoreSignal.INTERNAL_LISTS }) {
-			assertThat(contribution(result, pending).points()).isNull();
-			assertThat(contribution(result, pending).maxPoints()).isNull();
-			assertThat(contribution(result, pending).observation()).startsWith("Aún no disponible");
-		}
+		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).points()).isNull();
+		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).maxPoints()).isNull();
+		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).observation()).startsWith("Aún no disponible");
+		// The RNPN is read when the request is submitted: before that there is no check and the model gives it no weight
+		assertThat(contribution(result, ScoreSignal.RNPN).points()).isNull();
+		assertThat(contribution(result, ScoreSignal.RNPN).observation()).isEqualTo("The RNPN has not been checked yet");
 		assertThat(result.contributions()).hasSize(ScoreSignal.values().length);
+	}
+
+	@Test
+	void anRnpnThatMatchesAddsNothingButCountsAsRead() {
+		Contribution rnpn = contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(rnpn(RnpnOutcome.MATCH, 1))),
+				ScoreSignal.RNPN);
+
+		assertThat(rnpn.points()).isZero();
+		assertThat(rnpn.maxPoints()).isEqualTo(15);
+		assertThat(rnpn.observation()).isEqualTo("RNPN check (simulated): the data matches");
+	}
+
+	@Test
+	void anRnpnThatDoesNotAnswerAddsHalfThePoints() {
+		Contribution rnpn = contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(rnpn(RnpnOutcome.UNAVAILABLE, 3))),
+				ScoreSignal.RNPN);
+
+		assertThat(rnpn.points()).isEqualTo(8);
+		assertThat(rnpn.observation()).isEqualTo("RNPN check (simulated): the RNPN did not answer after 3 tries");
+	}
+
+	@Test
+	void anRnpnThatDoesNotMatchAddsAllThePointsAndSaysWhichFields() {
+		Result result = ScoreEngine.score(modelWithRnpn(), withRnpn(rnpn(RnpnOutcome.NO_MATCH, 1)));
+
+		assertThat(contribution(result, ScoreSignal.RNPN).points()).isEqualTo(15);
+		assertThat(contribution(result, ScoreSignal.RNPN).observation())
+			.isEqualTo("RNPN check (simulated): the data does not match (last names, birth date)");
+		assertThat(result.score()).isEqualTo(15);
+	}
+
+	@Test
+	void aModelWithoutAWeightForTheRnpnIgnoresTheCheck() {
+		Result result = ScoreEngine.score(model, withRnpn(rnpn(RnpnOutcome.NO_MATCH, 1)));
+
+		assertThat(contribution(result, ScoreSignal.RNPN).points()).isNull();
+		assertThat(contribution(result, ScoreSignal.RNPN).maxPoints()).isNull();
+		assertThat(result.score()).isZero();
+	}
+
+	@Test
+	void theRnpnCheckOfARealProviderIsNotLabelledAsSimulated() {
+		RnpnCheck real = new RnpnCheck(null, RnpnOutcome.MATCH, "rnpn-sv", 1, List.of(), null);
+
+		assertThat(contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(real)), ScoreSignal.RNPN).observation())
+			.isEqualTo("RNPN check: the data matches");
 	}
 
 	@ParameterizedTest
@@ -350,11 +400,27 @@ class ScoreEngineTests {
 	}
 
 	private static Inputs inputs(MonthlyAmountRange range, IdentityDocument document, RequestSignals signals) {
-		return new Inputs(range, document, signals, null, TODAY);
+		return new Inputs(range, document, signals, null, null, TODAY);
 	}
 
 	private static Inputs withLiveness(LivenessCheck liveness) {
-		return new Inputs(null, null, null, liveness, TODAY);
+		return new Inputs(null, null, null, liveness, null, TODAY);
+	}
+
+	private static Inputs withRnpn(RnpnCheck rnpn) {
+		return new Inputs(null, null, null, null, rnpn, TODAY);
+	}
+
+	/** A check of the simulated RNPN; a result that does not match names the last names and the birth date. */
+	private static RnpnCheck rnpn(RnpnOutcome outcome, int tries) {
+		List<RnpnField> fields = outcome == RnpnOutcome.NO_MATCH ? List.of(RnpnField.LAST_NAMES, RnpnField.BIRTH_DATE)
+				: List.of();
+		return new RnpnCheck(null, outcome, "simulated", tries, fields,
+				outcome == RnpnOutcome.UNAVAILABLE ? "does not answer" : null);
+	}
+
+	private static ScoreModel modelWithRnpn() {
+		return modelWith(Map.of(ScoreSignal.RNPN, 15), 39, 69);
 	}
 
 	/** A liveness check after the given tries; the last one answered with this status and confidence. */

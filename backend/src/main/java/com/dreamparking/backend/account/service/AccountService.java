@@ -37,6 +37,9 @@ public class AccountService {
 		if (request.getStatus() == RequestStatus.ENHANCED_REVIEW) {
 			throw new InvalidStateException("The request is held for enhanced review and cannot open an account");
 		}
+		if (request.getStatus() == RequestStatus.AWAITING_RNPN) {
+			throw new InvalidStateException("The request is waiting for the RNPN and cannot open an account");
+		}
 		if (request.getStatus() != RequestStatus.COMPLETED) {
 			throw new InvalidStateException("Only submitted requests can open an account");
 		}

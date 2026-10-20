@@ -5659,7 +5659,7 @@
     },
     "/api/onboarding/requests/{requestId}/liveness" : {
       "put" : {
-        "description" : "Multipart con `selfie`, JPEG o PNG de hasta 5 MB. Guarda la selfie cifrada en el expediente y registra el nivel de confianza (de 0 a 1) que da el proveedor; ese número no se devuelve a la app, lo usan el score y la consola. Si el proveedor no está disponible responde `status: FAILED` y la solicitud sigue: esa señal no suma ni resta. Se puede repetir mientras la solicitud está en progreso; cada intento cuenta en `attempts`.",
+        "description" : "Multipart con `selfie`, JPEG o PNG de hasta 5 MB. Guarda la selfie cifrada en el expediente y registra el nivel de confianza (de 0 a 1) que da el proveedor; ese número no se devuelve a la app, lo usan el score y la consola. Si el proveedor no está disponible responde `status: FAILED` y la solicitud sigue: esa señal no suma ni resta. Se puede repetir mientras la solicitud está en progreso; cada intento cuenta en `attempts`. Si la foto no sirve por cómo se tomó (poca luz, borrosa, sin rostro visible…) responde 422 con el motivo y no se guarda nada; nunca da motivos de sospecha.",
         "operationId" : "livenessCheck",
         "parameters" : [ {
           "in" : "path",
@@ -5736,6 +5736,16 @@
               }
             },
             "description" : "La selfie pasa de 5 MB"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La selfie no se puede juzgar por cómo se tomó: `reason` dice por qué (BLURRY, TOO_DARK, GLARE, FACE_NOT_VISIBLE, MULTIPLE_FACES, OTHER) y la app pide repetirla. No se guarda ni cuenta como intento"
           }
         },
         "summary" : "Prueba de vida: selfie de la persona",

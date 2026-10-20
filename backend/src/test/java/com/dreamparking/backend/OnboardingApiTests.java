@@ -42,15 +42,15 @@ class OnboardingApiTests {
 					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.level").value("LOW"))
-			.andExpect(jsonPath("$.score").value(4))
-			.andExpect(jsonPath("$.modelVersion").value(1))
+			.andExpect(jsonPath("$.score").value(3))
+			.andExpect(jsonPath("$.modelVersion").value(2))
 			.andExpect(jsonPath("$.ruleCode").isEmpty())
-			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].points").value(4))
-			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].maxPoints").value(25))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].points").value(3))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].maxPoints").value(20))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].observation")
 				.value("Monto mensual declarado: USD 200.01 a 500"))
 			.andExpect(jsonPath("$.explanation").value(
-					"Score 4 de 100, riesgo bajo (Modelo de score v1): suman sobre todo monto declarado (4)."));
+					"Score 3 de 100, riesgo bajo (Modelo de score v2): suman sobre todo monto declarado (3)."));
 
 		mvc.perform(get("/api/onboarding/requests/{id}", id))
 			.andExpect(jsonPath("$.riskLevel").value("LOW"))
@@ -68,11 +68,11 @@ class OnboardingApiTests {
 					{"transactionTypeCode": "AHORRO", "monthlyAmountRangeCode": "500_1000"}
 					"""))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.score").value(8));
+			.andExpect(jsonPath("$.score").value(6));
 
 		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.score").value(8))
+			.andExpect(jsonPath("$.score").value(6))
 			.andExpect(jsonPath("$.evaluatedValue").value(1000));
 	}
 

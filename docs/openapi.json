@@ -603,6 +603,9 @@
           "consent" : {
             "$ref" : "#/components/schemas/ConsoleRequestConsent"
           },
+          "customerNumber" : {
+            "type" : "string"
+          },
           "expectedActivity" : {
             "$ref" : "#/components/schemas/ConsoleRequestExpectedActivity"
           },
@@ -1354,6 +1357,27 @@
           },
           "mobilePhone" : {
             "type" : "string"
+          },
+          "number" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CustomerRiskHistoryResponse" : {
+        "properties" : {
+          "customerId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "customerNumber" : {
+            "type" : "string"
+          },
+          "requests" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RequestRisk"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -1999,6 +2023,42 @@
               "$ref" : "#/components/schemas/ProfileDeviation"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "RequestRisk" : {
+        "properties" : {
+          "assessments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RiskAssessmentResponse"
+            },
+            "type" : "array"
+          },
+          "decisions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RiskDecisionResponse"
+            },
+            "type" : "array"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "type" : "string"
+          },
+          "submittedAt" : {
+            "format" : "date-time",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -4440,6 +4500,60 @@
           "bearerAuth" : [ ]
         } ],
         "summary" : "Busca un cliente por DUI",
+        "tags" : [ "Consola · Clientes" ]
+      }
+    },
+    "/api/console/customers/risk-history" : {
+      "get" : {
+        "description" : "Formato CLI-0000001. Por cada solicitud del cliente, de la más antigua a la más reciente, trae las evaluaciones del score y las decisiones de revisión reforzada.",
+        "operationId" : "customerRiskHistory",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "number",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 20,
+            "minLength" : 0,
+            "pattern" : "CLI-[0-9]{7,}",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CustomerRiskHistoryResponse"
+                }
+              }
+            },
+            "description" : "Señales de riesgo del cliente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No hay cliente con ese número"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Señales de riesgo de un cliente, por su número de cliente",
         "tags" : [ "Consola · Clientes" ]
       }
     },

@@ -207,7 +207,15 @@ void main() {
     expect(SubmissionStatus.fromApi(null), isNull);
   });
 
-  for (final status in ['COMPLETED', 'ENHANCED_REVIEW']) {
+  test('submitRequest says when the identity is still being verified (VDI-112)', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async => http.Response('{"number":"SOL-2026-00418","status":"AWAITING_RNPN"}', 200)),
+    );
+    expect((await api.submitRequest('abc')).status, SubmissionStatus.awaitingVerification);
+  });
+
+  for (final status in ['COMPLETED', 'ENHANCED_REVIEW', 'AWAITING_RNPN']) {
     test('if the request was already submitted ($status), submitRequest returns its number and status', () async {
       final api = OnboardingApi(
         baseUrl: 'https://api.test',

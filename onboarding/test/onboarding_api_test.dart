@@ -252,6 +252,42 @@ void main() {
     );
   });
 
+  test('checkLiveness sends the selfie as multipart and says whether it was checked (VDI-116)', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        expect(req.method, 'PUT');
+        expect(req.url.path, '/api/onboarding/requests/abc/liveness');
+        expect(req.headers['content-type'], startsWith('multipart/form-data'));
+        expect(utf8.decode(req.bodyBytes, allowMalformed: true), contains('name="selfie"; filename="selfie.jpg"'));
+        return http.Response('{"status":"CHECKED","attempts":2}', 200);
+      }),
+    );
+    final result = await api.checkLiveness('abc', Uint8List.fromList([0xFF, 0xD8]));
+    expect(result.checked, isTrue);
+    expect(result.attempts, 2);
+  });
+
+  test('checkLiveness with the provider not available is not an error', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async => http.Response('{"status":"FAILED","attempts":1}', 200)),
+    );
+    expect((await api.checkLiveness('abc', Uint8List(1))).checked, isFalse);
+  });
+
+  test('a selfie that cannot be judged gives the reason (422)', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async =>
+          http.Response('{"status":422,"detail":"The selfie cannot be judged: GLARE","reason":"GLARE"}', 422)),
+    );
+    expect(
+      api.checkLiveness('abc', Uint8List(1)),
+      throwsA(isA<ApiException>().having((e) => e.status, 'status', 422).having((e) => e.reason, 'reason', 'GLARE')),
+    );
+  });
+
   test('confirmIdentityDocument sends the data the person confirmed, with the dates as year-month-day', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',

@@ -229,7 +229,7 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
   }
 }
 
-/// Back arrow, «Paso 2 de 5 · Tu DUI» and help.
+/// Back arrow, «Paso 2 de 6 · Tu DUI» and help.
 class _Header extends StatelessWidget {
   const _Header({required this.onBack, required this.onHelp});
 
@@ -249,7 +249,7 @@ class _Header extends StatelessWidget {
           ),
           const Expanded(
             child: Text(
-              'Paso 2 de 5 · Tu DUI',
+              'Paso 2 de 6 · Tu DUI',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w700),
             ),

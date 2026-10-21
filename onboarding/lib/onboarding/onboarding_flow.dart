@@ -1488,6 +1488,29 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             ],
             onDone: _restart,
           ),
+        SubmissionStatus.awaitingVerification => _StatusNotice(
+            key: const Key('awaiting-verification'),
+            icon: Icons.hourglass_top_rounded,
+            title: 'Tu solicitud quedó en espera',
+            message: 'Aún no terminamos de verificar tu identidad. Tu información está guardada: no tienes que repetir nada.',
+            number: _form.number ?? '',
+            // VDI-112: the identity check is told in general; the registry behind it is never named.
+            steps: [
+              const TextSpan(text: 'Seguimos con la verificación por nuestra cuenta.'),
+              TextSpan(children: [
+                const TextSpan(text: 'Te avisaremos por mensaje '),
+                if (_form.phone.isEmpty)
+                  const TextSpan(text: 'al número que nos diste')
+                else ...[
+                  const TextSpan(text: 'al '),
+                  TextSpan(text: _form.phone, style: const TextStyle(fontWeight: FontWeight.w700)),
+                ],
+                const TextSpan(text: ' cuando haya novedades.'),
+              ]),
+              const TextSpan(text: 'Tu solicitud no se aprueba ni se rechaza mientras tanto: solo espera.'),
+            ],
+            onDone: _restart,
+          ),
       };
 
   /// The request was received as usual.
@@ -1895,8 +1918,8 @@ class _NoticeIcon extends StatelessWidget {
   }
 }
 
-/// Last screen of a request that was received but does not go on as usual (VDI-118): what happens now and its
-/// number. It says what comes next, never why.
+/// Last screen of a request that was received but does not go on as usual (VDI-112, VDI-118): what happens now and
+/// its number. It says what comes next, never why.
 class _StatusNotice extends StatelessWidget {
   const _StatusNotice({
     super.key,

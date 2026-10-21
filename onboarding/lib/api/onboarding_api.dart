@@ -29,6 +29,35 @@ class ApiException implements Exception {
   String toString() => 'ApiException($status): $message';
 }
 
+/// How a submitted request was left (`status` of `POST /submit`). The app only tells the person what happens next:
+/// never the score or why.
+enum SubmissionStatus {
+  /// Received as usual (`COMPLETED`).
+  completed,
+
+  /// Held for a person of the bank to review it (`ENHANCED_REVIEW`, VDI-118).
+  enhancedReview;
+
+  /// `null` while the request was not submitted (`IN_PROGRESS`) or was abandoned. A status this version of the app
+  /// does not know yet is told as [completed]: the request was received.
+  static SubmissionStatus? fromApi(Object? status) => switch (status) {
+    'ENHANCED_REVIEW' => enhancedReview,
+    null || 'IN_PROGRESS' || 'ABANDONED' => null,
+    _ => completed,
+  };
+}
+
+/// A submitted request: its number and how it was left.
+class Submission {
+  const Submission(this.number, this.status);
+
+  factory Submission.fromJson(Map<String, dynamic> json) =>
+      Submission(json['number'] as String, SubmissionStatus.fromApi(json['status']) ?? SubmissionStatus.completed);
+
+  final String number;
+  final SubmissionStatus status;
+}
+
 /// Client for `/api/onboarding/requests` (see docs/integracion-api.md and docs/openapi.json).
 class OnboardingApi {
   OnboardingApi({http.Client? client, String baseUrl = apiBaseUrl})
@@ -72,19 +101,20 @@ class OnboardingApi {
     });
   }
 
-  /// Submits the request and returns the number the server assigned to it (SOL-YYYY-NNNNN, unique).
+  /// Submits the request and returns the number the server assigned to it (SOL-YYYY-NNNNN, unique) and how it was
+  /// left.
   ///
   /// If the request was already submitted (for example, the response to a previous submit was lost
   /// and the client retried), it returns the number the request already has instead of failing.
-  Future<String> submitRequest(String requestId) async {
+  Future<Submission> submitRequest(String requestId) async {
     try {
-      final json = await _send('POST', '/api/onboarding/requests/$requestId/submit');
-      return json['number'] as String;
+      return Submission.fromJson(await _send('POST', '/api/onboarding/requests/$requestId/submit'));
     } on ApiException catch (e) {
       if (e.status != 409) rethrow;
       final current = await _send('GET', '/api/onboarding/requests/$requestId');
-      final number = current['number'];
-      if (current['status'] == 'COMPLETED' && number is String) return number;
+      if (current['number'] is String && SubmissionStatus.fromApi(current['status']) != null) {
+        return Submission.fromJson(current);
+      }
       rethrow;
     }
   }

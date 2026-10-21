@@ -743,6 +743,27 @@ void main() {
         expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
       });
 
+      testWidgets('waiting for the identity check: nothing to repeat, and the registry is never named (VDI-112)',
+          (tester) async {
+        final store = FakeSavedRequestStore();
+        await tester.pumpWidget(app(FakeApi(submitStatus: 'AWAITING_RNPN', number: 'SOL-2026-00418'), store: store));
+        await submitRequest(tester);
+
+        expect(find.byKey(const Key('awaiting-verification')), findsOneWidget);
+        expect(find.text('Tu solicitud quedó en espera'), findsOneWidget);
+        expect(find.textContaining('no tienes que repetir nada'), findsOneWidget);
+        expect(find.text('SOL-2026-00418'), findsOneWidget);
+        expect(find.textContaining('7845-2310', findRichText: true), findsOneWidget, reason: 'the phone it will be told at');
+        expect(find.text('Tu solicitud no se aprueba ni se rechaza mientras tanto: solo espera.'), findsOneWidget);
+        for (final hint in ['RNPN', 'Registro Nacional', 'servicio', 'intentar', 'Reintentar']) {
+          expect(find.textContaining(RegExp(hint, caseSensitive: false), findRichText: true), findsNothing, reason: hint);
+        }
+        expect(store.id, isNull, reason: 'a submitted request is not offered again');
+
+        await tap(tester, find.text('Entendido'));
+        expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
+      });
+
       testWidgets('if the submit response was lost, the retry still shows the review', (tester) async {
         final fake = FakeApi(submitErrors: [409], submitStatus: 'ENHANCED_REVIEW')..submitted = true;
         await tester.pumpWidget(app(fake));

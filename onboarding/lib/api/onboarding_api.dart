@@ -36,12 +36,17 @@ enum SubmissionStatus {
   completed,
 
   /// Held for a person of the bank to review it (`ENHANCED_REVIEW`, VDI-118).
-  enhancedReview;
+  enhancedReview,
+
+  /// The identity could not be verified yet and the API keeps trying (`AWAITING_RNPN`, VDI-112). The person repeats
+  /// nothing, and the app never names the registry it is checked against.
+  awaitingVerification;
 
   /// `null` while the request was not submitted (`IN_PROGRESS`) or was abandoned. A status this version of the app
   /// does not know yet is told as [completed]: the request was received.
   static SubmissionStatus? fromApi(Object? status) => switch (status) {
     'ENHANCED_REVIEW' => enhancedReview,
+    'AWAITING_RNPN' => awaitingVerification,
     null || 'IN_PROGRESS' || 'ABANDONED' => null,
     _ => completed,
   };

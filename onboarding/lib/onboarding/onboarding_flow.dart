@@ -123,6 +123,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   var _submitFailed = false;
   var _copied = false;
 
+  /// How the request was left when it was submitted: it decides the last screen.
+  var _submitted = SubmissionStatus.completed;
+
   // DUI step (VDI-77).
   /// Photos taken so far; the API gets both together.
   final _duiPhotos = <DuiSide, Uint8List>{};
@@ -662,10 +665,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     _signals.steps.complete(Screen.review, widget.clock());
     await _sendSignals();
     try {
-      final number = await _api.submitRequest(_form.id!);
+      final submission = await _api.submitRequest(_form.id!);
       if (!mounted) return;
       setState(() {
-        _form.number = number;
+        _form.number = submission.number;
+        _submitted = submission.status;
         _submitting = false;
       });
       unawaited(_forgetSavedRequest());
@@ -701,6 +705,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _startError = null;
       _saveError = null;
       _copied = false;
+      _submitted = SubmissionStatus.completed;
     });
     _goTo(Screen.welcome);
   }
@@ -1466,7 +1471,27 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   // ---------------------------------------------------------------- 7. Confirmation
 
-  Widget _confirmation() {
+  Widget _confirmation() => switch (_submitted) {
+        SubmissionStatus.completed => _received(),
+        SubmissionStatus.enhancedReview => _StatusNotice(
+            key: const Key('enhanced-review'),
+            icon: Icons.manage_search_rounded,
+            title: 'Estamos revisando tu solicitud',
+            message: 'Una persona del banco la revisará con más detalle antes de abrir tu cuenta. '
+                'Es un paso normal de seguridad.',
+            number: _form.number ?? '',
+            // VDI-118: what comes next, never why. The deadline is not given until the business sets it.
+            steps: const [
+              TextSpan(text: 'No tienes que hacer nada por ahora.'),
+              TextSpan(text: 'Te contactaremos al número que nos diste cuando terminemos de revisarla.'),
+              TextSpan(text: 'Por tu seguridad, no damos detalles de cómo se hace esta revisión.'),
+            ],
+            onDone: _restart,
+          ),
+      };
+
+  /// The request was received as usual.
+  Widget _received() {
     return Padding(
       padding: EdgeInsets.fromLTRB(24, 16, 24, 32 + MediaQuery.paddingOf(context).bottom),
       child: Column(
@@ -1866,6 +1891,85 @@ class _NoticeIcon extends StatelessWidget {
       height: 44,
       decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.brandSoft),
       child: Icon(item.icon, size: 24, color: AppColors.brandGreen),
+    );
+  }
+}
+
+/// Last screen of a request that was received but does not go on as usual (VDI-118): what happens now and its
+/// number. It says what comes next, never why.
+class _StatusNotice extends StatelessWidget {
+  const _StatusNotice({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.number,
+    required this.steps,
+    required this.onDone,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String number;
+
+  /// «Qué pasa ahora», in order.
+  final List<InlineSpan> steps;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 20, 24, 28 + MediaQuery.paddingOf(context).bottom),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: const BoxDecoration(color: AppColors.brandSoft, shape: BoxShape.circle),
+              child: Icon(icon, size: 62, color: AppColors.brandGreen),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Semantics(
+            header: true,
+            child: Text(title, style: AppText.heading(28, height: 1.15), textAlign: TextAlign.center),
+          ),
+          const SizedBox(height: 14),
+          Text(message, style: AppText.body, textAlign: TextAlign.center),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: AppColors.neutral100,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                const Expanded(child: Text('Número de solicitud', style: AppText.label)),
+                Text(number, style: AppText.heading(16)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          const SectionTitle('Qué pasa ahora', size: 19),
+          const SizedBox(height: 14),
+          for (var i = 0; i < steps.length; i++) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                NumberBadge(i + 1, size: 30, soft: true),
+                const SizedBox(width: 14),
+                Expanded(child: Text.rich(steps[i], style: AppText.body)),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
+          const SizedBox(height: 10),
+          PrimaryButton(text: 'Entendido', onPressed: onDone),
+        ],
+      ),
     );
   }
 }

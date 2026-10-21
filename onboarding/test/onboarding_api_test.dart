@@ -185,17 +185,50 @@ void main() {
         return http.Response('{"number":"SOL-2026-00419","status":"COMPLETED"}', 200);
       }),
     );
-    expect(await api.submitRequest('abc'), 'SOL-2026-00419');
+    final submission = await api.submitRequest('abc');
+    expect(submission.number, 'SOL-2026-00419');
+    expect(submission.status, SubmissionStatus.completed);
   });
 
-  test('if the request was already submitted, submitRequest returns its number', () async {
+  test('submitRequest says when the request was held for enhanced review (VDI-118)', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async => http.Response('{"number":"SOL-2026-00417","status":"ENHANCED_REVIEW"}', 200)),
+    );
+    final submission = await api.submitRequest('abc');
+    expect(submission.number, 'SOL-2026-00417');
+    expect(submission.status, SubmissionStatus.enhancedReview);
+  });
+
+  test('a status the app does not know yet is told as received', () {
+    expect(SubmissionStatus.fromApi('SOMETHING_NEW'), SubmissionStatus.completed);
+    expect(SubmissionStatus.fromApi('IN_PROGRESS'), isNull);
+    expect(SubmissionStatus.fromApi('ABANDONED'), isNull);
+    expect(SubmissionStatus.fromApi(null), isNull);
+  });
+
+  for (final status in ['COMPLETED', 'ENHANCED_REVIEW']) {
+    test('if the request was already submitted ($status), submitRequest returns its number and status', () async {
+      final api = OnboardingApi(
+        baseUrl: 'https://api.test',
+        client: MockClient((req) async => req.method == 'POST'
+            ? http.Response('{"status":409,"detail":"Onboarding request abc is $status"}', 409)
+            : http.Response('{"number":"SOL-2026-00419","status":"$status"}', 200)),
+      );
+      final submission = await api.submitRequest('abc');
+      expect(submission.number, 'SOL-2026-00419');
+      expect(submission.status, SubmissionStatus.fromApi(status));
+    });
+  }
+
+  test('if the request was abandoned, submitRequest fails', () async {
     final api = OnboardingApi(
       baseUrl: 'https://api.test',
       client: MockClient((req) async => req.method == 'POST'
-          ? http.Response('{"status":409,"detail":"Onboarding request abc is COMPLETED"}', 409)
-          : http.Response('{"number":"SOL-2026-00419","status":"COMPLETED"}', 200)),
+          ? http.Response('{"status":409,"detail":"Onboarding request abc is ABANDONED"}', 409)
+          : http.Response('{"number":null,"status":"ABANDONED"}', 200)),
     );
-    expect(await api.submitRequest('abc'), 'SOL-2026-00419');
+    expect(api.submitRequest('abc'), throwsA(isA<ApiException>()));
   });
 
   test('if steps are missing, submitRequest fails with the server detail', () async {

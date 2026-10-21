@@ -135,6 +135,7 @@ class FakeApi {
     this.resumeResponse,
     this.abandonStatus = 200,
     this.number = 'SOL-2026-00419',
+    this.submitStatus = 'COMPLETED',
   });
 
   int failStartTimes;
@@ -170,6 +171,9 @@ class FakeApi {
 
   /// Number the server assigns on submit.
   final String number;
+
+  /// How the server leaves the request on submit: `COMPLETED`, `ENHANCED_REVIEW`...
+  final String submitStatus;
 
   /// Whether it was already submitted: `GET` of the request answers COMPLETED with [number].
   var submitted = false;
@@ -247,7 +251,7 @@ class FakeApi {
             final failure = error(submitErrors, (r) => submitErrors = r);
             if (failure != null) return failure;
             submitted = true;
-            return http.Response('{"number":"$number","status":"COMPLETED","completedSteps":5}', 200);
+            return http.Response('{"number":"$number","status":"$submitStatus","completedSteps":5}', 200);
           }
           if (req.url.path.endsWith('/resume')) {
             final (status, body) = resumeResponse ?? (404, '{"status":404,"detail":"Request not found"}');
@@ -258,7 +262,7 @@ class FakeApi {
           }
           if (req.method == 'GET' && req.url.path.startsWith('/api/onboarding/requests/')) {
             return submitted
-                ? http.Response('{"number":"$number","status":"COMPLETED"}', 200)
+                ? http.Response('{"number":"$number","status":"$submitStatus"}', 200)
                 : http.Response('{"number":null,"status":"IN_PROGRESS"}', 200);
           }
           if (req.url.path.endsWith('/income')) {
@@ -697,6 +701,64 @@ void main() {
       await tap(tester, find.text('Enviar solicitud'));
       expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       expect(find.text('SOL-2026-00420'), findsOneWidget);
+    });
+
+    group('after submitting, a request that does not go on as usual', () {
+      /// Fills every step and submits.
+      Future<void> submitRequest(WidgetTester tester) async {
+        await tap(tester, find.text('Empezar'));
+        await acceptNotice(tester);
+        await tapContinue(tester);
+        await skipLocation(tester);
+        await fillBasicData(tester);
+        await tapContinue(tester);
+        await passDui(tester);
+        await tap(tester, find.text('Remesas'));
+        await tap(tester, find.text('USD 500.01 a 1,000'));
+        await tapContinue(tester);
+        await tap(tester, find.text('Ahorro'));
+        await tap(tester, find.text('Más de USD 1,000'));
+        await tapContinue(tester);
+        await tap(tester, find.text('Enviar solicitud'));
+      }
+
+      testWidgets('held for enhanced review: says a person will review it, without the criteria (VDI-118)',
+          (tester) async {
+        final store = FakeSavedRequestStore();
+        await tester.pumpWidget(app(FakeApi(submitStatus: 'ENHANCED_REVIEW', number: 'SOL-2026-00417'), store: store));
+        await submitRequest(tester);
+
+        expect(find.byKey(const Key('enhanced-review')), findsOneWidget);
+        expect(find.text('Estamos revisando tu solicitud'), findsOneWidget);
+        expect(find.text('SOL-2026-00417'), findsOneWidget);
+        expect(find.text('No tienes que hacer nada por ahora.'), findsOneWidget);
+        expect(find.text('Por tu seguridad, no damos detalles de cómo se hace esta revisión.'), findsOneWidget);
+        expect(find.text('¡Recibimos tu solicitud!'), findsNothing, reason: 'it does not say the account will be ready');
+        for (final hint in ['score', 'riesgo', 'puntaje', 'sospech', 'alto']) {
+          expect(find.textContaining(RegExp(hint, caseSensitive: false)), findsNothing, reason: 'never says why: $hint');
+        }
+        expect(store.id, isNull, reason: 'a submitted request is not offered again');
+
+        await tap(tester, find.text('Entendido'));
+        expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
+      });
+
+      testWidgets('if the submit response was lost, the retry still shows the review', (tester) async {
+        final fake = FakeApi(submitErrors: [409], submitStatus: 'ENHANCED_REVIEW')..submitted = true;
+        await tester.pumpWidget(app(fake));
+        await submitRequest(tester);
+        expect(find.text('Estamos revisando tu solicitud'), findsOneWidget);
+        expect(find.text('SOL-2026-00419'), findsOneWidget);
+      });
+
+      testWidgets('starting again after the notice shows the usual screen for the next request', (tester) async {
+        final fake = FakeApi(submitStatus: 'ENHANCED_REVIEW');
+        await tester.pumpWidget(app(fake));
+        await submitRequest(tester);
+        await tap(tester, find.text('Entendido'));
+        expect(find.text('Estamos revisando tu solicitud'), findsNothing);
+        expect(find.text('Empezar'), findsOneWidget);
+      });
     });
 
     testWidgets('the back arrow goes to the previous step', (tester) async {

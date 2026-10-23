@@ -6,7 +6,7 @@ import 'face_camera.dart';
 /// The three things the person is asked in front of the camera, in order (VDI-116).
 enum ChallengeStep {
   lookFront('Mira al frente', 'Mira de frente a la pantalla'),
-  turn('Gira la cabeza', 'Gira un poco la cabeza hacia un lado'),
+  turn('Gira la cabeza', 'Gira la cabeza hacia un lado'),
   blink('Parpadea', 'Parpadea despacio');
 
   const ChallengeStep(this.label, this.instruction);
@@ -38,10 +38,15 @@ enum FaceHint {
 /// Active liveness check on the phone (VDI-116): the same face has to look at the camera, turn the head and blink,
 /// and then look at the camera again for the selfie. What it decides never leaves the phone: the API judges the
 /// selfie on its own. It is fed the frames of the camera and says when the photo can be taken.
+///
+/// The turn is measured from how the face looked at the camera, not from 0°: a camera that is not right in front of
+/// the person (the webcam of a laptop, a phone held to a side) already reads several degrees when they look at it.
+/// Measured with a person in front of a laptop webcam: looking at it read about 8°, and a natural turn 10° to 17° away
+/// from that.
 class LivenessChallenge {
   LivenessChallenge({
-    this.frontYaw = 12,
-    this.turnYaw = 25,
+    this.frontYaw = 15,
+    this.turnYaw = 15,
     this.openEyes = 0.7,
     this.closedEyes = 0.25,
     this.steadyFrames = 3,
@@ -50,7 +55,8 @@ class LivenessChallenge {
   /// Degrees under which the head looks at the camera.
   final double frontYaw;
 
-  /// Degrees over which the head is turned. A side either way: the person only has to move.
+  /// Degrees the head has to turn away from how it looked at the camera. A side either way: the person only has to
+  /// move.
   final double turnYaw;
 
   /// Chance of open eyes over which both are taken as open, and under [closedEyes] as closed.
@@ -64,6 +70,10 @@ class LivenessChallenge {
   var _hint = FaceHint.searching;
   int? _face;
   var _steady = 0;
+
+  /// Head angles while the face looked at the camera; their mean is where the turn is measured from.
+  final _frontYaws = <double>[];
+  double _baseYaw = 0;
   var _eyesOpenSeen = false;
   var _eyesClosedSeen = false;
   var _blinked = false;
@@ -100,22 +110,30 @@ class LivenessChallenge {
 
     final placement = _placement(face.box);
     _hint = dark ? FaceHint.tooDark : placement;
-    final yaw = (face.yaw ?? 0).abs();
+    final yaw = face.yaw ?? 0;
     switch (_step) {
       case ChallengeStep.lookFront:
-        _steady = placement.isGood && !dark && yaw < frontYaw ? _steady + 1 : 0;
+        final front = placement.isGood && !dark && yaw.abs() < frontYaw;
+        _steady = front ? _steady + 1 : 0;
+        if (front) {
+          _frontYaws.add(yaw);
+        } else {
+          _frontYaws.clear();
+        }
         if (_steady >= steadyFrames) {
+          _baseYaw = _frontYaws.reduce((a, b) => a + b) / _frontYaws.length;
           _step = ChallengeStep.turn;
           _steady = 0;
         }
       case ChallengeStep.turn:
         // While turning the face leaves the middle of the oval: only that it is still there matters.
-        if (yaw > turnYaw) _step = ChallengeStep.blink;
+        if ((yaw - _baseYaw).abs() > turnYaw) _step = ChallengeStep.blink;
       case ChallengeStep.blink:
         if (!_blinked) {
           _blink(face);
         } else {
-          _steady = placement.isGood && !dark && yaw < frontYaw && _eyesOpen(face) ? _steady + 1 : 0;
+          final front = placement.isGood && !dark && (yaw - _baseYaw).abs() < frontYaw && _eyesOpen(face);
+          _steady = front ? _steady + 1 : 0;
           _ready = _steady >= steadyFrames;
         }
     }
@@ -139,18 +157,20 @@ class LivenessChallenge {
   bool _eyesClosed(DetectedFace f) =>
       f.leftEyeOpen != null && f.rightEyeOpen != null && f.leftEyeOpen! < closedEyes && f.rightEyeOpen! < closedEyes;
 
-  /// The oval is in the middle of the image; the face has to fill a good part of it.
+  /// The oval is in the middle of the image; the face has to fill a good part of it. With the image upright and
+  /// narrower than tall, a face at a comfortable distance measured 70 % to 90 % of its width.
   static FaceHint _placement(Rect box) {
     if (box.width < 0.3) return FaceHint.tooFar;
-    if (box.width > 0.85) return FaceHint.tooClose;
+    if (box.width > 1.0) return FaceHint.tooClose;
     final center = box.center;
-    if ((center.dx - 0.5).abs() > 0.15 || (center.dy - 0.45).abs() > 0.18) return FaceHint.offCenter;
+    if ((center.dx - 0.5).abs() > 0.2 || (center.dy - 0.45).abs() > 0.2) return FaceHint.offCenter;
     return FaceHint.good;
   }
 
   void _restart() {
     _step = ChallengeStep.lookFront;
     _steady = 0;
+    _frontYaws.clear();
     _eyesOpenSeen = false;
     _eyesClosedSeen = false;
     _blinked = false;

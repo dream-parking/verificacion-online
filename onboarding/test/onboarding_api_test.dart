@@ -207,7 +207,15 @@ void main() {
     expect(SubmissionStatus.fromApi(null), isNull);
   });
 
-  for (final status in ['COMPLETED', 'ENHANCED_REVIEW']) {
+  test('submitRequest says when the identity is still being verified (VDI-112)', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async => http.Response('{"number":"SOL-2026-00418","status":"AWAITING_RNPN"}', 200)),
+    );
+    expect((await api.submitRequest('abc')).status, SubmissionStatus.awaitingVerification);
+  });
+
+  for (final status in ['COMPLETED', 'ENHANCED_REVIEW', 'AWAITING_RNPN']) {
     test('if the request was already submitted ($status), submitRequest returns its number and status', () async {
       final api = OnboardingApi(
         baseUrl: 'https://api.test',
@@ -241,6 +249,42 @@ void main() {
     expect(
       api.submitRequest('abc'),
       throwsA(isA<ApiException>().having((e) => e.message, 'message', 'Complete the 4 previous steps before submitting')),
+    );
+  });
+
+  test('checkLiveness sends the selfie as multipart and says whether it was checked (VDI-116)', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        expect(req.method, 'PUT');
+        expect(req.url.path, '/api/onboarding/requests/abc/liveness');
+        expect(req.headers['content-type'], startsWith('multipart/form-data'));
+        expect(utf8.decode(req.bodyBytes, allowMalformed: true), contains('name="selfie"; filename="selfie.jpg"'));
+        return http.Response('{"status":"CHECKED","attempts":2}', 200);
+      }),
+    );
+    final result = await api.checkLiveness('abc', Uint8List.fromList([0xFF, 0xD8]));
+    expect(result.checked, isTrue);
+    expect(result.attempts, 2);
+  });
+
+  test('checkLiveness with the provider not available is not an error', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async => http.Response('{"status":"FAILED","attempts":1}', 200)),
+    );
+    expect((await api.checkLiveness('abc', Uint8List(1))).checked, isFalse);
+  });
+
+  test('a selfie that cannot be judged gives the reason (422)', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async =>
+          http.Response('{"status":422,"detail":"The selfie cannot be judged: GLARE","reason":"GLARE"}', 422)),
+    );
+    expect(
+      api.checkLiveness('abc', Uint8List(1)),
+      throwsA(isA<ApiException>().having((e) => e.status, 'status', 422).having((e) => e.reason, 'reason', 'GLARE')),
     );
   });
 

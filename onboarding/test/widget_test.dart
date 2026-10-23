@@ -13,6 +13,7 @@ import 'package:onboarding/identity/frame_quality.dart';
 import 'package:onboarding/onboarding/privacy_notice.dart';
 import 'package:onboarding/onboarding/saved_request.dart';
 import 'package:onboarding/identity/identity_document.dart';
+import 'package:onboarding/liveness/face_camera.dart';
 import 'package:onboarding/main.dart';
 import 'package:onboarding/onboarding/application_form.dart';
 import 'package:onboarding/onboarding/onboarding_flow.dart';
@@ -119,6 +120,75 @@ class FakeCameraSession implements CameraSession {
   }
 }
 
+/// Fake front camera of the selfie (VDI-116): the test pushes what the phone "sees".
+class FakeFaceCamera implements FaceCamera {
+  FakeFaceCamera({this.denied = false});
+
+  final bool denied;
+  var opens = 0;
+  var photos = 0;
+  FakeFaceSession? current;
+
+  /// A face in the middle of the oval, with the head turned [yaw] degrees and the eyes open as [eyes] says.
+  static FaceFrame face({double yaw = 0, double eyes = 0.95, int trackingId = 1}) => FaceFrame(
+        faces: [
+          DetectedFace(
+            box: const Rect.fromLTWH(0.25, 0.2, 0.5, 0.5),
+            yaw: yaw,
+            leftEyeOpen: eyes,
+            rightEyeOpen: eyes,
+            trackingId: trackingId,
+          ),
+        ],
+        light: FrameHint.good,
+      );
+
+  /// Looks at the camera, turns the head, blinks and looks at the camera again: the selfie is taken.
+  static final challenge = [
+    for (var i = 0; i < 3; i++) face(),
+    face(yaw: 32),
+    face(),
+    face(eyes: 0.05),
+    face(),
+    for (var i = 0; i < 3; i++) face(),
+  ];
+
+  /// Sends [frames] one by one, as the camera would.
+  Future<void> show(WidgetTester tester, List<FaceFrame> frames) async {
+    for (final f in frames) {
+      current!.controller.add(f);
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+  }
+
+  @override
+  Future<FaceSession> open() async {
+    opens++;
+    if (denied) throw const CameraUnavailable(permissionDenied: true);
+    return current = FakeFaceSession(this);
+  }
+}
+
+class FakeFaceSession implements FaceSession {
+  FakeFaceSession(this._camera);
+
+  final FakeFaceCamera _camera;
+  final controller = StreamController<FaceFrame>.broadcast();
+
+  @override
+  Stream<FaceFrame> get frames => controller.stream;
+
+  @override
+  Widget get preview => const ColoredBox(color: Colors.grey);
+
+  @override
+  Future<Uint8List> takePhoto() async => Uint8List.fromList([0xFF, 0xD8, 0x5E, ++_camera.photos]);
+
+  @override
+  Future<void> dispose() => controller.close();
+}
+
 /// Fake API: answers the catalog and every request step, and records the calls.
 class FakeApi {
   FakeApi({
@@ -136,6 +206,7 @@ class FakeApi {
     this.abandonStatus = 200,
     this.number = 'SOL-2026-00419',
     this.submitStatus = 'COMPLETED',
+    this.livenessResponses = const [],
   });
 
   int failStartTimes;
@@ -159,6 +230,9 @@ class FakeApi {
 
   /// Responses of the first `PUT /identity-document` calls, as (HTTP code, body); then 200 with a reading.
   List<(int, String)> identityResponses;
+
+  /// Responses of the first `PUT /liveness` calls, as (HTTP code, body); then 200 with `CHECKED`.
+  List<(int, String)> livenessResponses;
 
   /// HTTP codes returned by the first `PUT /identity-document/confirmation` calls (then 200).
   List<int> confirmationErrors;
@@ -186,6 +260,7 @@ class FakeApi {
   List<http.Request> get identityUploads => calls.where((r) => r.url.path.endsWith('/identity-document')).toList();
   List<http.Request> get identityConfirmations =>
       calls.where((r) => r.url.path.endsWith('/identity-document/confirmation')).toList();
+  List<http.Request> get livenessChecks => calls.where((r) => r.url.path.endsWith('/liveness')).toList();
   List<http.Request> get submits => calls.where((r) => r.url.path.endsWith('/submit')).toList();
   List<http.Request> get incomes => calls.where((r) => r.url.path.endsWith('/income')).toList();
   List<http.Request> get activities => calls.where((r) => r.url.path.endsWith('/expected-activity')).toList();
@@ -247,6 +322,14 @@ class FakeApi {
             }
             return http.Response.bytes(utf8.encode(duiReading), 200);
           }
+          if (req.url.path.endsWith('/liveness')) {
+            if (livenessResponses.isNotEmpty) {
+              final (status, body) = livenessResponses.first;
+              livenessResponses = livenessResponses.sublist(1);
+              return http.Response.bytes(utf8.encode(body), status);
+            }
+            return http.Response('{"status":"CHECKED","attempts":${livenessChecks.length}}', 200);
+          }
           if (req.url.path.endsWith('/submit')) {
             final failure = error(submitErrors, (r) => submitErrors = r);
             if (failure != null) return failure;
@@ -291,11 +374,15 @@ class FakeApi {
 /// Id the fake API gives to the requests it creates.
 const requestId = '11111111-2222-3333-4444-555555555555';
 
-/// Request id kept in memory, instead of the phone preferences.
+/// Request id kept in memory, instead of the phone preferences. A request given here already has its selfie unless
+/// [selfieTaken] is false.
 class FakeSavedRequestStore implements SavedRequestStore {
-  FakeSavedRequestStore([this.id]);
+  FakeSavedRequestStore([this.id, bool selfieTaken = true]) : selfieId = selfieTaken ? id : null;
 
   String? id;
+
+  /// The request whose selfie was received (VDI-116).
+  String? selfieId;
 
   @override
   Future<String?> read() async => id;
@@ -304,7 +391,13 @@ class FakeSavedRequestStore implements SavedRequestStore {
   Future<void> save(String value) async => id = value;
 
   @override
-  Future<void> clear() async => id = null;
+  Future<bool> selfieTaken(String value) async => selfieId == value;
+
+  @override
+  Future<void> saveSelfieTaken(String value) async => selfieId = value;
+
+  @override
+  Future<void> clear() async => id = selfieId = null;
 }
 
 /// `GET /resume` of a request left at [step], with what the API saved up to there.
@@ -440,11 +533,23 @@ void main() {
 
     final shutter = find.byKey(const Key('shutter'));
 
-    /// Photographs the front and the back of the DUI and confirms the data that was read (VDI-77 and VDI-78).
+    /// The fake front camera of the app being tested, to push faces into it.
+    late FakeFaceCamera faces;
+
+    /// The selfie with the liveness check (VDI-116), up to «Continuar con mis ingresos».
+    Future<void> passSelfie(WidgetTester tester) async {
+      await tap(tester, find.text('Empezar la prueba'));
+      await faces.show(tester, FakeFaceCamera.challenge);
+      await tap(tester, find.text('Continuar con mis ingresos'));
+    }
+
+    /// Photographs the front and the back of the DUI, confirms the data that was read (VDI-77 and VDI-78) and takes
+    /// the selfie (VDI-116).
     Future<void> passDui(WidgetTester tester) async {
       await tap(tester, shutter);
       await tap(tester, shutter);
       await tap(tester, find.text('Mis datos son correctos'));
+      await passSelfie(tester);
     }
 
     Widget app(
@@ -453,6 +558,7 @@ void main() {
       DeviceLocationSource? location,
       DateTime Function()? clock,
       FakeCamera? camera,
+      FakeFaceCamera? faceCamera,
       SavedRequestStore? store,
     }) =>
         OnboardingApp(
@@ -461,6 +567,7 @@ void main() {
             deviceInfo: device ?? FakeDeviceInfo(),
             location: location ?? FakeLocation(),
             camera: camera ?? FakeCamera(),
+            faceCamera: faces = faceCamera ?? FakeFaceCamera(),
             savedRequest: store ?? FakeSavedRequestStore(),
             clock: clock ?? DateTime.now,
           ),
@@ -487,7 +594,7 @@ void main() {
       await tap(tester, find.text('Permitir ubicación aproximada'));
 
       // Basic data.
-      expect(find.text('Paso 1 de 5'), findsOneWidget);
+      expect(find.text('Paso 1 de 6'), findsOneWidget);
       await tapContinue(tester);
       expect(find.text('Escribe tus nombres.'), findsOneWidget);
       await fillBasicData(tester);
@@ -495,19 +602,19 @@ void main() {
       await passDui(tester);
 
       // Income.
-      expect(find.text('Paso 3 de 5'), findsOneWidget);
+      expect(find.text('Paso 4 de 6'), findsOneWidget);
       await tap(tester, find.text('Remesas'));
       await tap(tester, find.text('USD 500.01 a 1,000'));
       await tapContinue(tester);
 
       // Expected activity.
-      expect(find.text('Paso 4 de 5'), findsOneWidget);
+      expect(find.text('Paso 5 de 6'), findsOneWidget);
       await tap(tester, find.text('Ahorro'));
       await tap(tester, find.text('Más de USD 1,000'));
       await tapContinue(tester);
 
       // Review.
-      expect(find.text('Paso 5 de 5'), findsOneWidget);
+      expect(find.text('Paso 6 de 6'), findsOneWidget);
       expect(find.text('Marta Alejandra Rivas Cruz'), findsOneWidget);
       expect(find.text('DUI 04812377-5 · Cel. 7845-2310'), findsOneWidget);
       expect(find.text('Tu DUI'), findsOneWidget);
@@ -608,6 +715,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(ready(), isTrue);
       await tap(tester, find.text('Mis datos son correctos'));
+      await passSelfie(tester);
 
       // Income: source and range.
       expect(ready(), isFalse);
@@ -637,11 +745,11 @@ void main() {
       await acceptNotice(tester);
 
       await tapContinue(tester);
-      expect(find.text('Paso 1 de 5'), findsNothing, reason: 'it does not move on without the notice recorded');
+      expect(find.text('Paso 1 de 6'), findsNothing, reason: 'it does not move on without the notice recorded');
       await tapContinue(tester);
       await skipLocation(tester);
 
-      expect(find.text('Paso 1 de 5'), findsOneWidget);
+      expect(find.text('Paso 1 de 6'), findsOneWidget);
       expect(fake.starts, hasLength(1), reason: 'no second request is created');
       expect(fake.privacyConsents, hasLength(2));
     });
@@ -657,11 +765,11 @@ void main() {
 
       await tapContinue(tester);
       expect(find.text('No pudimos guardar tus datos'), findsOneWidget);
-      expect(find.text('Paso 1 de 5'), findsOneWidget);
+      expect(find.text('Paso 1 de 6'), findsOneWidget);
 
       await tapContinue(tester);
       await passDui(tester);
-      expect(find.text('Paso 3 de 5'), findsOneWidget);
+      expect(find.text('Paso 4 de 6'), findsOneWidget);
       expect(fake.basicData, hasLength(2));
     });
 
@@ -703,6 +811,175 @@ void main() {
       expect(find.text('SOL-2026-00420'), findsOneWidget);
     });
 
+    group('selfie with the liveness check (VDI-116)', () {
+      /// Up to the selfie explanation, after confirming the DUI.
+      Future<void> toSelfie(WidgetTester tester) async {
+        await tap(tester, find.text('Empezar'));
+        await acceptNotice(tester);
+        await tapContinue(tester);
+        await skipLocation(tester);
+        await fillBasicData(tester);
+        await tapContinue(tester);
+        await tap(tester, shutter);
+        await tap(tester, shutter);
+        await tap(tester, find.text('Mis datos son correctos'));
+      }
+
+      testWidgets('explains it first, does the check without touching and sends one selfie', (tester) async {
+        final fake = FakeApi();
+        final store = FakeSavedRequestStore();
+        await tester.pumpWidget(app(fake, store: store));
+        await toSelfie(tester);
+
+        expect(find.text('Paso 3 de 6'), findsOneWidget);
+        expect(find.text('Ahora, una selfie rápida'), findsOneWidget);
+        expect(find.text('Quítate lentes oscuros, gorra o cubrebocas.'), findsOneWidget);
+        expect(faces.opens, 0, reason: 'the camera opens only when the person starts');
+
+        await tap(tester, find.text('Empezar la prueba'));
+        expect(find.text('Paso 3 de 6 · Tu selfie'), findsOneWidget);
+        expect(find.text('Mira de frente a la pantalla'), findsOneWidget);
+        expect(find.text('Se termina sola al completar los 3 pasos'), findsOneWidget);
+
+        await faces.show(tester, [FakeFaceCamera.face(), FakeFaceCamera.face(), FakeFaceCamera.face()]);
+        expect(find.text('Gira un poco la cabeza hacia un lado'), findsOneWidget);
+        expect(find.text('Bien, tu rostro está dentro del óvalo'), findsOneWidget);
+        await faces.show(tester, [FakeFaceCamera.face(yaw: 30)]);
+        expect(find.text('Parpadea despacio'), findsOneWidget);
+        expect(fake.livenessChecks, isEmpty);
+
+        await faces.show(tester, FakeFaceCamera.challenge.sublist(4));
+        expect(faces.photos, 1);
+        final sent = fake.livenessChecks.single;
+        expect(sent.method, 'PUT');
+        expect(sent.url.path, '/api/onboarding/requests/$requestId/liveness');
+        expect(sent.headers['content-type'], startsWith('multipart/form-data'));
+        expect(utf8.decode(sent.bodyBytes, allowMalformed: true), contains('name="selfie"'));
+
+        expect(find.text('Listo, recibimos tu selfie'), findsOneWidget);
+        expect(store.selfieId, requestId, reason: 'kept so it is not asked again when the request is picked up');
+        await tap(tester, find.text('Continuar con mis ingresos'));
+        expect(find.text('Paso 4 de 6'), findsOneWidget);
+      });
+
+      testWidgets('the selfie is in the review, and is not asked again when coming back', (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await toSelfie(tester);
+        await passSelfie(tester);
+        await tap(tester, find.byTooltip('Volver al paso anterior'));
+        expect(find.text('Listo, recibimos tu selfie'), findsOneWidget);
+        await tap(tester, find.text('Continuar con mis ingresos'));
+        await tap(tester, find.text('Remesas'));
+        await tap(tester, find.text('USD 500.01 a 1,000'));
+        await tapContinue(tester);
+        await tap(tester, find.text('Ahorro'));
+        await tap(tester, find.text('Más de USD 1,000'));
+        await tapContinue(tester);
+        expect(find.text('Tu selfie'), findsOneWidget);
+        expect(find.text('Recibimos tu selfie'), findsOneWidget);
+        expect(fake.livenessChecks, hasLength(1));
+      });
+
+      testWidgets('a still face (a photo or a screen) never takes the selfie, and in time it asks to try again',
+          (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await toSelfie(tester);
+        await tap(tester, find.text('Empezar la prueba'));
+        await faces.show(tester, [for (var i = 0; i < 30; i++) FakeFaceCamera.face()]);
+        expect(faces.photos, 0);
+
+        await tester.pump(const Duration(seconds: 46));
+        await tester.pumpAndSettle();
+        expect(find.text('No pudimos completar la prueba'), findsOneWidget);
+        expect(find.text('Pasa seguido y se arregla fácil. Prueba así y vuelve a intentarlo:'), findsOneWidget);
+        expect(fake.livenessChecks, isEmpty, reason: 'nothing was sent, so it is not an attempt');
+        for (final hint in ['sospech', 'foto de una pantalla', 'impres', 'falso', 'fraude']) {
+          expect(find.textContaining(RegExp(hint, caseSensitive: false)), findsNothing, reason: 'never says why: $hint');
+        }
+
+        await tap(tester, find.text('Intentar de nuevo'));
+        await faces.show(tester, FakeFaceCamera.challenge);
+        expect(find.text('Listo, recibimos tu selfie'), findsOneWidget);
+      });
+
+      testWidgets('a selfie the API cannot judge (422) says what to fix and lets the person try again', (tester) async {
+        final fake = FakeApi(livenessResponses: [
+          (422, '{"status":422,"detail":"The selfie cannot be judged: TOO_DARK","reason":"TOO_DARK"}'),
+        ]);
+        await tester.pumpWidget(app(fake));
+        await toSelfie(tester);
+        await tap(tester, find.text('Empezar la prueba'));
+        await faces.show(tester, FakeFaceCamera.challenge);
+
+        expect(find.text('No pudimos completar la prueba'), findsOneWidget);
+        expect(find.text('Había poca luz en tu rostro.'), findsOneWidget);
+        expect(find.textContaining('TOO_DARK'), findsNothing);
+        await tap(tester, find.text('Intentar de nuevo'));
+        await faces.show(tester, FakeFaceCamera.challenge);
+        expect(fake.livenessChecks, hasLength(2));
+        expect(find.text('Listo, recibimos tu selfie'), findsOneWidget);
+      });
+
+      testWidgets('without connection the same selfie is sent again, without repeating the check', (tester) async {
+        final fake = FakeApi(livenessResponses: [(503, '{"status":503,"detail":"Service unavailable"}')]);
+        await tester.pumpWidget(app(fake));
+        await toSelfie(tester);
+        await tap(tester, find.text('Empezar la prueba'));
+        await faces.show(tester, FakeFaceCamera.challenge);
+
+        expect(find.text('No pudimos enviar tu selfie'), findsOneWidget);
+        expect(find.text('Empezar la prueba'), findsNothing);
+        await tap(tester, find.text('Reintentar'));
+        expect(fake.livenessChecks, hasLength(2));
+        expect(faces.photos, 1, reason: 'the camera was not opened again');
+        // The multipart boundary changes; the photo inside is the same.
+        bool carriesPhoto(http.Request r) => latin1.decode(r.bodyBytes).contains(latin1.decode([0xFF, 0xD8, 0x5E, 1]));
+        expect(fake.livenessChecks.every(carriesPhoto), isTrue);
+        expect(find.text('Listo, recibimos tu selfie'), findsOneWidget);
+      });
+
+      testWidgets('if the provider is not available the person goes on the same', (tester) async {
+        final fake = FakeApi(livenessResponses: [(200, '{"status":"FAILED","attempts":1}')]);
+        await tester.pumpWidget(app(fake));
+        await toSelfie(tester);
+        await passSelfie(tester);
+        expect(find.text('Paso 4 de 6'), findsOneWidget);
+      });
+
+      testWidgets('without the camera permission it says how to allow it', (tester) async {
+        await tester.pumpWidget(app(FakeApi(), faceCamera: FakeFaceCamera(denied: true)));
+        await toSelfie(tester);
+        await tap(tester, find.text('Empezar la prueba'));
+        expect(find.textContaining('Para tomar tu selfie necesitamos usar la cámara'), findsOneWidget);
+      });
+
+      testWidgets('back from the camera goes to the explanation', (tester) async {
+        await tester.pumpWidget(app(FakeApi()));
+        await toSelfie(tester);
+        await tap(tester, find.text('Empezar la prueba'));
+        await tap(tester, find.byTooltip('Volver al paso anterior'));
+        expect(find.text('Ahora, una selfie rápida'), findsOneWidget);
+      });
+
+      testWidgets('«Guardar y seguir después» goes back to the start, which offers to pick it up at the selfie',
+          (tester) async {
+        final store = FakeSavedRequestStore();
+        final fake = FakeApi(resumeResponse: (200, resumeJson('INCOME')));
+        await tester.pumpWidget(app(fake, store: store));
+        await toSelfie(tester);
+        await tap(tester, find.text('Guardar y seguir después'));
+
+        expect(find.text('¡Hola de nuevo, Marta!'), findsOneWidget);
+        expect(find.text('Paso 3 de 6'), findsOneWidget, reason: 'the API is at the income, but the selfie is missing');
+        await tap(tester, find.text('Continuar donde quedé'));
+        expect(find.text('Ahora, una selfie rápida'), findsOneWidget);
+        await tap(tester, find.byTooltip('Volver al paso anterior'));
+        expect(find.text('Paso 1 de 6'), findsOneWidget, reason: 'the DUI photos are not in the phone');
+      });
+    });
+
     group('after submitting, a request that does not go on as usual', () {
       /// Fills every step and submits.
       Future<void> submitRequest(WidgetTester tester) async {
@@ -736,6 +1013,27 @@ void main() {
         expect(find.text('¡Recibimos tu solicitud!'), findsNothing, reason: 'it does not say the account will be ready');
         for (final hint in ['score', 'riesgo', 'puntaje', 'sospech', 'alto']) {
           expect(find.textContaining(RegExp(hint, caseSensitive: false)), findsNothing, reason: 'never says why: $hint');
+        }
+        expect(store.id, isNull, reason: 'a submitted request is not offered again');
+
+        await tap(tester, find.text('Entendido'));
+        expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
+      });
+
+      testWidgets('waiting for the identity check: nothing to repeat, and the registry is never named (VDI-112)',
+          (tester) async {
+        final store = FakeSavedRequestStore();
+        await tester.pumpWidget(app(FakeApi(submitStatus: 'AWAITING_RNPN', number: 'SOL-2026-00418'), store: store));
+        await submitRequest(tester);
+
+        expect(find.byKey(const Key('awaiting-verification')), findsOneWidget);
+        expect(find.text('Tu solicitud quedó en espera'), findsOneWidget);
+        expect(find.textContaining('no tienes que repetir nada'), findsOneWidget);
+        expect(find.text('SOL-2026-00418'), findsOneWidget);
+        expect(find.textContaining('7845-2310', findRichText: true), findsOneWidget, reason: 'the phone it will be told at');
+        expect(find.text('Tu solicitud no se aprueba ni se rechaza mientras tanto: solo espera.'), findsOneWidget);
+        for (final hint in ['RNPN', 'Registro Nacional', 'servicio', 'intentar', 'Reintentar']) {
+          expect(find.textContaining(RegExp(hint, caseSensitive: false), findRichText: true), findsNothing, reason: hint);
         }
         expect(store.id, isNull, reason: 'a submitted request is not offered again');
 
@@ -784,7 +1082,7 @@ void main() {
         await skipLocation(tester);
         expect(fake.starts, hasLength(1));
         expect(fake.starts.single.url.path, '/api/onboarding/requests');
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
       });
 
       testWidgets('without the terms and conditions it does not move on', (tester) async {
@@ -801,7 +1099,7 @@ void main() {
         await tap(tester, find.text('He leído y acepto los términos y condiciones.'));
         await tapContinue(tester);
         await skipLocation(tester);
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
       });
 
       testWidgets('there is no demo data link on the basic data screen', (tester) async {
@@ -832,7 +1130,7 @@ void main() {
 
         await tapContinue(tester);
         await skipLocation(tester);
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
         expect(fake.starts, hasLength(1));
       });
 
@@ -844,11 +1142,11 @@ void main() {
         await tapContinue(tester);
 
         expect(find.text('No pudimos iniciar tu solicitud'), findsOneWidget);
-        expect(find.text('Paso 1 de 5'), findsNothing);
+        expect(find.text('Paso 1 de 6'), findsNothing);
 
         await tap(tester, find.text('Reintentar'));
         await skipLocation(tester);
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
         expect(fake.starts, hasLength(2));
       });
     });
@@ -896,7 +1194,7 @@ void main() {
         expect(fake.signals, hasLength(1));
 
         await skipLocation(tester);
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
         expect(fake.signals, hasLength(2));
       });
     });
@@ -964,7 +1262,7 @@ void main() {
 
         await tap(tester, find.text('Permitir ubicación aproximada'));
         expect(location.reads, 1);
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
         final body = lastSignals(fake);
         expect(body['deviceLocationStatus'], 'AVAILABLE');
         expect(body['approximateLocation'], 'San Salvador, El Salvador');
@@ -980,7 +1278,7 @@ void main() {
 
         await skipLocation(tester);
         expect(location.reads, 0, reason: 'the system permission is not asked');
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
         final body = lastSignals(fake);
         expect(body['deviceLocationStatus'], 'DENIED');
         expect(body.containsKey('approximateLocation'), isFalse);
@@ -992,7 +1290,7 @@ void main() {
         await goToLocation(tester, fake, FakeLocation(const DeviceLocation.denied()));
 
         await tap(tester, find.text('Permitir ubicación aproximada'));
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
         expect(lastSignals(fake)['deviceLocationStatus'], 'DENIED');
       });
 
@@ -1001,7 +1299,7 @@ void main() {
         await goToLocation(tester, fake, FakeLocation(const DeviceLocation.unavailable()));
 
         await tap(tester, find.text('Permitir ubicación aproximada'));
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
         expect(lastSignals(fake)['deviceLocationStatus'], 'UNAVAILABLE');
       });
 
@@ -1339,6 +1637,7 @@ void main() {
         final steps = [
           ('Datos básicos', 'Tu nombre, DUI y celular.'),
           ('Tu DUI', 'Una foto del frente y otra del reverso.'),
+          ('Tu selfie', 'Una foto de tu rostro para comprobar que eres tú.'),
           ('Tus ingresos', 'De dónde viene tu dinero y cuánto ganas.'),
           ('El dinero de tu cuenta', 'Qué dinero esperas mover cada mes.'),
           ('Revisar y enviar', 'Confirmas todo antes de mandarlo.'),
@@ -1390,7 +1689,7 @@ void main() {
         final camera = FakeCamera();
         await goToDui(tester, FakeApi(), camera);
 
-        expect(find.text('Paso 2 de 5 · Tu DUI'), findsOneWidget);
+        expect(find.text('Paso 2 de 6 · Tu DUI'), findsOneWidget);
         expect(find.text('Coloca el frente de tu DUI dentro del marco'), findsOneWidget);
         for (final tip in ['Buena luz', 'Sin reflejos', 'Se ven las 4 esquinas']) {
           expect(find.text(tip), findsOneWidget);
@@ -1744,7 +2043,7 @@ void main() {
         expect(find.text('Ahora coloca el reverso de tu DUI dentro del marco'), findsOneWidget);
 
         await tap(tester, find.byTooltip('Volver al paso anterior'));
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
         expect(camera.disposed, 1);
 
         await tapContinue(tester);
@@ -1807,7 +2106,7 @@ void main() {
 
         expect(find.text('¿Leímos bien tus datos?'), findsOneWidget);
         expect(find.text('Los sacamos de las fotos de tu DUI. Corrige lo que no esté bien.'), findsOneWidget);
-        expect(find.text('Paso 2 de 5'), findsOneWidget);
+        expect(find.text('Paso 2 de 6'), findsOneWidget);
         expect(
           [for (var i = 0; i < 5; i++) field(tester, i)],
           ['04812377-5', 'Marta Alejandra', 'Rivas Cruz', '12/04/1990', '01/06/2029'],
@@ -1835,7 +2134,7 @@ void main() {
           'birthDate': '1990-04-12',
           'expiryDate': '2029-06-01',
         });
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 3 de 6'), findsOneWidget, reason: 'the selfie comes after the DUI');
       });
 
       testWidgets('the person can correct any of the five data and the corrected ones are sent', (tester) async {
@@ -1881,13 +2180,13 @@ void main() {
         await confirm(tester);
         expect(find.text('Escribe tu fecha de nacimiento como día/mes/año, por ejemplo 14/03/1991.'), findsOneWidget);
         expect(fake.identityConfirmations, isEmpty, reason: 'nothing is sent while a datum is invalid');
-        expect(find.text('Paso 2 de 5'), findsOneWidget);
+        expect(find.text('Paso 2 de 6'), findsOneWidget);
 
         await type(tester, 3, '14031991');
         expect(find.text(notClear), findsNothing, reason: 'the mark goes away when the person writes it');
         await confirm(tester);
         expect(fake.identityConfirmations, hasLength(1));
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 3 de 6'), findsOneWidget, reason: 'the selfie comes after the DUI');
       });
 
       testWidgets('a datum read badly is marked too, and the person can fix it', (tester) async {
@@ -1976,13 +2275,13 @@ void main() {
         expect(find.text('Tu DUI venció el 01/06/2020. Para abrir tu cuenta necesitamos un DUI vigente.'),
             findsOneWidget);
         expect(fake.identityConfirmations, isEmpty);
-        expect(find.text('Paso 2 de 5'), findsOneWidget);
+        expect(find.text('Paso 2 de 6'), findsOneWidget);
 
         await type(tester, 4, '01062029');
         expect(find.textContaining('venció'), findsNothing);
         await confirm(tester);
         expect(jsonDecode(fake.identityConfirmations.single.body)['expiryDate'], '2029-06-01');
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 3 de 6'), findsOneWidget, reason: 'the selfie comes after the DUI');
       });
 
       testWidgets('repeating the front takes only that photo and sends both to be read again', (tester) async {
@@ -2053,7 +2352,7 @@ void main() {
 
         await tap(tester, find.text('Reintentar'));
         expect(fake.identityConfirmations, hasLength(2));
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 3 de 6'), findsOneWidget, reason: 'the selfie comes after the DUI');
       });
 
       testWidgets('a rejected field (400) is named in Spanish, without the server text', (tester) async {
@@ -2128,7 +2427,7 @@ void main() {
         await tap(tester, confirmButton);
         expect(find.text('Tus datos no coinciden con tu DUI'), findsNothing);
         expect(fake.identityConfirmations, hasLength(1));
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 3 de 6'), findsOneWidget, reason: 'the selfie comes after the DUI');
       });
 
       testWidgets('accents, capitals and extra spaces in the DUI do not trigger the warning', (tester) async {
@@ -2181,7 +2480,7 @@ void main() {
         final body = jsonDecode(fake.identityConfirmations.single.body) as Map<String, dynamic>;
         expect(body['dui'], '07145973-5');
         expect(body['firstNames'], 'Nayeli Aimy');
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 3 de 6'), findsOneWidget, reason: 'the selfie comes after the DUI');
       });
 
       testWidgets('after accepting it once, a retry of the same data does not ask again', (tester) async {
@@ -2194,7 +2493,7 @@ void main() {
         await tap(tester, find.text('Reintentar'));
         expect(find.text('Tus datos no coinciden con tu DUI'), findsNothing);
         expect(fake.identityConfirmations, hasLength(2));
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 3 de 6'), findsOneWidget, reason: 'the selfie comes after the DUI');
       });
 
       testWidgets('«Corregir mis datos» goes to the basic data with what was written, and after fixing it comes back',
@@ -2219,7 +2518,7 @@ void main() {
         await tap(tester, confirmButton);
         expect(find.text('Tus datos no coinciden con tu DUI'), findsNothing, reason: 'now they match');
         expect(fake.identityConfirmations, hasLength(1));
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 3 de 6'), findsOneWidget, reason: 'the selfie comes after the DUI');
       });
 
       testWidgets('going back from the basic data after «Corregir» goes to the previous step as always', (tester) async {
@@ -2418,7 +2717,7 @@ void main() {
         await fillBasicData(tester);
         await tapContinue(tester);
         await passDui(tester);
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 4 de 6'), findsOneWidget);
       }
 
       testWidgets('shows only the options of the UIF catalog', (tester) async {
@@ -2442,11 +2741,11 @@ void main() {
         await tapContinue(tester);
         expect(find.text('¿Por qué lo preguntamos?', findRichText: true), findsNothing);
         expect(find.text('Cuéntanos de dónde vienen tus ingresos.'), findsOneWidget);
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 4 de 6'), findsOneWidget);
 
         await tester.enterText(find.byType(TextField), 'Venta de artesanías');
         await tapContinue(tester);
-        expect(find.text('Paso 4 de 5'), findsOneWidget);
+        expect(find.text('Paso 5 de 6'), findsOneWidget);
 
         await tap(tester, find.text('Ahorro'));
         await tap(tester, find.text('USD 200.01 a 500'));
@@ -2487,7 +2786,7 @@ void main() {
         expect(fake.incomes, isEmpty, reason: 'nothing is sent until Continuar is tapped');
         await tapContinue(tester);
 
-        expect(find.text('Paso 4 de 5'), findsOneWidget);
+        expect(find.text('Paso 5 de 6'), findsOneWidget);
         final req = fake.incomes.single;
         expect(req.method, 'PUT');
         expect(req.url.path, '/api/onboarding/requests/11111111-2222-3333-4444-555555555555/income');
@@ -2516,10 +2815,10 @@ void main() {
         await tapContinue(tester);
 
         expect(find.text('No pudimos guardar tus ingresos'), findsOneWidget);
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 4 de 6'), findsOneWidget);
 
         await tap(tester, find.text('Reintentar'));
-        expect(find.text('Paso 4 de 5'), findsOneWidget);
+        expect(find.text('Paso 5 de 6'), findsOneWidget);
         expect(fake.incomes, hasLength(2));
       });
 
@@ -2546,7 +2845,7 @@ void main() {
         await tap(tester, find.text('Salario'));
         await tap(tester, find.text('Hasta USD 500'));
         await tapContinue(tester);
-        expect(find.text('Paso 4 de 5'), findsOneWidget);
+        expect(find.text('Paso 5 de 6'), findsOneWidget);
       }
 
       testWidgets('options come only from the catalog: there is no free text field', (tester) async {
@@ -2578,7 +2877,7 @@ void main() {
         await tap(tester, find.text('USD 200.01 a 500'));
         await tapContinue(tester);
 
-        expect(find.text('Paso 5 de 5'), findsOneWidget);
+        expect(find.text('Paso 6 de 6'), findsOneWidget);
         expect(find.text('Remesas familiares'), findsOneWidget);
         expect(find.text('USD 200.01 a 500 al mes'), findsOneWidget);
         final req = fake.activities.single;
@@ -2594,10 +2893,10 @@ void main() {
         await tap(tester, find.text('Hasta USD 200'));
         await tapContinue(tester);
         expect(find.text('No pudimos guardar esta información'), findsOneWidget);
-        expect(find.text('Paso 4 de 5'), findsOneWidget);
+        expect(find.text('Paso 5 de 6'), findsOneWidget);
 
         await tap(tester, find.text('Reintentar'));
-        expect(find.text('Paso 5 de 5'), findsOneWidget);
+        expect(find.text('Paso 6 de 6'), findsOneWidget);
         expect(fake.activities, hasLength(2));
       });
     });
@@ -2666,7 +2965,7 @@ void main() {
 
       testWidgets('the welcome lists the steps: the saved ones with their date, where it was left and the pending ones', (tester) async {
         await openWith(tester, 'INCOME');
-        expect(find.text('Paso 3 de 5'), findsOneWidget);
+        expect(find.text('Paso 4 de 6'), findsOneWidget);
         expect(find.textContaining('Guardado el'), findsNWidgets(2));
         expect(find.text('Aquí te quedaste'), findsOneWidget);
         expect(find.text('Pendiente'), findsNWidgets(2));
@@ -2675,10 +2974,10 @@ void main() {
 
       testWidgets('with the DUI unconfirmed the list puts the person back at the DUI, whatever step the API says', (tester) async {
         await openWith(tester, 'INCOME', body: resumeJson('INCOME', confirmedDui: false));
-        expect(find.text('Paso 2 de 5'), findsOneWidget);
+        expect(find.text('Paso 2 de 6'), findsOneWidget);
         expect(find.textContaining('Guardado el'), findsOneWidget);
         expect(find.text('Aquí te quedaste'), findsOneWidget);
-        expect(find.text('Pendiente'), findsNWidgets(3));
+        expect(find.text('Pendiente'), findsNWidgets(4), reason: 'the selfie, income, activity and review');
       });
 
       testWidgets(
@@ -2686,7 +2985,7 @@ void main() {
         (tester) async {
           final fake = await openWith(tester, 'INCOME');
           await tap(tester, find.text('Continuar donde quedé'));
-          expect(find.text('Paso 3 de 5'), findsOneWidget);
+          expect(find.text('Paso 4 de 6'), findsOneWidget);
           expect(fake.starts, isEmpty);
           expect(fake.privacyConsents, isEmpty);
           expect(
@@ -2700,7 +2999,7 @@ void main() {
       testWidgets('what was saved fills the screens again', (tester) async {
         await openWith(tester, 'BASIC_DATA');
         await tap(tester, find.text('Continuar donde quedé'));
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
         final fields = tester
             .widgetList<TextField>(find.byType(TextField))
             .toList();
@@ -2756,7 +3055,7 @@ void main() {
         expect(find.text('Vuelve a tomar las fotos de tu DUI'), findsOneWidget);
         await tap(tester, find.text('Entendido'));
         expect(shutter, findsOneWidget);
-        expect(find.text('Paso 3 de 5'), findsNothing);
+        expect(find.text('Paso 4 de 6'), findsNothing);
       });
 
       testWidgets('with the DUI already confirmed it is not asked again and back skips its empty screens', (tester) async {
@@ -2764,7 +3063,9 @@ void main() {
         await tap(tester, find.text('Continuar donde quedé'));
         expect(find.text('Vuelve a tomar las fotos de tu DUI'), findsNothing);
         await tap(tester, find.byTooltip('Volver al paso anterior'));
-        expect(find.text('Paso 1 de 5'), findsOneWidget);
+        expect(find.text('Listo, recibimos tu selfie'), findsOneWidget, reason: 'the selfie was taken: it is not asked again');
+        await tap(tester, find.byTooltip('Volver al paso anterior'));
+        expect(find.text('Paso 1 de 6'), findsOneWidget);
       });
 
       testWidgets(

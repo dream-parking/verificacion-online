@@ -19,7 +19,11 @@ export type DeviceLocationStatus = "AVAILABLE" | "DENIED" | "UNAVAILABLE";
 
 export type Role = "KYC_LEAD" | "FRAUD_ANALYST" | "ADMIN";
 export type RiskLevel = "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
-export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ABANDONED";
+/**
+ * ENHANCED_REVIEW: submitted, but the score went above the threshold (VDI-117). AWAITING_RNPN: submitted, but the RNPN
+ * did not answer after the retries (VDI-111). Neither is approved automatically.
+ */
+export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
 export type Criticality = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type AlertStatus = "UNASSIGNED" | "ASSIGNED" | "IN_REVIEW" | "CLOSED";
 export type Step = "PRIVACY_NOTICE" | "BASIC_DATA" | "IDENTITY_DOCUMENT" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
@@ -136,9 +140,43 @@ export type IdentityDocument = {
   correctedFields: string[] | null;
 };
 
+/**
+ * Entry of the audit log of risk decisions (VDI-117), taken when the request was submitted. The score, the threshold and
+ * the model version are the ones used at that moment; `reason` comes in English. Entries are never edited or deleted.
+ */
+export type RiskDecision = {
+  id: number;
+  decision: "AUTOMATIC_FLOW" | "ENHANCED_REVIEW";
+  reason: string | null;
+  score: number;
+  threshold: number;
+  modelVersion: number;
+  /** SYSTEM for the automatic rule. */
+  decidedBy: string | null;
+  decidedAt: string;
+};
+
+export type RnpnOutcome = "MATCH" | "NO_MATCH" | "UNAVAILABLE";
+export type RnpnField = "DUI" | "FIRST_NAMES" | "LAST_NAMES" | "BIRTH_DATE";
+
+/**
+ * Last check of the confirmed DUI data against the RNPN (VDI-111). `simulated` is true while the RNPN is the stand-in
+ * service; `mismatchedFields` is empty unless the outcome is NO_MATCH; `attempts` also counts the unanswered tries.
+ */
+export type RnpnCheck = {
+  outcome: RnpnOutcome;
+  simulated: boolean;
+  provider: string | null;
+  attempts: number;
+  mismatchedFields: RnpnField[] | null;
+  checkedAt: string;
+};
+
 export type RequestDetail = {
   id: string;
   number: string | null;
+  /** Customer number such as CLI-0000001 (VDI-122). Null until the first request of the customer is submitted. */
+  customerNumber?: string | null;
   status: RequestStatus;
   riskLevel: RiskLevel;
   completedSteps: number;
@@ -167,6 +205,10 @@ export type RequestDetail = {
   /** Null until the person reaches the DUI step; missing in older API versions. */
   identityDocument?: IdentityDocument | null;
   risk: Assessment | null;
+  /** Audit log of risk decisions, oldest first. Missing in older API versions. */
+  riskDecisions?: RiskDecision[] | null;
+  /** Null until the request is submitted; missing in older API versions. */
+  rnpn?: RnpnCheck | null;
   signals: {
     ip: string | null;
     approximateLocation: string | null;
@@ -215,6 +257,13 @@ export type ScoreModel = {
   weights: { signal: string; name: string; maxPoints: number | null }[];
 };
 
+/** A version in the score model history (VDI-120). `publishedBy` is null when a migration published it. */
+export type ScoreModelVersion = ScoreModel & {
+  validTo: string | null;
+  inForce: boolean;
+  publishedBy: string | null;
+};
+
 export type Alert = {
   id: string;
   account: string;
@@ -236,13 +285,17 @@ export type Catalogs = {
 
 // ---- Requests
 
-/** API error (application/problem+json body) or network error (status 0). */
+/**
+ * API error (application/problem+json body) or network error (status 0). A 400 for invalid fields
+ * also lists each field with its message, in Spanish, under `errors`.
+ */
 export class ApiError extends Error {
   constructor(
     public status: number,
     public title: string,
     public detail?: string,
     public retryAfterSeconds?: number,
+    public errors?: Record<string, string>,
   ) {
     super(detail || title);
   }
@@ -269,7 +322,8 @@ export async function apiFetch<T>(
   if (!res.ok) {
     const problem = await res.json().catch(() => ({}));
     const retry = Number(res.headers.get("Retry-After"));
-    throw new ApiError(res.status, problem.title ?? res.statusText, problem.detail, retry || undefined);
+    const errors = problem.errors && typeof problem.errors === "object" ? problem.errors : undefined;
+    throw new ApiError(res.status, problem.title ?? res.statusText, problem.detail, retry || undefined, errors);
   }
   return res.status === 204 ? (undefined as T) : res.json();
 }

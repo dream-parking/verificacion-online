@@ -8,6 +8,9 @@ enum Screen {
   basicData,
   identityDocument,
   identityConfirmation,
+
+  /// Selfie with the liveness check (VDI-116). The API does not count it as a step of its own.
+  selfie,
   income,
   expectedActivity,
   review,

@@ -24,8 +24,14 @@ export const RISK: Record<RiskLevel, Badge> = {
 export const REQUEST_STATUS: Record<RequestStatus, Badge> = {
   COMPLETED: { cls: "s-ok", label: "✓ Completada" },
   IN_PROGRESS: { cls: "s-progress", label: "… En progreso" },
+  ENHANCED_REVIEW: { cls: "s-enhanced", label: "⚑ Revisión reforzada" },
+  AWAITING_RNPN: { cls: "s-waiting", label: "◷ En espera" },
   ABANDONED: { cls: "s-abandoned", label: "✕ Abandonada" },
 };
+
+/** The person already sent the request: approved automatically, held for enhanced review or waiting for the RNPN. */
+export const isSubmitted = (status: RequestStatus) =>
+  status === "COMPLETED" || status === "ENHANCED_REVIEW" || status === "AWAITING_RNPN";
 
 export const CRITICALITY: Record<Criticality, Badge> = {
   CRITICAL: { cls: "c-critical", label: "◆ Crítica" },

@@ -13,6 +13,8 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -39,7 +41,7 @@ class OpenAiLivenessClientTests {
 	@BeforeEach
 	void startProvider() throws Exception {
 		statusCode = 200;
-		body = completed("{\"faceDetected\":true,\"confidence\":0.87}");
+		body = completed("{\"usable\":true,\"problem\":null,\"faceDetected\":true,\"confidence\":0.87}");
 		delayMillis = 0;
 		server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
 		server.createContext("/v1/responses", exchange -> {
@@ -111,14 +113,14 @@ class OpenAiLivenessClientTests {
 
 	@Test
 	void noFaceMeansZeroConfidenceWhateverTheModelSays() throws Exception {
-		body = completed("{\"faceDetected\":false,\"confidence\":0.95}");
+		body = completed("{\"usable\":true,\"problem\":null,\"faceDetected\":false,\"confidence\":0.95}");
 
 		assertThat(client(true, "sk-test").check(SELFIE).confidence()).isEqualByComparingTo("0.00");
 	}
 
 	@Test
 	void keepsTheConfidenceBetweenZeroAndOne() throws Exception {
-		body = completed("{\"faceDetected\":true,\"confidence\":1.7}");
+		body = completed("{\"usable\":true,\"problem\":null,\"faceDetected\":true,\"confidence\":1.7}");
 
 		assertThat(client(true, "sk-test").check(SELFIE).confidence()).isEqualByComparingTo("1.00");
 	}
@@ -163,9 +165,56 @@ class OpenAiLivenessClientTests {
 		assertThatThrownBy(() -> client(true, "sk-test").check(SELFIE)).isInstanceOf(LivenessException.class)
 			.hasMessageContaining("invalid answer");
 
-		body = completed("{\"faceDetected\":true}");
+		body = completed("{\"usable\":true,\"problem\":null,\"faceDetected\":true}");
 		assertThatThrownBy(() -> client(true, "sk-test").check(SELFIE)).isInstanceOf(LivenessException.class)
 			.hasMessageContaining("invalid answer");
+	}
+
+	@ParameterizedTest
+	@EnumSource(SelfieProblem.class)
+	void aPhotoThatCannotBeJudgedAnswersWhyAndNoConfidence(SelfieProblem problem) throws Exception {
+		body = completed("{\"usable\":false,\"problem\":\"" + problem + "\",\"faceDetected\":false,\"confidence\":0}");
+
+		LivenessResult result = client(true, "sk-test").check(SELFIE);
+
+		assertThat(result.isUsable()).isFalse();
+		assertThat(result.problem()).isEqualTo(problem);
+		assertThat(result.confidence()).isNull();
+	}
+
+	@Test
+	void anUnknownOrMissingProblemIsOther() throws Exception {
+		body = completed("{\"usable\":false,\"problem\":\"SOMETHING_NEW\",\"faceDetected\":false,\"confidence\":0}");
+		assertThat(client(true, "sk-test").check(SELFIE).problem()).isEqualTo(SelfieProblem.OTHER);
+
+		body = completed("{\"usable\":false,\"problem\":null,\"faceDetected\":false,\"confidence\":0}");
+		assertThat(client(true, "sk-test").check(SELFIE).problem()).isEqualTo(SelfieProblem.OTHER);
+	}
+
+	@Test
+	void aUsablePhotoIgnoresAProblemTheModelLeftBehind() throws Exception {
+		body = completed("{\"usable\":true,\"problem\":\"TOO_DARK\",\"faceDetected\":true,\"confidence\":0.8}");
+
+		LivenessResult result = client(true, "sk-test").check(SELFIE);
+
+		assertThat(result.isUsable()).isTrue();
+		assertThat(result.confidence()).isEqualByComparingTo("0.80");
+	}
+
+	@Test
+	void theSchemaAsksIfTheSelfieIsUsableAndListsOnlyQualityProblems() throws Exception {
+		client(true, "sk-test").check(SELFIE);
+
+		JsonNode schema = JsonMapper.builder().build().readTree(requestBody.get()).get("text").get("format").get("schema");
+		assertThat(schema.get("required").toString()).contains("usable", "problem", "faceDetected", "confidence");
+		String problems = schema.get("properties").get("problem").toString();
+		for (SelfieProblem problem : SelfieProblem.values()) {
+			assertThat(problems).contains(problem.name());
+		}
+		assertThat(problems).doesNotContain("SCREEN", "PRINT", "FAKE", "SPOOF");
+		// a fake looking photo lowers the confidence and is never reported as a problem
+		String instructions = OpenAiLivenessClient.INSTRUCTIONS;
+		assertThat(instructions).contains("A photo that looks fake is still usable");
 	}
 
 	@Test

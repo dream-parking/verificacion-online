@@ -39,6 +39,14 @@ public class Customer {
 	@Column(name = "mobile_phone", nullable = false, length = 9)
 	private String mobilePhone;
 
+	/**
+	 * Customer number such as CLI-0000001: assigned once, when the first request is submitted, and never changed. It is
+	 * written only by {@code CustomerRepository.assignNumber} and the entity never updates it ({@code updatable = false}),
+	 * so correcting the customer's data cannot overwrite a number another submission assigned in the meantime.
+	 */
+	@Column(name = "number", length = 20, insertable = false, updatable = false)
+	private String number;
+
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
@@ -81,6 +89,11 @@ public class Customer {
 
 	public void setMobilePhone(String mobilePhone) {
 		this.mobilePhone = mobilePhone;
+	}
+
+	/** The customer number, or null until the customer submits the first request. */
+	public String getNumber() {
+		return number;
 	}
 
 	public Instant getCreatedAt() {

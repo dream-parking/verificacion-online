@@ -28,9 +28,11 @@ import com.dreamparking.backend.onboarding.service.OnboardingService;
 
 /**
  * Liveness check of the selfie (VDI-114): stores the selfie encrypted and records the confidence the provider gives.
- * A provider failure is not an error, so an outage never blocks the request: the check is recorded as
- * {@code FAILED} without confidence and the signal does not count in the score. The provider call runs outside the
- * database transaction so a slow answer does not hold a connection of the small pool.
+ * A selfie that cannot be judged (too dark, blurry…) is answered with an error so the customer takes it again, and
+ * is neither saved nor counted ({@link UnusableSelfieException}). A provider failure is not an error, so an outage
+ * never blocks the request: the check is recorded as {@code FAILED} without confidence and the signal does not count
+ * in the score. The provider call runs outside the database transaction so a slow answer does not hold a connection
+ * of the small pool.
  */
 @Service
 public class LivenessService {
@@ -60,6 +62,7 @@ public class LivenessService {
 	 * Checks the selfie and saves the answer. Can be repeated while the request is in progress; every try counts.
 	 * @throws com.dreamparking.backend.common.exception.InvalidInputException when the selfie is empty or not a JPEG or PNG
 	 * @throws com.dreamparking.backend.common.exception.InvalidStateException when the request is not in progress
+	 * @throws UnusableSelfieException when the selfie cannot be judged; nothing is saved
 	 */
 	public LivenessCheckResponse check(UUID requestId, byte[] content) {
 		DocumentPhoto selfie = IdentityDocumentService.photo("selfie", content);
@@ -73,6 +76,9 @@ public class LivenessService {
 		catch (LivenessException ex) {
 			log.warn("The liveness check of a request could not be done: {}", ex.getMessage());
 			failure = ex.getMessage();
+		}
+		if (result != null && !result.isUsable()) {
+			throw new UnusableSelfieException(result.problem());
 		}
 		LivenessResult answer = result;
 		String failed = failure;

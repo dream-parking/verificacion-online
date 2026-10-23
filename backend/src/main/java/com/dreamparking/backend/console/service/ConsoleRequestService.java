@@ -37,6 +37,7 @@ import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 import com.dreamparking.backend.risk.service.RiskAssessmentService;
 import com.dreamparking.backend.risk.service.RiskDecisionService;
+import com.dreamparking.backend.rnpn.repository.RnpnCheckRepository;
 
 /** Read side of the console: request list and detail. */
 @Service
@@ -94,6 +95,8 @@ public class ConsoleRequestService {
 
 	private final RiskDecisionService riskDecisions;
 
+	private final RnpnCheckRepository rnpnChecks;
+
 	private final IdentityDocumentRepository identityDocuments;
 
 	private final IdentityDocumentImageRepository identityDocumentImages;
@@ -105,7 +108,7 @@ public class ConsoleRequestService {
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
-			RiskAssessmentService riskAssessments, RiskDecisionService riskDecisions,
+			RiskAssessmentService riskAssessments, RiskDecisionService riskDecisions, RnpnCheckRepository rnpnChecks,
 			IdentityDocumentRepository identityDocuments, IdentityDocumentImageRepository identityDocumentImages,
 			ExpectedActivityVersionRepository expectedActivityVersions, PrivacyConsentRepository consents) {
 		this.jdbc = jdbc;
@@ -117,6 +120,7 @@ public class ConsoleRequestService {
 		this.events = events;
 		this.riskAssessments = riskAssessments;
 		this.riskDecisions = riskDecisions;
+		this.rnpnChecks = rnpnChecks;
 		this.identityDocuments = identityDocuments;
 		this.identityDocumentImages = identityDocumentImages;
 		this.expectedActivityVersions = expectedActivityVersions;
@@ -203,6 +207,10 @@ public class ConsoleRequestService {
 					a.getRegisteredAt(), a.getUpdatedAt(), profileVersions(requestId)))
 			.orElse(null);
 		var risk = riskAssessments.findCurrent(requestId).orElse(null);
+		var rnpn = rnpnChecks.findFirstByRequestIdOrderByCheckedAtDescIdDesc(requestId)
+			.map(c -> new ConsoleRequestDetail.Rnpn(c.getOutcome(), c.isSimulated(), c.getProvider(), c.getAttempts(),
+					c.getMismatchedFields(), c.getCheckedAt()))
+			.orElse(null);
 		var signalsView = signals.findById(requestId)
 			.filter(s -> s.getIp() != null || s.getDeviceFingerprint() != null)
 			.map(ConsoleRequestService::toSignals)
@@ -218,10 +226,11 @@ public class ConsoleRequestService {
 					e.getOccurredAt()))
 			.toList();
 
-		return new ConsoleRequestDetail(request.getId(), request.getNumber(), request.getStatus(),
+		return new ConsoleRequestDetail(request.getId(), request.getNumber(),
+				request.getCustomer() == null ? null : request.getCustomer().getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
 				request.getSubmittedAt(), applicant, consent, identityDocument, income, expectedActivity, risk,
-				riskDecisions.log(requestId), signalsView, stepTimes, timeline);
+				riskDecisions.log(requestId), rnpn, signalsView, stepTimes, timeline);
 	}
 
 	/** Every version of the declared profile, the oldest first; the last one is the one in force. */

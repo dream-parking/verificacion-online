@@ -14,7 +14,7 @@ String formatSavedAt(DateTime local) {
   return '${local.day} de ${_months[local.month - 1]} a las $hour:$minutes ${local.hour < 12 ? 'a. m.' : 'p. m.'}';
 }
 
-/// «¡Hola de nuevo!»: shown on opening the app when a request was left halfway (VDI-87). Lists the 5 steps with when
+/// «¡Hola de nuevo!»: shown on opening the app when a request was left halfway (VDI-87). Lists the 6 steps with when
 /// each was saved and where the person is; the buttons are in the action bar of the flow.
 class ResumeView extends StatelessWidget {
   const ResumeView({super.key, required this.info, required this.current});
@@ -27,6 +27,7 @@ class ResumeView extends StatelessWidget {
   static const _names = {
     Screen.basicData: 'Datos básicos',
     Screen.identityDocument: 'Tu DUI',
+    Screen.selfie: 'Tu selfie',
     Screen.income: 'Tus ingresos',
     Screen.expectedActivity: 'El dinero de tu cuenta',
     Screen.review: 'Revisar y enviar',

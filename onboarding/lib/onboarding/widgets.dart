@@ -282,9 +282,9 @@ class OptionCard extends StatelessWidget {
   }
 }
 
-/// Segmented "Paso N de 5" progress bar.
+/// Segmented "Paso N de 6" progress bar.
 class StepProgress extends StatelessWidget {
-  const StepProgress({super.key, required this.step, this.total = 5});
+  const StepProgress({super.key, required this.step, this.total = 6});
 
   final int step;
   final int total;

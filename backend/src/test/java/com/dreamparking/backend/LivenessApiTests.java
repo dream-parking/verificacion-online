@@ -36,6 +36,7 @@ import com.dreamparking.backend.console.entity.enums.ConsoleRole;
 import com.dreamparking.backend.liveness.client.LivenessClient;
 import com.dreamparking.backend.liveness.client.LivenessException;
 import com.dreamparking.backend.liveness.client.LivenessResult;
+import com.dreamparking.backend.liveness.client.SelfieProblem;
 import com.jayway.jsonpath.JsonPath;
 
 /**
@@ -150,6 +151,45 @@ class LivenessApiTests {
 			// no signal rejects by itself: the worst liveness only moves the score, and the request goes on
 			.andExpect(jsonPath("$.score").value(8))
 			.andExpect(jsonPath("$.level").value("LOW"));
+	}
+
+	@Test
+	void aSelfieThatCannotBeJudgedIsRejectedWithTheReasonAndSavesNothing() throws Exception {
+		when(liveness.check(any())).thenReturn(LivenessResult.unusable(SelfieProblem.TOO_DARK));
+		String id = startRequest();
+
+		upload(id, SELFIE, "image/jpeg").andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.reason").value("TOO_DARK"));
+
+		assertThat(jdbc.queryForObject("select count(*) from liveness_check where request_id = ?::uuid",
+				Integer.class, id)).isZero();
+		assertThat(jdbc.queryForObject("select count(*) from request_event where request_id = ?::uuid "
+				+ "and type = 'LIVENESS_CHECKED'", Integer.class, id)).isZero();
+	}
+
+	@Test
+	void anUnusableTryDoesNotCountNorReplaceAGoodResult() throws Exception {
+		when(liveness.check(any())).thenReturn(new LivenessResult(new BigDecimal("0.91")))
+			.thenReturn(LivenessResult.unusable(SelfieProblem.BLURRY))
+			.thenReturn(LivenessResult.unusable(SelfieProblem.GLARE))
+			.thenReturn(LivenessResult.unusable(SelfieProblem.TOO_DARK))
+			.thenReturn(new LivenessResult(new BigDecimal("0.85")));
+		String id = startRequest();
+
+		upload(id, SELFIE, "image/jpeg").andExpect(jsonPath("$.attempts").value(1));
+		upload(id, SELFIE, "image/jpeg").andExpect(status().isUnprocessableContent())
+			.andExpect(jsonPath("$.reason").value("BLURRY"));
+		upload(id, SELFIE, "image/jpeg").andExpect(status().isUnprocessableContent());
+		upload(id, SELFIE, "image/jpeg").andExpect(status().isUnprocessableContent());
+		em.flush();
+		// the good result is still there and three bad photos did not make it a repeated try
+		assertThat(jdbc.queryForObject("select confidence from liveness_check where request_id = ?::uuid",
+				BigDecimal.class, id)).isEqualByComparingTo("0.91");
+		assertThat(jdbc.queryForObject("select attempts from liveness_check where request_id = ?::uuid", Integer.class,
+				id)).isEqualTo(1);
+
+		// the next judged selfie is the second try, not the fifth
+		upload(id, SELFIE, "image/jpeg").andExpect(status().isOk()).andExpect(jsonPath("$.attempts").value(2));
 	}
 
 	@Test

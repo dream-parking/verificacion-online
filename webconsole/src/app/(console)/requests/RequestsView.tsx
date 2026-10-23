@@ -16,6 +16,7 @@ import { useLoad } from "@/lib/console/hooks";
 import { errorMessage, usePaginatedFilters } from "@/lib/console/hooks";
 import { apiFetch, fetchAllRequests, type Catalogs, type RequestSummary } from "@/lib/console/api";
 import { REQUEST_STATUS, formatDate, formatShortDate, TIME_NOTE, RISK } from "@/lib/console/format";
+import { customerNumberOf, fetchCustomerRequestIds, isPartialCustomerNumber } from "@/lib/console/customers";
 
 const INITIAL_FILTERS = {
   requestNumber: "",
@@ -30,10 +31,16 @@ const INITIAL_FILTERS = {
 const UNDECLARED = "__none__";
 const NO_NUMBER = "Sin número aún";
 
-function matchesFilters(r: RequestSummary, f: typeof INITIAL_FILTERS) {
+/**
+ * `customerRequests` are the requests of the customer whose number was typed in the first filter (VDI-123): the API
+ * list does not carry the customer number. It is undefined while they load or when no customer has that number.
+ */
+function matchesFilters(r: RequestSummary, f: typeof INITIAL_FILTERS, customerRequests?: string[] | null) {
   const requestNumber = f.requestNumber.trim().toLowerCase();
   const name = f.name.trim().toLowerCase();
-  if (requestNumber && !(r.number ?? NO_NUMBER).toLowerCase().includes(requestNumber)) return false;
+  if (customerNumberOf(f.requestNumber)) {
+    if (!customerRequests?.includes(r.id)) return false;
+  } else if (requestNumber && !(r.number ?? NO_NUMBER).toLowerCase().includes(requestNumber)) return false;
   if (name && !(r.name ?? "").toLowerCase().includes(name)) return false;
   if (f.date !== "all" && formatDate(r.date) !== f.date) return false;
   if (f.kind === UNDECLARED ? r.transactionTypeLabel : f.kind !== "all" && r.transactionTypeLabel !== f.kind)
@@ -62,9 +69,13 @@ export function RequestsView() {
   const catalogs = useLoad("catalogos", (t) => apiFetch<Catalogs>("/api/catalogs", { token: t }));
   const { filters: f, setFilter, clear, hasFilters, size, setSize, setPage, paginate } =
     usePaginatedFilters(INITIAL_FILTERS);
+  const customerNumber = customerNumberOf(f.requestNumber);
+  const customer = useLoad(customerNumber && `cliente:${customerNumber}`, (t) =>
+    fetchCustomerRequestIds(t, customerNumber!),
+  );
 
   const data = requests.data ?? [];
-  const filtered = data.filter((r) => matchesFilters(r, f));
+  const filtered = data.filter((r) => matchesFilters(r, f, customer.data));
   const pagination = paginate(filtered);
   const dates = [...new Set(data.map((r) => formatDate(r.date)))];
 
@@ -79,8 +90,8 @@ export function RequestsView() {
       <FiltersPanel label="solicitudes" hasFilters={hasFilters} onClear={clear}>
         <TextFilter
           id="f-num"
-          label="Solicitud"
-          placeholder="Por ejemplo, SOL-2026-00418"
+          label="Solicitud o cliente"
+          placeholder="SOL-2026-00418 o CLI-0000001"
           value={f.requestNumber}
           onChange={(v) => setFilter("requestNumber", v)}
         />
@@ -149,6 +160,8 @@ export function RequestsView() {
             { value: "all", label: "Todos" },
             { value: "IN_PROGRESS", label: "En progreso" },
             { value: "COMPLETED", label: "Completada" },
+            { value: "ENHANCED_REVIEW", label: "Revisión reforzada" },
+            { value: "AWAITING_RNPN", label: "En espera" },
             { value: "ABANDONED", label: "Abandonada" },
           ]}
         />
@@ -190,10 +203,28 @@ export function RequestsView() {
             text="Cuando alguien envíe su solicitud desde la app, aparecerá aquí."
           />
         )}
-        {data.length > 0 && filtered.length === 0 && (
+        {data.length > 0 && customer.loading && (
+          <div role="status" className="p-4 text-sm text-muted">
+            Buscando las solicitudes del cliente {customerNumber}…
+          </div>
+        )}
+        {data.length > 0 && customer.error && (
+          <LoadError
+            title="No pudimos buscar el número de cliente"
+            text={errorMessage(customer.error, "Hubo un problema con el servidor. Intenta de nuevo en un momento.")}
+            onRetry={customer.reload}
+          />
+        )}
+        {data.length > 0 && filtered.length === 0 && !customer.loading && !customer.error && (
           <Empty
             title="No encontramos solicitudes"
-            text="Prueba con otros filtros, o quítalos para ver todas."
+            text={
+              customerNumber && customer.data === null
+                ? `No hay ningún cliente con el número ${customerNumber}.`
+                : isPartialCustomerNumber(f.requestNumber)
+                  ? "Escribe el número de cliente completo, por ejemplo CLI-0000001."
+                  : "Prueba con otros filtros, o quítalos para ver todas."
+            }
             onClear={hasFilters ? clear : undefined}
           />
         )}

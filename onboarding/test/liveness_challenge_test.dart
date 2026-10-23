@@ -108,9 +108,26 @@ void main() {
   });
 
   test('in the dark it asks for light and does not move on', () {
-    final c = feed([for (var i = 0; i < 5; i++) face(light: FrameHint.tooDark)]);
+    final c = feed([for (var i = 0; i < 5; i++) face(light: FrameHint.veryDark)]);
     expect(c.hint, FaceHint.tooDark);
     expect(c.step, ChallengeStep.lookFront);
+  });
+
+  test('dim light (an ordinary room on an iPhone) neither stops the check nor warns', () {
+    final c = feed([
+      for (var i = 0; i < 3; i++) face(light: FrameHint.tooDark),
+      face(yaw: 30, light: FrameHint.tooDark),
+      face(light: FrameHint.tooDark),
+      face(eyes: 0.05, light: FrameHint.tooDark),
+      for (var i = 0; i < 4; i++) face(light: FrameHint.tooDark),
+    ]);
+    expect(c.hint, FaceHint.good);
+    expect(c.ready, isTrue);
+  });
+
+  test('without a face, only a scene too dark says there is little light', () {
+    expect(feed([const FaceFrame(light: FrameHint.tooDark)]).hint, FaceHint.searching);
+    expect(feed([const FaceFrame(light: FrameHint.veryDark)]).hint, FaceHint.tooDark);
   });
 
   test('a face too far, too close or off the middle is told how to fix it and does not count', () {

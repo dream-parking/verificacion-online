@@ -115,8 +115,8 @@ void main() {
 
   test('a face too far, too close or off the middle is told how to fix it and does not count', () {
     expect(feed([face(box: const Rect.fromLTWH(0.4, 0.35, 0.2, 0.2))]).hint, FaceHint.tooFar);
-    expect(feed([face(box: const Rect.fromLTWH(0.02, 0.0, 0.96, 0.9))]).hint, FaceHint.tooClose);
-    final aside = feed([for (var i = 0; i < 5; i++) face(box: const Rect.fromLTWH(0.45, 0.2, 0.5, 0.5))]);
+    expect(feed([face(box: const Rect.fromLTWH(-0.05, 0.0, 1.1, 0.6))]).hint, FaceHint.tooClose);
+    final aside = feed([for (var i = 0; i < 5; i++) face(box: const Rect.fromLTWH(0.55, 0.2, 0.5, 0.5))]);
     expect(aside.hint, FaceHint.offCenter);
     expect(aside.step, ChallengeStep.lookFront);
   });
@@ -125,6 +125,44 @@ void main() {
     final afterBlink = [...front, face(yaw: 35), face(), face(eyes: 0.05), face()];
     expect(feed([...afterBlink, for (var i = 0; i < 5; i++) face(yaw: 30)]).ready, isFalse);
     expect(feed([...afterBlink, for (var i = 0; i < 5; i++) face(eyes: 0.4)]).ready, isFalse);
+  });
+
+  group('measured with a person in front of a laptop webcam', () {
+    // Looking at the webcam read about 8°, the face took 70 % to 90 % of the image width, and a natural turn reached
+    // 17° one way and -9.5° the other. With 25° from 0° it never got past «Gira la cabeza».
+    FaceFrame webcam({double yaw = 8, double eyes = 0.99, double width = 0.72}) =>
+        face(yaw: yaw, eyes: eyes, box: Rect.fromLTWH(0.5 - width / 2, 0.31, width, 0.4));
+
+    test('a face at that distance is well placed', () {
+      for (final width in [0.68, 0.72, 0.84, 0.9]) {
+        expect(feed([webcam(width: width)]).hint, FaceHint.good, reason: 'width $width');
+      }
+    });
+
+    test('the turn is measured from how the face looked at the camera', () {
+      final front = [webcam(), webcam(yaw: 7.6), webcam(yaw: 9.2)];
+      expect(feed([...front, webcam(yaw: 17.2)]).step, ChallengeStep.turn, reason: '9° from the start is not a turn');
+      expect(feed([...front, webcam(yaw: -9.5)]).step, ChallengeStep.blink, reason: '17.5° from the start is');
+    });
+
+    test('the whole check gets to the selfie', () {
+      final c = feed([
+        webcam(), webcam(yaw: 7.6), webcam(yaw: 9.2),
+        webcam(yaw: -9.5),
+        webcam(), webcam(eyes: 0.03), webcam(),
+        webcam(yaw: 7.5), webcam(yaw: 9.9), webcam(yaw: 9.4),
+      ]);
+      expect(c.ready, isTrue);
+    });
+
+    test('the final photo is taken looking at the camera as at the start, not turned', () {
+      final c = feed([
+        webcam(), webcam(), webcam(),
+        webcam(yaw: -9.5), webcam(), webcam(eyes: 0.03), webcam(),
+        for (var i = 0; i < 5; i++) webcam(yaw: -9),
+      ]);
+      expect(c.ready, isFalse);
+    });
   });
 
   test('once ready it stays ready', () {

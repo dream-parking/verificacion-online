@@ -842,7 +842,7 @@ void main() {
         expect(find.text('Se termina sola al completar los 3 pasos'), findsOneWidget);
 
         await faces.show(tester, [FakeFaceCamera.face(), FakeFaceCamera.face(), FakeFaceCamera.face()]);
-        expect(find.text('Gira un poco la cabeza hacia un lado'), findsOneWidget);
+        expect(find.text('Gira la cabeza hacia un lado'), findsOneWidget);
         expect(find.text('Bien, tu rostro está dentro del óvalo'), findsOneWidget);
         await faces.show(tester, [FakeFaceCamera.face(yaw: 30)]);
         expect(find.text('Parpadea despacio'), findsOneWidget);

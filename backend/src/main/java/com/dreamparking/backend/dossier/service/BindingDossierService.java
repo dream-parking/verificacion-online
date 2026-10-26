@@ -1,12 +1,14 @@
 package com.dreamparking.backend.dossier.service;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 import tools.jackson.databind.json.JsonMapper;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,13 +36,17 @@ import com.dreamparking.backend.rnpn.repository.RnpnCheckRepository;
  * Builds and reads the binding dossier (VDI-131): when the customer signs, {@link #freeze} copies the evidence that
  * backed the approval into a row nobody can change. The electronic signature (VDI-15) calls it in the same transaction
  * that records the signature, with the contract version and fingerprint it signed:
- * {@code dossiers.freeze(requestId, new Signature(version, fingerprint, signedAt))}.
+ * {@code dossiers.freeze(requestId, new Signature(version, fingerprint, signedAt))}. It also saves the date until
+ * which the dossier is retained: the signature plus {@code app.dossier.retention-years} (VDI-134).
  */
 @Service
 public class BindingDossierService {
 
 	/** Shape of the stored evidence; a change of shape raises it so old dossiers stay readable. */
 	static final int SCHEMA_VERSION = 1;
+
+	/** The retention period is counted in calendar years of Salvadoran time, like the rest of the file's dates. */
+	private static final ZoneId EL_SALVADOR = ZoneId.of("America/El_Salvador");
 
 	private static final Pattern FINGERPRINT = Pattern.compile("[0-9a-f]{64}");
 
@@ -66,11 +72,16 @@ public class BindingDossierService {
 
 	private final JsonMapper json;
 
+	private final int retentionYears;
+
 	public BindingDossierService(BindingDossierRepository dossiers, OnboardingRequestRepository requests,
 			PrivacyConsentRepository consents, IdentityDocumentRepository identityDocuments,
 			RnpnCheckRepository rnpnChecks, LivenessCheckRepository livenessChecks,
 			RiskAssessmentService riskAssessments, RiskDecisionService riskDecisions, ScoreModelRepository scoreModels,
-			JsonMapper json) {
+			JsonMapper json, @Value("${app.dossier.retention-years:10}") int retentionYears) {
+		if (retentionYears < 1) {
+			throw new IllegalArgumentException("app.dossier.retention-years must be at least 1, not " + retentionYears);
+		}
 		this.dossiers = dossiers;
 		this.requests = requests;
 		this.consents = consents;
@@ -81,6 +92,7 @@ public class BindingDossierService {
 		this.riskDecisions = riskDecisions;
 		this.scoreModels = scoreModels;
 		this.json = json;
+		this.retentionYears = retentionYears;
 	}
 
 	/**
@@ -98,13 +110,18 @@ public class BindingDossierService {
 			.orElseThrow(() -> new NotFoundException("Onboarding request not found: " + requestId));
 		String evidence = json.writeValueAsString(evidenceOf(request));
 		return toResponse(dossiers.save(new BindingDossier(request, signature.contractVersion(),
-				signature.contractFingerprint(), signature.signedAt(), evidence)));
+				signature.contractFingerprint(), signature.signedAt(), retainedUntil(signature.signedAt()), evidence)));
 	}
 
 	/** The dossier of the request, or empty while the customer has not signed. */
 	@Transactional(readOnly = true)
 	public Optional<BindingDossierResponse> find(UUID requestId) {
 		return dossiers.findByRequest_Id(requestId).map(this::toResponse);
+	}
+
+	/** The date of the signature plus the retention period. */
+	Instant retainedUntil(Instant signedAt) {
+		return signedAt.atZone(EL_SALVADOR).plusYears(retentionYears).toInstant();
 	}
 
 	private Evidence evidenceOf(OnboardingRequest request) {
@@ -142,7 +159,7 @@ public class BindingDossierService {
 	private BindingDossierResponse toResponse(BindingDossier dossier) {
 		return new BindingDossierResponse(dossier.getId(), dossier.getRequest().getId(),
 				new Signature(dossier.getContractVersion(), dossier.getContractFingerprint(), dossier.getSignedAt()),
-				dossier.getFrozenAt(), json.readValue(dossier.getEvidence(), Evidence.class));
+				dossier.getFrozenAt(), dossier.getRetainedUntil(), json.readValue(dossier.getEvidence(), Evidence.class));
 	}
 
 	private static void validate(Signature signature) {

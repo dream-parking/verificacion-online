@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -83,6 +84,7 @@ class BindingDossierApiTests {
 		assertThat(dossier.requestId()).hasToString(requestId);
 		assertThat(dossier.signature()).isEqualTo(signature());
 		assertThat(dossier.frozenAt()).isNotNull();
+		assertThat(dossier.retainedUntil()).isEqualTo(Instant.parse("2036-10-27T15:30:00Z"));
 		var evidence = dossier.evidence();
 		assertThat(evidence.schemaVersion()).isEqualTo(1);
 		assertThat(evidence.identity().dui()).isEqualTo("01234567-8");
@@ -116,6 +118,7 @@ class BindingDossierApiTests {
 			.andExpect(jsonPath("$.bindingDossier.signature.contractVersion").value("2026.1"))
 			.andExpect(jsonPath("$.bindingDossier.signature.contractFingerprint").value(FINGERPRINT))
 			.andExpect(jsonPath("$.bindingDossier.signature.signedAt").value("2026-10-27T15:30:00Z"))
+			.andExpect(jsonPath("$.bindingDossier.retainedUntil").value("2036-10-27T15:30:00Z"))
 			.andExpect(jsonPath("$.bindingDossier.evidence.identity.dui").value("01234567-8"))
 			.andExpect(jsonPath("$.bindingDossier.evidence.consent.noticeVersion").isNotEmpty())
 			.andExpect(jsonPath("$.bindingDossier.evidence.rnpn.outcome").value("MATCH"))
@@ -160,6 +163,17 @@ class BindingDossierApiTests {
 		assertThat(jdbc.queryForObject("select count(*) from binding_dossier where request_id = ?", Integer.class,
 				requestId))
 			.isEqualTo(1);
+	}
+
+	@Test
+	void theDatabaseRefusesToDeleteTheDossierBeforeItsRetentionDate() throws Exception {
+		UUID requestId = UUID.fromString(submitted("01234567-8"));
+		dossiers.freeze(requestId, signature());
+		em.flush();
+
+		assertThatThrownBy(() -> jdbc.update("delete from binding_dossier where request_id = ?", requestId))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("cannot be deleted before 2036-10-27");
 	}
 
 	@Test

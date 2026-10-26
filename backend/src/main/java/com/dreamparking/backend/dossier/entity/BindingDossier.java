@@ -21,7 +21,8 @@ import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 /**
  * The binding dossier of a request (VDI-131): a frozen copy of the evidence that backed the approval, written when the
  * customer signs. {@code evidence} is the JSON of {@code BindingDossierResponse.Evidence}, kept as text so it is read
- * back exactly as it was written. The file only receives new dossiers: the database refuses to change or delete one.
+ * back exactly as it was written. The file only receives new dossiers: the database refuses to change one, or to delete it before
+ * {@code retainedUntil}.
  */
 @Entity
 @Table(name = "binding_dossier")
@@ -45,6 +46,10 @@ public class BindingDossier {
 	@Column(name = "signed_at", nullable = false, updatable = false)
 	private Instant signedAt;
 
+	/** The date until the dossier is retained (VDI-134): the signature plus the retention period; no deletion before it. */
+	@Column(name = "retained_until", nullable = false, updatable = false)
+	private Instant retainedUntil;
+
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name = "evidence", nullable = false, updatable = false)
 	private String evidence;
@@ -57,11 +62,12 @@ public class BindingDossier {
 	}
 
 	public BindingDossier(OnboardingRequest request, String contractVersion, String contractFingerprint,
-			Instant signedAt, String evidence) {
+			Instant signedAt, Instant retainedUntil, String evidence) {
 		this.request = request;
 		this.contractVersion = contractVersion;
 		this.contractFingerprint = contractFingerprint;
 		this.signedAt = signedAt;
+		this.retainedUntil = retainedUntil;
 		this.evidence = evidence;
 	}
 
@@ -83,6 +89,10 @@ public class BindingDossier {
 
 	public Instant getSignedAt() {
 		return signedAt;
+	}
+
+	public Instant getRetainedUntil() {
+		return retainedUntil;
 	}
 
 	public String getEvidence() {

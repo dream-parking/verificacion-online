@@ -9,7 +9,6 @@ import '../api/resume.dart';
 import '../identity/document_camera.dart';
 import '../identity/dui_capture.dart';
 import '../identity/identity_document.dart';
-import '../liveness/face_camera.dart';
 import '../liveness/selfie_capture.dart';
 import '../liveness/selfie_problem.dart';
 import '../signals/device_fingerprint.dart';
@@ -29,7 +28,7 @@ class OnboardingFlow extends StatefulWidget {
     this.api,
     this.deviceInfo,
     this.camera = const PlatformDocumentCamera(),
-    this.faceCamera = const PlatformFaceCamera(),
+    this.faceCamera = const PlatformDocumentCamera(front: true),
     this.location,
     this.savedRequest = const PreferencesSavedRequestStore(),
     this.clock = DateTime.now,
@@ -45,7 +44,7 @@ class OnboardingFlow extends StatefulWidget {
   final DocumentCamera camera;
 
   /// Front camera of the selfie, with the faces it finds (VDI-116); tests pass a fake one.
-  final FaceCamera faceCamera;
+  final DocumentCamera faceCamera;
 
   /// Approximate location reader (VDI-73); tests pass a fake one.
   final DeviceLocationSource? location;
@@ -562,16 +561,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     });
   }
 
-  /// VDI-116: «Empezar la prueba» or «Intentar de nuevo» opens the camera.
+  /// VDI-116: «Tomar mi selfie» or «Intentar de nuevo» opens the camera.
   void _startSelfie() => setState(() {
         _selfie = _SelfiePhase.camera;
         _selfieProblem = null;
-      });
-
-  /// The steps were not done in time: try again, without saying more. Nothing was sent, so it is not an attempt.
-  void _onSelfieTimeout() => setState(() {
-        _selfie = _SelfiePhase.retry;
-        _selfieProblem = SelfieProblem.notCompleted;
       });
 
   void _onSelfieCaptured(Uint8List photo) {
@@ -979,7 +972,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 // After a connection error the selfie is sent again from the message; the camera is not opened again.
                 if (_selfieError == null) ...[
                   PrimaryButton(
-                    text: _selfie == _SelfiePhase.retry ? 'Intentar de nuevo' : 'Empezar la prueba',
+                    text: _selfie == _SelfiePhase.retry ? 'Intentar de nuevo' : 'Tomar mi selfie',
                     onPressed: _busy ? null : _startSelfie,
                   ),
                   const SizedBox(height: 12),
@@ -1409,7 +1402,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   Widget _selfieCapture() => SelfieCaptureView(
         camera: widget.faceCamera,
         onCaptured: _onSelfieCaptured,
-        onTimeout: _onSelfieTimeout,
         onBack: _busy ? null : () => setState(() => _selfie = _SelfiePhase.intro),
       );
 
@@ -2106,10 +2098,10 @@ enum _SelfiePhase {
   /// What is going to be asked, before opening the camera.
   intro,
 
-  /// The camera with the steps of the check.
+  /// The front camera, with the shutter.
   camera,
 
-  /// The check was not completed or the selfie could not be judged: tips to try again.
+  /// The API could not judge the selfie because of how it was taken: tips to try again.
   retry,
 
   /// The API has the selfie.
@@ -2145,8 +2137,7 @@ class _SelfieIntro extends StatelessWidget {
           const ScreenTitle('Ahora, una selfie rápida'),
           const SizedBox(height: 12),
           const Text(
-            'Vamos a comprobar que eres tú y que estás aquí en este momento. Te pediremos mover un poco la cabeza; '
-            'no necesitas tocar la pantalla.',
+            'Vamos a comprobar que eres tú. Coloca tu rostro dentro del óvalo, mira a la cámara y toma la foto.',
             style: AppText.body,
           ),
           const SizedBox(height: 20),
@@ -2189,7 +2180,7 @@ class _SelfieIntro extends StatelessWidget {
   }
 }
 
-/// «No pudimos completar la prueba»: what can be fixed and tips. It never says the system suspected anything.
+/// «No pudimos usar tu selfie»: what can be fixed and tips. It never says the system suspected anything.
 class _SelfieRetry extends StatelessWidget {
   const _SelfieRetry({required this.problem});
 
@@ -2203,7 +2194,7 @@ class _SelfieRetry extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const ScreenTitle('No pudimos completar la prueba'),
+          const ScreenTitle('No pudimos usar tu selfie'),
           const SizedBox(height: 12),
           if (detail != null) ...[
             Text(detail, style: AppText.bodyBold),

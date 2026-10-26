@@ -129,7 +129,7 @@ Dev (`com.dreamparking.onboarding.dev`, *Tangamandapio Dev*) y QA (`com.dreampar
 
 ## 8. Correr en iPhone (iOS)
 
-Se necesita una Mac con **Xcode** (Mac App Store) y **CocoaPods**: la selfie con prueba de vida (VDI-116) usa ML Kit de Google, que en iOS solo se instala con CocoaPods.
+Se necesita una Mac con **Xcode** (Mac App Store). No hace falta CocoaPods: todos los plugins se instalan con Swift Package Manager.
 
 1. Configurar Xcode (pide la contraseña de la Mac):
    ```bash
@@ -138,9 +138,9 @@ Se necesita una Mac con **Xcode** (Mac App Store) y **CocoaPods**: la selfie con
    ```bash
    sudo xcodebuild -runFirstLaunch
    ```
-2. Instalar CocoaPods:
+2. Descargar el simulador de iOS (unos 8 GB; solo si se va a usar):
    ```bash
-   brew install cocoapods
+   xcodebuild -downloadPlatform iOS
    ```
 3. Conectar el iPhone por cable, desbloquearlo y aceptar «Confiar en esta computadora». En el iPhone, activar **Ajustes → Privacidad y seguridad → Modo de desarrollador** (se reinicia).
 4. Firmar la app con un Apple ID (gratis): abrir `ios/Runner.xcworkspace` en Xcode → target **Runner** → **Signing & Capabilities** → marcar *Automatically manage signing* → en **Team** elegir o agregar tu Apple ID. Si el *Bundle Identifier* ya está tomado, cambiarlo por uno propio (por ejemplo, agregarle tu nombre). **No subir** este cambio al repo.
@@ -150,7 +150,7 @@ Se necesita una Mac con **Xcode** (Mac App Store) y **CocoaPods**: la selfie con
    ```
    La primera vez, el iPhone pide confiar en el desarrollador: **Ajustes → General → VPN y gestión de dispositivos** → tu Apple ID → *Confiar*.
 
-**Simulador de iOS: no sirve para esta app.** ML Kit no trae versión para el simulador en Macs con chip Apple, y los simuladores de Xcode 27 ya no aceptan la versión para Intel: la app compila, pero el simulador la rechaza («Needs to Be Updated»). Además, el simulador no tiene cámara, así que no se podrían probar el DUI ni la selfie. Para iOS hay que usar un iPhone real.
+**Simulador de iOS:** la app corre (`flutter run` con el simulador abierto), pero el simulador no tiene cámara: sirve para las pantallas, no para el DUI ni la selfie. Para esos pasos hay que usar un iPhone real.
 
 ## Problemas comunes
 
@@ -165,4 +165,3 @@ Se necesita una Mac con **Xcode** (Mac App Store) y **CocoaPods**: la selfie con
   flutter pub get
   ```
 - **iPhone:** ver la sección 8.
-- **iOS, «Framework 'Pods_Runner' not found» en la primera compilación:** volver a correr `flutter run`; pasa solo la primera vez, justo después de instalar los pods.

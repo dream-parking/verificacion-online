@@ -36,15 +36,18 @@ abstract class CameraSession {
   Future<void> dispose();
 }
 
-/// Opens the camera to photograph the DUI (VDI-77).
+/// Opens a camera: the rear one to photograph the DUI (VDI-77) or the front one for the selfie (VDI-116).
 abstract class DocumentCamera {
   /// Throws [CameraUnavailable] if there is no camera or the permission was denied.
   Future<CameraSession> open();
 }
 
-/// Rear camera of the phone, through the `camera` plugin.
+/// Camera of the phone, through the `camera` plugin: the rear one by default, or the front one for the selfie.
 class PlatformDocumentCamera implements DocumentCamera {
-  const PlatformDocumentCamera();
+  const PlatformDocumentCamera({this.front = false});
+
+  /// The front camera, for the selfie (VDI-116). It is not zoomed in: a face is not a document.
+  final bool front;
 
   static const _deniedCodes = {'CameraAccessDenied', 'CameraAccessDeniedWithoutPrompt', 'CameraAccessRestricted'};
 
@@ -54,17 +57,18 @@ class PlatformDocumentCamera implements DocumentCamera {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) throw const CameraUnavailable();
-      final rear = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.back, orElse: () => cameras.first);
-      // No audio: the DUI is a photo, so the microphone is never requested. The live frames come as YUV on
+      final lens = front ? CameraLensDirection.front : CameraLensDirection.back;
+      final camera = cameras.firstWhere((c) => c.lensDirection == lens, orElse: () => cameras.first);
+      // No audio: the DUI and the selfie are photos, so the microphone is never requested. The live frames come as YUV on
       // Android and BGRA on iOS, where the brightness is cheap to read.
       controller = CameraController(
-        rear,
+        camera,
         ResolutionPreset.veryHigh,
         enableAudio: false,
         imageFormatGroup: defaultTargetPlatform == TargetPlatform.android ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
       );
       await controller.initialize();
-      await _prepare(controller);
+      await _prepare(controller, zoom: !front);
     } on CameraException catch (e) {
       debugPrint('Could not open the camera: ${e.code}');
       throw CameraUnavailable(permissionDenied: _deniedCodes.contains(e.code));
@@ -75,14 +79,16 @@ class PlatformDocumentCamera implements DocumentCamera {
   }
 
   /// Zoom and focus for photographing a document. Whatever the phone cannot do is skipped: the camera still works.
-  static Future<void> _prepare(CameraController controller) async {
+  static Future<void> _prepare(CameraController controller, {required bool zoom}) async {
     // The flash off: in the dark the phone would fire it on its own (automatic by default) and put a glare on the DUI.
     // The Product Owner decided that the answer to the dark is to block the shutter, not to light the document.
     await _tryTo('flash', () => controller.setFlashMode(FlashMode.off));
-    await _tryTo('zoom', () async {
-      final zoom = initialZoom(await controller.getMinZoomLevel(), await controller.getMaxZoomLevel());
-      await controller.setZoomLevel(zoom);
-    });
+    if (zoom) {
+      await _tryTo('zoom', () async {
+        final level = initialZoom(await controller.getMinZoomLevel(), await controller.getMaxZoomLevel());
+        await controller.setZoomLevel(level);
+      });
+    }
     await _tryTo('focus', () async {
       await controller.setFocusMode(FocusMode.auto);
       await controller.setFocusPoint(const Offset(0.5, 0.5));

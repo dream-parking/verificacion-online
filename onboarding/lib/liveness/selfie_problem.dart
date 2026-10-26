@@ -1,9 +1,6 @@
 /// Why the selfie has to be taken again (VDI-116). It only names what the person can fix about how it was taken; it
 /// never says the system suspects anything, so as not to teach what it looks for.
 enum SelfieProblem {
-  /// The steps of the check were not completed in time. Nothing else is said.
-  notCompleted(null),
-
   // `reason` of a 422 of `PUT /liveness`: the API could not judge the selfie because of how it was taken.
   blurry('La foto salió movida. Sostén el teléfono firme.'),
   tooDark('Había poca luz en tu rostro.'),
@@ -30,6 +27,6 @@ enum SelfieProblem {
   static const tips = [
     'Ponte frente a una ventana o una lámpara, no de espaldas a la luz.',
     'Deja tu rostro completo dentro del óvalo, sin lentes oscuros, gorra ni cubrebocas.',
-    'Sostén el teléfono firme y sigue las indicaciones de la pantalla.',
+    'Sostén el teléfono firme a la altura de tus ojos al tomar la foto.',
   ];
 }

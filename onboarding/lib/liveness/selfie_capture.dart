@@ -5,42 +5,31 @@ import 'package:flutter/material.dart';
 
 import '../identity/document_camera.dart';
 import '../identity/dui_capture.dart';
+import '../identity/frame_quality.dart';
 import '../onboarding/widgets.dart';
 import '../theme.dart';
-import 'face_camera.dart';
-import 'liveness_challenge.dart';
 
-/// Selfie with the liveness check (VDI-116): the front camera with an oval, the three steps of the check one after the
-/// other and a live hint about the face. Nothing has to be tapped: when the steps are done the selfie is taken and
-/// [onCaptured] gets it. If they are not done within [timeout], [onTimeout] is called. It takes the whole screen.
+/// Selfie for the liveness check (VDI-116): the front camera with an oval, a live hint about the light and a
+/// shutter, as in the DUI. The person takes the photo; the API judges it. [onCaptured] gets it. It takes the whole
+/// screen.
 class SelfieCaptureView extends StatefulWidget {
-  const SelfieCaptureView({
-    super.key,
-    required this.camera,
-    required this.onCaptured,
-    required this.onTimeout,
-    this.onBack,
-    this.timeout = const Duration(seconds: 45),
-  });
+  const SelfieCaptureView({super.key, required this.camera, required this.onCaptured, this.onBack});
 
-  final FaceCamera camera;
+  final DocumentCamera camera;
   final ValueChanged<Uint8List> onCaptured;
-  final VoidCallback onTimeout;
 
   /// Back arrow of the header; `null` hides its action.
   final VoidCallback? onBack;
-  final Duration timeout;
 
   @override
   State<SelfieCaptureView> createState() => _SelfieCaptureViewState();
 }
 
 class _SelfieCaptureViewState extends State<SelfieCaptureView> {
-  FaceSession? _session;
-  StreamSubscription<FaceFrame>? _frames;
+  CameraSession? _session;
+  StreamSubscription<FrameHint>? _hints;
   CameraUnavailable? _unavailable;
-  final _challenge = LivenessChallenge();
-  Timer? _timer;
+  var _hint = FrameHint.analyzing;
   var _taking = false;
   var _disposed = false;
 
@@ -58,11 +47,8 @@ class _SelfieCaptureViewState extends State<SelfieCaptureView> {
         await session.dispose();
         return;
       }
-      _frames = session.frames.listen(_onFrame);
-      // The time starts when the person can see themselves.
-      _timer?.cancel();
-      _timer = Timer(widget.timeout, () {
-        if (mounted && !_taking) widget.onTimeout();
+      _hints = session.hints.listen((hint) {
+        if (mounted) setState(() => _hint = hint);
       });
       setState(() => _session = session);
     } on CameraUnavailable catch (e) {
@@ -70,16 +56,9 @@ class _SelfieCaptureViewState extends State<SelfieCaptureView> {
     }
   }
 
-  void _onFrame(FaceFrame frame) {
-    if (!mounted || _taking) return;
-    setState(() => _challenge.add(frame));
-    if (_challenge.ready) _take();
-  }
-
   Future<void> _take() async {
     final session = _session;
-    if (session == null || _taking) return;
-    _timer?.cancel();
+    if (session == null || _taking || _hint.blocksShutter) return;
     setState(() => _taking = true);
     try {
       final photo = await session.takePhoto();
@@ -87,14 +66,15 @@ class _SelfieCaptureViewState extends State<SelfieCaptureView> {
     } on Exception catch (e) {
       debugPrint('Could not take the selfie: $e');
       if (mounted) setState(() => _unavailable = const CameraUnavailable());
+    } finally {
+      if (mounted) setState(() => _taking = false);
     }
   }
 
   @override
   void dispose() {
     _disposed = true;
-    _timer?.cancel();
-    _frames?.cancel();
+    _hints?.cancel();
     _session?.dispose();
     super.dispose();
   }
@@ -122,30 +102,23 @@ class _SelfieCaptureViewState extends State<SelfieCaptureView> {
     );
   }
 
-  Widget _camera(FaceSession session) {
-    final step = _challenge.step;
-    final lookAgain = _challenge.isDone(ChallengeStep.blink);
+  Widget _camera(CameraSession session) {
     return Column(
       children: [
-        _ChallengeProgress(challenge: _challenge),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-          child: Semantics(
-            liveRegion: true,
-            child: Text(
-              _taking ? 'Listo, no te muevas' : lookAgain ? 'Ahora mira al frente' : step.instruction,
-              key: const Key('selfie-instruction'),
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.25),
-            ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(24, 8, 24, 8),
+          child: Text(
+            'Coloca tu rostro dentro del óvalo y mira a la cámara',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.25),
           ),
         ),
         Expanded(
           child: Stack(
             children: [
               Positioned.fill(child: session.preview),
-              Positioned.fill(child: _OvalOverlay(good: _challenge.hint.isGood)),
-              Positioned(left: 16, right: 16, bottom: 12, child: Center(child: _StatusPill(_challenge.hint))),
+              const Positioned.fill(child: _OvalOverlay()),
+              Positioned(left: 16, right: 16, bottom: 12, child: Center(child: FrameStatusPill(_hint))),
             ],
           ),
         ),
@@ -158,17 +131,13 @@ class _SelfieCaptureViewState extends State<SelfieCaptureView> {
             children: [
               _Tip(Icons.light_mode_outlined, 'Buena luz'),
               _Tip(Icons.face_outlined, 'Rostro completo'),
-              _Tip(Icons.do_not_touch_outlined, 'Sin tocar la pantalla'),
+              _Tip(Icons.face_retouching_off_outlined, 'Sin lentes ni gorra'),
             ],
           ),
         ),
         Padding(
-          padding: EdgeInsets.fromLTRB(24, 14, 24, 20 + MediaQuery.paddingOf(context).bottom),
-          child: const Text(
-            'Se termina sola al completar los 3 pasos',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
+          padding: EdgeInsets.fromLTRB(24, 16, 24, 20 + MediaQuery.paddingOf(context).bottom),
+          child: Shutter(busy: _taking, blocked: _hint.blocksShutter, onPressed: _take),
         ),
       ],
     );
@@ -207,58 +176,9 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// «1 · Mira al frente», «2 · Gira la cabeza», «3 · Parpadea»: the ones done and the current one lit.
-class _ChallengeProgress extends StatelessWidget {
-  const _ChallengeProgress({required this.challenge});
-
-  final LivenessChallenge challenge;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          for (final s in ChallengeStep.values) ...[
-            if (s.index > 0) const SizedBox(width: 8),
-            Expanded(
-              child: Builder(builder: (context) {
-                final lit = challenge.isDone(s) || challenge.step == s;
-                return Semantics(
-                  label: '${s.index + 1}. ${s.label}${challenge.isDone(s) ? ', hecho' : ''}',
-                  excludeSemantics: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: lit ? AppColors.brand : Colors.white24,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${s.index + 1} · ${s.label}',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: lit ? AppColors.brand : Colors.white54),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Dims what is outside the oval where the face goes; the oval turns green when the face is well placed.
+/// Dims what is outside the oval where the face goes.
 class _OvalOverlay extends StatelessWidget {
-  const _OvalOverlay({required this.good});
-
-  final bool good;
+  const _OvalOverlay();
 
   @override
   Widget build(BuildContext context) {
@@ -266,17 +186,16 @@ class _OvalOverlay extends StatelessWidget {
       builder: (context, c) {
         final width = (c.maxWidth * 0.68).clamp(0.0, c.maxHeight * 0.6);
         final oval = Rect.fromCenter(center: Offset(c.maxWidth / 2, c.maxHeight * 0.45), width: width, height: width * 1.3);
-        return CustomPaint(key: Key(good ? 'oval-good' : 'oval'), painter: _OvalPainter(oval, good));
+        return CustomPaint(painter: _OvalPainter(oval));
       },
     );
   }
 }
 
 class _OvalPainter extends CustomPainter {
-  const _OvalPainter(this.oval, this.good);
+  const _OvalPainter(this.oval);
 
   final Rect oval;
-  final bool good;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -288,50 +207,14 @@ class _OvalPainter extends CustomPainter {
     canvas.drawOval(
       oval,
       Paint()
-        ..color = good ? AppColors.brand : Colors.white70
+        ..color = AppColors.brand
         ..style = PaintingStyle.stroke
         ..strokeWidth = 4,
     );
   }
 
   @override
-  bool shouldRepaint(_OvalPainter old) => old.oval != oval || old.good != good;
-}
-
-/// «Bien, tu rostro está dentro del óvalo», or what to fix.
-class _StatusPill extends StatelessWidget {
-  const _StatusPill(this.hint);
-
-  final FaceHint hint;
-
-  @override
-  Widget build(BuildContext context) {
-    final (icon, background, foreground) = switch (hint) {
-      FaceHint.good => (Icons.check, const Color(0xFF1C3A25), AppColors.brand),
-      FaceHint.searching => (Icons.face_outlined, Colors.black87, Colors.white),
-      FaceHint.tooDark => (Icons.light_mode_outlined, const Color(0xFF3D3010), const Color(0xFFFFD27A)),
-      FaceHint.manyFaces => (Icons.group_outlined, const Color(0xFF4A1A17), const Color(0xFFFFB4AB)),
-      FaceHint.tooFar || FaceHint.tooClose || FaceHint.offCenter =>
-        (Icons.center_focus_strong_outlined, const Color(0xFF3D3010), const Color(0xFFFFD27A)),
-    };
-    return Semantics(
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: ShapeDecoration(color: background, shape: const StadiumBorder()),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 20, color: foreground),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(hint.message, style: TextStyle(color: foreground, fontSize: 16, fontWeight: FontWeight.w700)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  bool shouldRepaint(_OvalPainter old) => old.oval != oval;
 }
 
 class _Tip extends StatelessWidget {

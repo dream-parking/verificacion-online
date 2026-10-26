@@ -1,8 +1,6 @@
 package com.dreamparking.backend.console.service;
 
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,11 +14,6 @@ import com.dreamparking.backend.common.exception.NotFoundException;
 import com.dreamparking.backend.console.dto.ConsoleRequestDetail;
 import com.dreamparking.backend.console.dto.ConsoleRequestListItem;
 import com.dreamparking.backend.console.dto.ConsoleRequestLocation;
-import com.dreamparking.backend.identity.entity.IdentityDocument;
-import com.dreamparking.backend.identity.entity.enums.OcrStatus;
-import com.dreamparking.backend.identity.repository.IdentityDocumentImageRepository;
-import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
-import com.dreamparking.backend.identity.service.DuiValidator;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
 import com.dreamparking.backend.onboarding.entity.enums.LocationStatus;
@@ -30,14 +23,10 @@ import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository
 import com.dreamparking.backend.onboarding.repository.ExpectedActivityVersionRepository;
 import com.dreamparking.backend.onboarding.repository.IncomeDeclarationRepository;
 import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepository;
-import com.dreamparking.backend.onboarding.repository.PrivacyConsentRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
 import com.dreamparking.backend.onboarding.repository.RequestSignalsRepository;
 import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
-import com.dreamparking.backend.risk.service.RiskAssessmentService;
-import com.dreamparking.backend.risk.service.RiskDecisionService;
-import com.dreamparking.backend.rnpn.repository.RnpnCheckRepository;
 
 /** Read side of the console: request list and detail. */
 @Service
@@ -45,9 +34,6 @@ import com.dreamparking.backend.rnpn.repository.RnpnCheckRepository;
 public class ConsoleRequestService {
 
 	static final int MAX_PAGE_SIZE = 100;
-
-	/** Dates printed on the DUI are Salvadoran dates. */
-	static final ZoneId EL_SALVADOR = ZoneId.of("America/El_Salvador");
 
 	/** Console filters; a null parameter disables its filter. Fixed SQL: the values only travel as bind parameters. */
 	private static final String LIST_FILTER = """
@@ -91,26 +77,14 @@ public class ConsoleRequestService {
 
 	private final RequestEventRepository events;
 
-	private final RiskAssessmentService riskAssessments;
-
-	private final RiskDecisionService riskDecisions;
-
-	private final RnpnCheckRepository rnpnChecks;
-
-	private final IdentityDocumentRepository identityDocuments;
-
-	private final IdentityDocumentImageRepository identityDocumentImages;
-
 	private final ExpectedActivityVersionRepository expectedActivityVersions;
 
-	private final PrivacyConsentRepository consents;
+	private final ConsoleDossierSection dossierSection;
 
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
-			RiskAssessmentService riskAssessments, RiskDecisionService riskDecisions, RnpnCheckRepository rnpnChecks,
-			IdentityDocumentRepository identityDocuments, IdentityDocumentImageRepository identityDocumentImages,
-			ExpectedActivityVersionRepository expectedActivityVersions, PrivacyConsentRepository consents) {
+			ExpectedActivityVersionRepository expectedActivityVersions, ConsoleDossierSection dossierSection) {
 		this.jdbc = jdbc;
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
@@ -118,13 +92,8 @@ public class ConsoleRequestService {
 		this.signals = signals;
 		this.steps = steps;
 		this.events = events;
-		this.riskAssessments = riskAssessments;
-		this.riskDecisions = riskDecisions;
-		this.rnpnChecks = rnpnChecks;
-		this.identityDocuments = identityDocuments;
-		this.identityDocumentImages = identityDocumentImages;
 		this.expectedActivityVersions = expectedActivityVersions;
-		this.consents = consents;
+		this.dossierSection = dossierSection;
 	}
 
 	/**
@@ -189,11 +158,7 @@ public class ConsoleRequestService {
 
 		var applicant = new ConsoleRequestDetail.Applicant(request.getFirstNames(), request.getLastNames(),
 				request.getDui(), request.getMobilePhone());
-		var consent = consents.findById(requestId)
-			.map(c -> new ConsoleRequestDetail.Consent(c.getNotice().getVersion(), c.getAcceptedAt(),
-					Boolean.TRUE.equals(c.getSignalsAccepted()), c.getTermsAccepted()))
-			.orElse(null);
-		var identityDocument = identityDocuments.findById(requestId).map(this::toIdentityDocument).orElse(null);
+		var dossier = dossierSection.of(requestId);
 		var income = incomeDeclarations.findById(requestId)
 			.map(d -> new ConsoleRequestDetail.Income(d.getSource().getCode(), d.getSource().getLabel(),
 					d.getSourceDetail(), d.getRange().getCode(), d.getRange().getLabel(), d.getRegisteredAt(),
@@ -205,11 +170,6 @@ public class ConsoleRequestService {
 					a.getMonthlyAmountRange().getLabel(), List.copyOf(a.getExtraTransactionTypeCodes()),
 					a.getMonthlyAmountUsd(), a.getMonthlyTransactionCount(), a.getMonthlyOutflowUsd(),
 					a.getRegisteredAt(), a.getUpdatedAt(), profileVersions(requestId)))
-			.orElse(null);
-		var risk = riskAssessments.findCurrent(requestId).orElse(null);
-		var rnpn = rnpnChecks.findFirstByRequestIdOrderByCheckedAtDescIdDesc(requestId)
-			.map(c -> new ConsoleRequestDetail.Rnpn(c.getOutcome(), c.isSimulated(), c.getProvider(), c.getAttempts(),
-					c.getMismatchedFields(), c.getCheckedAt()))
 			.orElse(null);
 		var signalsView = signals.findById(requestId)
 			.filter(s -> s.getIp() != null || s.getDeviceFingerprint() != null)
@@ -229,8 +189,9 @@ public class ConsoleRequestService {
 		return new ConsoleRequestDetail(request.getId(), request.getNumber(),
 				request.getCustomer() == null ? null : request.getCustomer().getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
-				request.getSubmittedAt(), applicant, consent, identityDocument, income, expectedActivity, risk,
-				riskDecisions.log(requestId), rnpn, signalsView, stepTimes, timeline);
+				request.getSubmittedAt(), applicant, dossier.consent(), dossier.identityDocument(), income,
+				expectedActivity, dossier.risk(), dossier.riskDecisions(), dossier.rnpn(), signalsView, stepTimes,
+				timeline);
 	}
 
 	/** Every version of the declared profile, the oldest first; the last one is the one in force. */
@@ -243,22 +204,6 @@ public class ConsoleRequestService {
 					v.getMonthlyAmountUsd(), v.getMonthlyTransactionCount(), v.getMonthlyOutflowUsd(),
 					v.getChangedBy(), v.getDeclaredAt()))
 			.toList();
-	}
-
-	private ConsoleRequestDetail.IdentityDocument toIdentityDocument(IdentityDocument d) {
-		var read = d.getStatus() == OcrStatus.READ ? new ConsoleRequestDetail.DuiData(d.getDui(), d.getFirstNames(),
-				d.getLastNames(), d.getBirthDate(), d.getIssueDate(), d.getExpiryDate(), d.getGender()) : null;
-		var confirmed = d.isConfirmed() ? new ConsoleRequestDetail.DuiData(d.getConfirmedDui(),
-				d.getConfirmedFirstNames(), d.getConfirmedLastNames(), d.getConfirmedBirthDate(), null,
-				d.getConfirmedExpiryDate(), null) : null;
-		String dui = d.isConfirmed() ? d.getConfirmedDui() : d.getDui();
-		return new ConsoleRequestDetail.IdentityDocument(d.getStatus(), d.getModel(), d.getAttempts(),
-				d.getUnreadableReason(), d.getUnreadableSide(), d.getFailure(), read, confirmed, d.getConfirmedAt(),
-				d.getCorrectedFields(), d.getDuiMatchesDeclared(), d.getNamesMatchDeclared(),
-				dui == null ? null : DuiValidator.hasValidCheckDigit(dui),
-				d.effectiveExpiryDate() == null ? null : d.isExpired(LocalDate.now(EL_SALVADOR)), d.getLooksAuthentic(),
-				d.getConfidence(), identityDocumentImages.findSidesByRequestId(d.getRequestId()), d.getProcessedAt(),
-				d.getRejectedConfirmations(), d.getRejectionReasons(), d.isEverLookedInauthentic());
 	}
 
 	private static ConsoleRequestDetail.Signals toSignals(RequestSignals s) {

@@ -1,6 +1,5 @@
 import 'dart:ui';
 
-import '../identity/frame_quality.dart';
 import 'face_camera.dart';
 
 /// The three things the person is asked in front of the camera, in order (VDI-116).
@@ -92,7 +91,10 @@ class LivenessChallenge {
 
   void add(FaceFrame frame) {
     if (_ready) return;
-    final dark = frame.light == FrameHint.tooDark || frame.light == FrameHint.veryDark;
+    // Only a scene too dark to see the face stops the check, as with the shutter of the DUI. «Poca luz» from the
+    // exposure is only a warning there: on an iPhone it reads in any room with ordinary light (under 6.5 EV), so it
+    // stopped the check forever. If the selfie does come out dark, the API answers 422 TOO_DARK and it is taken again.
+    final dark = frame.light.blocksShutter;
     if (frame.faces.length > 1) {
       _hint = FaceHint.manyFaces;
       _steady = 0;

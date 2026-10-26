@@ -304,6 +304,11 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "retainedUntil" : {
+            "description" : "Hasta cuándo se retiene (VDI-134): la fecha de la firma más el plazo de retención; antes de ella no se puede borrar",
+            "format" : "date-time",
+            "type" : "string"
+          },
           "signature" : {
             "$ref" : "#/components/schemas/DossierSignature"
           }

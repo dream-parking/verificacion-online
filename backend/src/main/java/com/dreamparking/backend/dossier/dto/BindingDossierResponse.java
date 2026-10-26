@@ -20,7 +20,9 @@ import com.dreamparking.backend.rnpn.entity.enums.RnpnOutcome;
  * score model or its thresholds change later. An element is null when the request never had it.
  */
 public record BindingDossierResponse(Long id, UUID requestId, Signature signature,
-		@Schema(description = "Cuándo se congeló el expediente") Instant frozenAt, Evidence evidence) {
+		@Schema(description = "Cuándo se congeló el expediente") Instant frozenAt,
+		@Schema(description = "Hasta cuándo se retiene (VDI-134): la fecha de la firma más el plazo de retención; antes de ella no se puede borrar") Instant retainedUntil,
+		Evidence evidence) {
 
 	/** The signature: the contract version and the SHA-256 fingerprint (hex) of the text that was signed. */
 	@Schema(name = "DossierSignature")

@@ -1190,7 +1190,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "CONTRACT_SIGNED", "CONTRACT_SIGNATURE_REJECTED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1220,6 +1220,52 @@
           "role" : {
             "enum" : [ "KYC_LEAD", "FRAUD_ANALYST", "ADMIN" ],
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ContractResponse" : {
+        "properties" : {
+          "fingerprint" : {
+            "description" : "Huella SHA-256 del texto en UTF-8, 64 caracteres hexadecimales en minúsculas",
+            "type" : "string"
+          },
+          "text" : {
+            "description" : "Texto completo del contrato, con saltos de línea \\n",
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "Versión del contrato; la app la manda al firmar",
+            "example" : "2026.1",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ContractSignatureResponse" : {
+        "properties" : {
+          "contractFingerprint" : {
+            "description" : "Huella SHA-256 del texto firmado",
+            "type" : "string"
+          },
+          "contractVersion" : {
+            "type" : "string"
+          },
+          "provider" : {
+            "description" : "Servicio de firma: `simulated` mientras no hay un proveedor real",
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "signedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "simulated" : {
+            "description" : "true mientras la firma es del servicio simulado",
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -2382,6 +2428,20 @@
             "type" : "integer"
           }
         },
+        "type" : "object"
+      },
+      "SignContractRequest" : {
+        "properties" : {
+          "contractVersion" : {
+            "description" : "Versión del contrato que la app mostró a la persona, tal como la devolvió GET /api/onboarding/contract",
+            "example" : "2026.1",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[0-9A-Za-z][0-9A-Za-z._-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "contractVersion" ],
         "type" : "object"
       },
       "SignalContribution" : {
@@ -5330,6 +5390,26 @@
         "tags" : [ "Consola · Usuarios" ]
       }
     },
+    "/api/onboarding/contract" : {
+      "get" : {
+        "description" : "Versión, texto y huella SHA-256 del contrato que la app muestra antes de firmar. Al firmar, la app manda esa misma `version`.",
+        "operationId" : "contractSignatureContract",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContractResponse"
+                }
+              }
+            },
+            "description" : "El contrato vigente"
+          }
+        },
+        "summary" : "Contrato de apertura vigente",
+        "tags" : [ "Onboarding" ]
+      }
+    },
     "/api/onboarding/requests" : {
       "post" : {
         "operationId" : "onboardingStart",
@@ -6104,6 +6184,85 @@
           }
         },
         "summary" : "Captura las señales de dispositivo y comportamiento",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/requests/{requestId}/signature" : {
+      "post" : {
+        "description" : "Firma el contrato vigente con el servicio de firma (simulado mientras no hay un proveedor real). Solo una solicitud enviada y aprobada (`COMPLETED`) puede firmar, una sola vez. Guarda la versión, la huella SHA-256 del texto firmado, la fecha y hora, y el dispositivo y la IP de la sesión; esa evidencia no se puede cambiar ni borrar.",
+        "operationId" : "contractSignatureSign",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SignContractRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContractSignatureResponse"
+                }
+              }
+            },
+            "description" : "Contrato firmado; la evidencia quedó en el expediente"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta `contractVersion` o es demasiado larga"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no está aprobada (en progreso, en revisión reforzada, en espera del RNPN o abandonada), ya firmó, o la versión no es la vigente"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El servicio de firma rechazó la firma: no se guarda y se puede intentar de nuevo"
+          }
+        },
+        "summary" : "Firma electrónica del contrato",
         "tags" : [ "Onboarding" ]
       }
     },

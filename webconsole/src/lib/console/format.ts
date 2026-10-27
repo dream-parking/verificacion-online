@@ -22,12 +22,18 @@ export const RISK: Record<RiskLevel, Badge> = {
 };
 
 export const REQUEST_STATUS: Record<RequestStatus, Badge> = {
-  COMPLETED: { cls: "s-ok", label: "✓ Completada" },
   IN_PROGRESS: { cls: "s-progress", label: "… En progreso" },
+  COMPLETED: { cls: "s-ok", label: "✓ Completada" },
   ENHANCED_REVIEW: { cls: "s-enhanced", label: "⚑ Revisión reforzada" },
   AWAITING_RNPN: { cls: "s-waiting", label: "◷ En espera" },
   ABANDONED: { cls: "s-abandoned", label: "✕ Abandonada" },
 };
+
+/** Options of the status filter, in the order of REQUEST_STATUS and without the symbol that precedes each badge label. */
+export const REQUEST_STATUS_OPTIONS = Object.entries(REQUEST_STATUS).map(([value, { label }]) => ({
+  value,
+  label: label.replace(/^\S+\s/, ""),
+}));
 
 /** The person already sent the request: approved automatically, held for enhanced review or waiting for the RNPN. */
 export const isSubmitted = (status: RequestStatus) =>

@@ -8,13 +8,14 @@ import {
   formatTime,
   isSubmitted,
   REQUEST_STATUS,
+  REQUEST_STATUS_OPTIONS,
   deviceLocationText,
   locationFailureText,
   minSec,
   profileTimeline,
   usd,
 } from "./format";
-import type { ProfileVersion } from "./api";
+import type { ProfileVersion, RequestStatus } from "./api";
 
 describe("fechas en hora de El Salvador (UTC−6)", () => {
   // 2026-10-06T04:08:03Z son las 10:08:03 p. m. del 5 de octubre en El Salvador.
@@ -53,6 +54,26 @@ describe("usd", () => {
 });
 
 describe("estado de la solicitud", () => {
+  it("todo estado tiene etiqueta y una opción en el filtro, con el texto sin el símbolo", () => {
+    // Typed as a Record so that a new RequestStatus fails to compile here until it is listed.
+    const known: Record<RequestStatus, true> = {
+      IN_PROGRESS: true,
+      COMPLETED: true,
+      ENHANCED_REVIEW: true,
+      AWAITING_RNPN: true,
+      ABANDONED: true,
+    };
+    expect(REQUEST_STATUS_OPTIONS.map((o) => o.value)).toEqual(Object.keys(known));
+    expect(REQUEST_STATUS_OPTIONS.map((o) => o.label)).toEqual([
+      "En progreso",
+      "Completada",
+      "Revisión reforzada",
+      "En espera",
+      "Abandonada",
+    ]);
+  });
+
+
   it("la revisión reforzada tiene texto y símbolo, no solo color", () => {
     expect(REQUEST_STATUS.ENHANCED_REVIEW).toEqual({ cls: "s-enhanced", label: "⚑ Revisión reforzada" });
   });

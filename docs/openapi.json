@@ -286,6 +286,30 @@
         "required" : [ "dui", "firstNames", "lastNames", "mobilePhone" ],
         "type" : "object"
       },
+      "BindingDossierResponse" : {
+        "properties" : {
+          "evidence" : {
+            "$ref" : "#/components/schemas/DossierEvidence"
+          },
+          "frozenAt" : {
+            "description" : "Cuándo se congeló el expediente",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "signature" : {
+            "$ref" : "#/components/schemas/DossierSignature"
+          }
+        },
+        "type" : "object"
+      },
       "CaptureSignalsRequest" : {
         "properties" : {
           "appVersion" : {
@@ -595,6 +619,9 @@
         "properties" : {
           "applicant" : {
             "$ref" : "#/components/schemas/ConsoleRequestApplicant"
+          },
+          "bindingDossier" : {
+            "$ref" : "#/components/schemas/BindingDossierResponse"
           },
           "completedSteps" : {
             "format" : "int32",
@@ -1411,6 +1438,171 @@
               "type" : "string"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierConsent" : {
+        "properties" : {
+          "acceptedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "noticeVersion" : {
+            "type" : "string"
+          },
+          "signalsAccepted" : {
+            "type" : "boolean"
+          },
+          "termsAccepted" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierEvidence" : {
+        "properties" : {
+          "consent" : {
+            "$ref" : "#/components/schemas/DossierConsent"
+          },
+          "decisions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RiskDecisionResponse"
+            },
+            "type" : "array"
+          },
+          "identity" : {
+            "$ref" : "#/components/schemas/DossierIdentity"
+          },
+          "liveness" : {
+            "$ref" : "#/components/schemas/DossierLiveness"
+          },
+          "risk" : {
+            "$ref" : "#/components/schemas/DossierRisk"
+          },
+          "rnpn" : {
+            "$ref" : "#/components/schemas/DossierRnpn"
+          },
+          "schemaVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierIdentity" : {
+        "properties" : {
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "confirmedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "customerNumber" : {
+            "type" : "string"
+          },
+          "dui" : {
+            "type" : "string"
+          },
+          "expiryDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "firstNames" : {
+            "type" : "string"
+          },
+          "lastNames" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierLiveness" : {
+        "properties" : {
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "confidence" : {
+            "type" : "number"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "CHECKED", "FAILED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierRisk" : {
+        "properties" : {
+          "assessment" : {
+            "$ref" : "#/components/schemas/RiskAssessmentResponse"
+          },
+          "lowMax" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "mediumMax" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "reviewThreshold" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierRnpn" : {
+        "properties" : {
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "mismatchedFields" : {
+            "items" : {
+              "enum" : [ "DUI", "FIRST_NAMES", "LAST_NAMES", "BIRTH_DATE" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "outcome" : {
+            "enum" : [ "MATCH", "NO_MATCH", "UNAVAILABLE" ],
+            "type" : "string"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "simulated" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierSignature" : {
+        "properties" : {
+          "contractFingerprint" : {
+            "type" : "string"
+          },
+          "contractVersion" : {
+            "type" : "string"
+          },
+          "signedAt" : {
+            "format" : "date-time",
+            "type" : "string"
           }
         },
         "type" : "object"

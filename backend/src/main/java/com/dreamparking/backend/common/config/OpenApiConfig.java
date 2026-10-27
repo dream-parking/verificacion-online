@@ -19,12 +19,14 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 
 import org.springdoc.core.customizers.OperationCustomizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * The OpenAPI document the front-end and mobile teams generate their clients from: stable operation ids, the error
- * body ({@code application/problem+json}) on every error response, the bearer scheme and the environments.
+ * body ({@code application/problem+json}) on every error response, the bearer scheme and the environments. The servers
+ * come from {@code app.openapi.servers} (VDI-139), so a new domain is a variable of the environment, not a code change.
  */
 @Configuration
 public class OpenApiConfig {
@@ -32,7 +34,7 @@ public class OpenApiConfig {
 	static final String PROBLEM_MEDIA_TYPE = "application/problem+json";
 
 	@Bean
-	OpenAPI verificacionOpenApi() {
+	OpenAPI verificacionOpenApi(@Value("${app.openapi.servers}") List<String> servers) {
 		return new OpenAPI()
 			.info(new Info().title("Verificación Online API")
 				.version("v1")
@@ -43,9 +45,7 @@ public class OpenApiConfig {
 						- Rutas `/api/console/**`: requieren `Authorization: Bearer <token>` de `POST /api/console/auth/login`.
 						- Errores: `application/problem+json` con `status`, `title` y `detail`.
 						- Los campos que aparecen como opcionales en los esquemas de respuesta pueden venir `null`."""))
-			.servers(List.of(new Server().url("https://api.dev.identidad.alambritos.online").description("Dev"),
-					new Server().url("https://api.qa.identidad.alambritos.online").description("QA"),
-					new Server().url("http://localhost:8080").description("Local")))
+			.servers(servers.stream().map(String::trim).filter(url -> !url.isEmpty()).map(url -> new Server().url(url)).toList())
 			.components(new Components().addSecuritySchemes("bearerAuth",
 					new SecurityScheme().type(SecurityScheme.Type.HTTP)
 						.scheme("bearer")

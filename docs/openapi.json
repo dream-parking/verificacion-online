@@ -6495,13 +6495,6 @@
     }
   },
   "servers" : [ {
-    "description" : "Dev",
-    "url" : "https://api.dev.identidad.alambritos.online"
-  }, {
-    "description" : "QA",
-    "url" : "https://api.qa.identidad.alambritos.online"
-  }, {
-    "description" : "Local",
     "url" : "http://localhost:8080"
   } ],
   "tags" : [ {

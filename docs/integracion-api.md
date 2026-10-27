@@ -63,6 +63,15 @@ Reglas:
 - **Score:** el nivel de confianza pasa al score como la señal «Prueba de vida» (VDI-115), con peso 10 en el modelo v2.
 - **App (VDI-116):** la selfie es el paso 3 de 6, después de confirmar el DUI. La persona la toma con el obturador de la cámara frontal, dentro de un óvalo, igual que las fotos del DUI; solo una escena demasiado oscura apaga el obturador. La prueba de vida la decide el API con esa foto: la app no hace un reto propio (el reto con ML Kit se quitó porque no terminaba en los teléfonos de prueba y ML Kit impedía usar el simulador de iOS). El API no reporta la selfie al retomar una solicitud, así que la app recuerda en el teléfono si ya la mandó, para no pedirla otra vez. Batería de ataques de presentación: [prueba-de-vida-ataques.md](prueba-de-vida-ataques.md).
 
+### Firma electrónica del contrato (VDI-130)
+
+- **Contrato vigente:** `GET /api/onboarding/contract` devuelve `{ version, text, fingerprint }`. La app muestra `text` y, al firmar, manda esa misma `version`. El texto lo guarda el backend, así que la app nunca manda el texto ni la huella.
+- **Firmar:** `POST /api/onboarding/requests/{id}/signature` con `{ "contractVersion": "2026.1" }`. Responde `201` con `{ requestId, contractVersion, contractFingerprint, signedAt, provider, simulated }`.
+- **Quién puede firmar:** solo una solicitud enviada y aprobada (`COMPLETED`), **una sola vez**. Una en progreso, abandonada, en revisión reforzada (`ENHANCED_REVIEW`) o en espera del RNPN (`AWAITING_RNPN`) responde `409`, igual que la apertura de cuenta. También responde `409` un segundo intento o una versión que no es la vigente (la app vuelve a pedir el contrato).
+- **Rechazo (`422`):** el servicio de firma puede rechazarla. No se guarda la firma, queda el evento `CONTRACT_SIGNATURE_REJECTED` y se puede intentar de nuevo.
+- **Evidencia:** en `contract_signature`, una fila por solicitud que nadie puede cambiar ni borrar. Guarda la versión, la huella SHA-256 del texto, la fecha y hora, el proveedor, la IP de la conexión, el `User-Agent` y la huella del dispositivo que mandó la app en `/signals`. En la línea de tiempo queda `CONTRACT_SIGNED`. La app no recibe la IP ni el dispositivo.
+- **Simulado:** todavía no hay proveedor de firma (`APP_SIGNATURE_PROVIDER=simulated`). Rechaza el DUI `00000040-8` y firma cualquier otro. Detalle: [signature.md](signature.md).
+
 ## Consola web — `/api/console` (requiere sesión)
 
 1. `POST /api/console/auth/login` con `{ email, password }` devuelve `accessToken` (vigencia `expiresIn` segundos, 8 h) y el usuario.

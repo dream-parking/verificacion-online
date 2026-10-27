@@ -15,7 +15,7 @@ import {
 import { useLoad } from "@/lib/console/hooks";
 import { errorMessage, usePaginatedFilters } from "@/lib/console/hooks";
 import { apiFetch, fetchAllRequests, type Catalogs, type RequestSummary } from "@/lib/console/api";
-import { REQUEST_STATUS, formatDate, formatShortDate, TIME_NOTE, RISK } from "@/lib/console/format";
+import { REQUEST_STATUS, REQUEST_STATUS_OPTIONS, formatDate, formatShortDate, TIME_NOTE, RISK } from "@/lib/console/format";
 import { customerNumberOf, fetchCustomerRequestIds, isPartialCustomerNumber } from "@/lib/console/customers";
 
 const INITIAL_FILTERS = {
@@ -158,11 +158,7 @@ export function RequestsView() {
           onChange={(v) => setFilter("status", v)}
           options={[
             { value: "all", label: "Todos" },
-            { value: "IN_PROGRESS", label: "En progreso" },
-            { value: "COMPLETED", label: "Completada" },
-            { value: "ENHANCED_REVIEW", label: "Revisión reforzada" },
-            { value: "AWAITING_RNPN", label: "En espera" },
-            { value: "ABANDONED", label: "Abandonada" },
+            ...REQUEST_STATUS_OPTIONS,
           ]}
         />
       </FiltersPanel>

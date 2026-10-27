@@ -7,6 +7,7 @@
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "next start",
     "lint": "eslint",
+    "gen:api": "openapi-typescript ../docs/openapi.json --properties-required-by-default -o src/lib/console/openapi.d.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
@@ -29,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "jsdom": "^30.1.2",
+    "openapi-typescript": "7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.7"

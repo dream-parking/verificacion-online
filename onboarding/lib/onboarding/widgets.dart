@@ -542,3 +542,29 @@ class LoadingOverlay extends StatelessWidget {
     );
   }
 }
+
+/// A rounded hint on the camera screens ("Buena luz", "Sin reflejos"…): an icon and a short text in white.
+class CaptureTip extends StatelessWidget {
+  const CaptureTip(this.icon, this.text, {super.key});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: ShapeDecoration(
+        shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.25))),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: Colors.white70),
+          const SizedBox(width: 6),
+          Text(text, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+}

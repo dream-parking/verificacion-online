@@ -14,8 +14,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * VDI-131: the binding dossier of a request is kept as it was frozen; not even SQL can change or delete it. The only
- * deletion allowed is the cascade of deleting the whole request, like the rest of the file.
+ * VDI-131 and VDI-134: the binding dossier of a request is kept as it was frozen: not even SQL can change it, and it cannot
+ * be deleted (nor its request) before its retention date.
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
@@ -36,8 +36,9 @@ class ImmutableBindingDossierTests {
 	void signedRequest() {
 		requestId = jdbc.queryForObject("insert into onboarding_request default values returning id::text", String.class);
 		dossierId = jdbc.queryForObject("""
-				insert into binding_dossier (request_id, contract_version, contract_fingerprint, signed_at, evidence)
-				values (?::uuid, '2026.1', ?, '2026-10-27T15:30:00Z', '{"schemaVersion": 1}'::jsonb) returning id""",
+				insert into binding_dossier (request_id, contract_version, contract_fingerprint, signed_at, retained_until, evidence)
+				values (?::uuid, '2026.1', ?, now() - interval '1 day', now() + interval '10 years',
+				        '{"schemaVersion": 1}'::jsonb) returning id""",
 				Long.class, requestId, FINGERPRINT);
 	}
 
@@ -46,7 +47,7 @@ class ImmutableBindingDossierTests {
 		assertThatThrownBy(() -> jdbc.update("update binding_dossier set evidence = '{\"schemaVersion\": 2}' where id = ?",
 				dossierId))
 			.isInstanceOf(DataIntegrityViolationException.class)
-			.hasMessageContaining("cannot be modified or deleted");
+			.hasMessageContaining("cannot be modified");
 	}
 
 	@Test
@@ -54,21 +55,66 @@ class ImmutableBindingDossierTests {
 		assertThatThrownBy(() -> jdbc.update("update binding_dossier set contract_version = '2026.2' where id = ?",
 				dossierId))
 			.isInstanceOf(DataIntegrityViolationException.class)
-			.hasMessageContaining("cannot be modified or deleted");
+			.hasMessageContaining("cannot be modified");
 	}
 
 	@Test
-	void aDossierCannotBeDeleted() {
+	void aDossierWithinItsRetentionPeriodCannotBeDeleted() {
 		assertThatThrownBy(() -> jdbc.update("delete from binding_dossier where id = ?", dossierId))
 			.isInstanceOf(DataIntegrityViolationException.class)
-			.hasMessageContaining("cannot be modified or deleted");
+			.hasMessageContaining("cannot be deleted before");
+	}
+
+	@Test
+	void aDossierCannotBeDeletedEvenOneMicrosecondBeforeItsRetentionDate() {
+		long almostExpired = dossierRetainedUntil("now() + interval '1 microsecond'");
+
+		assertThatThrownBy(() -> jdbc.update("delete from binding_dossier where id = ?", almostExpired))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("cannot be deleted before");
+	}
+
+	@Test
+	void aDossierCanBeDeletedFromTheMomentItsRetentionDateIsReached() {
+		long expired = dossierRetainedUntil("now()");
+
+		assertThat(jdbc.update("delete from binding_dossier where id = ?", expired)).isEqualTo(1);
+	}
+
+	@Test
+	void aDossierCanBeDeletedOnceItsRetentionDateHasPassed() {
+		long expired = dossierRetainedUntil("now() - interval '1 microsecond'");
+
+		assertThat(jdbc.update("delete from binding_dossier where id = ?", expired)).isEqualTo(1);
+	}
+
+	@Test
+	void aDossierPastItsRetentionDateStillCannotBeEdited() {
+		long expired = dossierRetainedUntil("now() - interval '1 day'");
+
+		assertThatThrownBy(() -> jdbc.update("update binding_dossier set retained_until = now() + interval '5 years' where id = ?",
+				expired))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("cannot be modified");
+	}
+
+	@Test
+	void theRetentionDateMustBeAfterTheSignature() {
+		String otherRequest = jdbc.queryForObject("insert into onboarding_request default values returning id::text",
+				String.class);
+
+		assertThatThrownBy(() -> jdbc.update("""
+				insert into binding_dossier (request_id, contract_version, contract_fingerprint, signed_at, retained_until, evidence)
+				values (?::uuid, '2026.1', ?, now(), now(), '{}'::jsonb)""", otherRequest, FINGERPRINT))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("ck_binding_dossier_retention");
 	}
 
 	@Test
 	void aRequestHasOneDossier() {
 		assertThatThrownBy(() -> jdbc.update("""
-				insert into binding_dossier (request_id, contract_version, contract_fingerprint, signed_at, evidence)
-				values (?::uuid, '2026.1', ?, now(), '{}'::jsonb)""", requestId, FINGERPRINT))
+				insert into binding_dossier (request_id, contract_version, contract_fingerprint, signed_at, retained_until, evidence)
+				values (?::uuid, '2026.1', ?, now(), now() + interval '1 year', '{}'::jsonb)""", requestId, FINGERPRINT))
 			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
@@ -103,17 +149,41 @@ class ImmutableBindingDossierTests {
 	}
 
 	@Test
-	void deletingTheWholeRequestRemovesItsDossier() {
-		jdbc.update("delete from onboarding_request where id = ?::uuid", requestId);
+	void aRequestWithADossierWithinItsPeriodCannotBeDeleted() {
+		assertThatThrownBy(() -> jdbc.update("delete from onboarding_request where id = ?::uuid", requestId))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("cannot be deleted before");
+	}
 
-		assertThat(jdbc.queryForObject("select count(*) from binding_dossier where id = ?", Integer.class, dossierId))
+	@Test
+	void deletingTheWholeRequestRemovesItsDossierOnceThePeriodHasPassed() {
+		String expiredRequest = jdbc.queryForObject("insert into onboarding_request default values returning id::text",
+				String.class);
+		long expired = jdbc.queryForObject("""
+				insert into binding_dossier (request_id, contract_version, contract_fingerprint, signed_at, retained_until, evidence)
+				values (?::uuid, '2026.1', ?, now() - interval '11 years', now() - interval '1 day', '{}'::jsonb) returning id""",
+				Long.class, expiredRequest, FINGERPRINT);
+
+		jdbc.update("delete from onboarding_request where id = ?::uuid", expiredRequest);
+
+		assertThat(jdbc.queryForObject("select count(*) from binding_dossier where id = ?", Integer.class, expired))
 			.isZero();
+	}
+
+	/** A dossier of another request whose retention date is this SQL expression (now() is fixed inside the test). */
+	private long dossierRetainedUntil(String retainedUntil) {
+		String otherRequest = jdbc.queryForObject("insert into onboarding_request default values returning id::text",
+				String.class);
+		return jdbc.queryForObject("""
+				insert into binding_dossier (request_id, contract_version, contract_fingerprint, signed_at, retained_until, evidence)
+				values (?::uuid, '2026.1', ?, now() - interval '20 years', %s, '{}'::jsonb) returning id""".formatted(retainedUntil),
+				Long.class, otherRequest, FINGERPRINT);
 	}
 
 	private void insert(String request, String fingerprint, String evidence) {
 		jdbc.update("""
-				insert into binding_dossier (request_id, contract_version, contract_fingerprint, signed_at, evidence)
-				values (?::uuid, '2026.1', ?, now(), ?::jsonb)""", request, fingerprint, evidence);
+				insert into binding_dossier (request_id, contract_version, contract_fingerprint, signed_at, retained_until, evidence)
+				values (?::uuid, '2026.1', ?, now(), now() + interval '1 year', ?::jsonb)""", request, fingerprint, evidence);
 	}
 
 }

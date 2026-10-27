@@ -1,16 +1,8 @@
 // Client of the console API. The types follow docs/openapi.json; in responses the optional
 // fields can come as null (see docs/integracion-api.md).
 
-const URLS_BY_ENV: Record<string, string> = {
-  dev: "https://api.dev.identidad.alambritos.online",
-  qa: "https://api.qa.identidad.alambritos.online",
-};
-
-/** NEXT_PUBLIC_API_URL has priority; otherwise it is derived from the build environment (local by default). */
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  URLS_BY_ENV[process.env.NEXT_PUBLIC_APP_ENV ?? ""] ||
-  "http://localhost:8080";
+/** The API URL comes only from NEXT_PUBLIC_API_URL (set by the deploy workflow); local development falls back to localhost. */
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 // ---- Contract types
 

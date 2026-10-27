@@ -26,6 +26,8 @@ permissions:
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/verificacion-online-backend
   APP_ENV: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
+  # Server listed in the OpenAPI document of the environment (VDI-139).
+  API_URL: ${{ github.ref_name == 'dev' && 'https://api.dev.identidad.alambritos.online' || 'https://api.qa.identidad.alambritos.online' }}
   RESOURCE_GROUP: rg-verificaciononline
 
 jobs:
@@ -74,7 +76,8 @@ jobs:
             az containerapp ingress update -n "$APP" -g "$RESOURCE_GROUP" --target-port 8080 -o none
             # 0.25 vCPU / 0.5 GiB doubles the free grant (~200 replica-hours/month shared by dev+qa).
             az containerapp update -n "$APP" -g "$RESOURCE_GROUP" --cpu 0.25 --memory 0.5Gi \
-              --image "$IMAGE:${{ github.sha }}" --set-env-vars APP_ENV="$APP_ENV" SPRING_PROFILES_ACTIVE=dev -o none
+              --image "$IMAGE:${{ github.sha }}" --set-env-vars APP_ENV="$APP_ENV" SPRING_PROFILES_ACTIVE=dev \
+              APP_OPENAPI_SERVERS="$API_URL" -o none
             FQDN=$(az containerapp show -n "$APP" -g "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)
             echo "FQDN=$FQDN" >> "$GITHUB_ENV"
 

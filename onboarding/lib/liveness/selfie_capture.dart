@@ -129,9 +129,9 @@ class _SelfieCaptureViewState extends State<SelfieCaptureView> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _Tip(Icons.light_mode_outlined, 'Buena luz'),
-              _Tip(Icons.face_outlined, 'Rostro completo'),
-              _Tip(Icons.face_retouching_off_outlined, 'Sin lentes ni gorra'),
+              CaptureTip(Icons.light_mode_outlined, 'Buena luz'),
+              CaptureTip(Icons.face_outlined, 'Rostro completo'),
+              CaptureTip(Icons.face_retouching_off_outlined, 'Sin lentes ni gorra'),
             ],
           ),
         ),
@@ -215,31 +215,6 @@ class _OvalPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_OvalPainter old) => old.oval != oval;
-}
-
-class _Tip extends StatelessWidget {
-  const _Tip(this.icon, this.text);
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: ShapeDecoration(
-        shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.25))),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: Colors.white70),
-          const SizedBox(width: 6),
-          Text(text, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-        ],
-      ),
-    );
-  }
 }
 
 /// The front camera cannot be used: says why and how to fix it.

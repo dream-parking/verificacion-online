@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -16,7 +17,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,7 +52,8 @@ import com.dreamparking.backend.onboarding.repository.ExpectedActivityRepository
  * added up by calendar month (El Salvador) and compared with the expected activity declared in the onboarding request.
  * The first time a kind of deviation shows up in a month it is recorded and raises an alert for the console; later
  * movements of the same month do not raise it again. A figure counts as a deviation when it exceeds what was declared
- * by more than {@code app.profile-tracking.tolerance-percent}.
+ * by more than the tolerance in force ({@link ProfileToleranceService}, VDI-137), read again with every movement so a
+ * change applies to the next one; each recorded deviation keeps the tolerance it was detected with.
  */
 @Service
 public class ProfileTrackingService {
@@ -74,19 +75,18 @@ public class ProfileTrackingService {
 
 	private final AlertService alertService;
 
-	private final int tolerancePercent;
+	private final ProfileToleranceService toleranceService;
 
 	public ProfileTrackingService(AccountRepository accounts, AccountMovementRepository movements,
 			ProfileDeviationRepository deviations, ExpectedActivityRepository expectedActivities,
-			CatalogService catalogService, AlertService alertService,
-			@Value("${app.profile-tracking.tolerance-percent:20}") int tolerancePercent) {
+			CatalogService catalogService, AlertService alertService, ProfileToleranceService toleranceService) {
 		this.accounts = accounts;
 		this.movements = movements;
 		this.deviations = deviations;
 		this.expectedActivities = expectedActivities;
 		this.catalogService = catalogService;
 		this.alertService = alertService;
-		this.tolerancePercent = tolerancePercent;
+		this.toleranceService = toleranceService;
 	}
 
 	/**
@@ -140,12 +140,17 @@ public class ProfileTrackingService {
 		Map<ProfileDeviationType, ProfileDeviation> recorded = deviations
 			.findByIdAccountIdAndIdPeriod(accountId, period.atDay(1))
 			.stream()
-			.collect(Collectors.toMap(d -> d.getId().getDeviation(), Function.identity()));
-		Evaluation evaluation = evaluate(declared, movementsOf(account, period), period);
-		List<Deviation> found = evaluation.findings()
-			.stream()
-			.map(f -> f.toDeviation(recorded.get(f.type())))
-			.toList();
+			.collect(Collectors.toMap(d -> d.getId().getDeviation(), Function.identity(), (a, b) -> a,
+					() -> new EnumMap<>(ProfileDeviationType.class)));
+		int tolerancePercent = toleranceService.current();
+		Evaluation evaluation = evaluate(declared, movementsOf(account, period), period, tolerancePercent);
+		List<Deviation> found = new ArrayList<>();
+		for (Finding finding : evaluation.findings()) {
+			found.add(finding.toDeviation(recorded.get(finding.type())));
+			recorded.remove(finding.type());
+		}
+		// A deviation already recorded stays even when the tolerance in force now allows it: it raised an alert.
+		recorded.values().stream().map(ProfileTrackingService::toDeviation).forEach(found::add);
 		return new ProfileComparisonResponse(accountId, declared.getRequestId(), period.toString(), tolerancePercent,
 				toDeclared(declared), evaluation.actual(), found, found.isEmpty());
 	}
@@ -157,8 +162,9 @@ public class ProfileTrackingService {
 			.map(d -> d.getId().getDeviation())
 			.collect(Collectors.toSet());
 
+		int tolerancePercent = toleranceService.current();
 		List<Deviation> raised = new ArrayList<>();
-		for (Finding finding : evaluate(declared, movementsOf(account, month), month).findings()) {
+		for (Finding finding : evaluate(declared, movementsOf(account, month), month, tolerancePercent).findings()) {
 			if (alreadyRecorded.contains(finding.type())) {
 				continue;
 			}
@@ -169,20 +175,22 @@ public class ProfileTrackingService {
 			evidence.put("declared", finding.declared());
 			evidence.put("actual", finding.actual());
 			evidence.put("limit", finding.limit());
+			evidence.put("tolerancePercent", tolerancePercent);
 			UUID alertId = alertService
 				.raise(new RaiseAlertRequest(account.getId(), finding.type().alertTypeCode(), null, finding.detail(),
 						evidence))
 				.id();
 			ProfileDeviation deviation = deviations.saveAndFlush(new ProfileDeviation(
 					new ProfileDeviationId(account.getId(), month.atDay(1), finding.type()), finding.declared(),
-					finding.actual(), finding.detail(), alertId));
+					finding.actual(), finding.detail(), alertId, tolerancePercent));
 			raised.add(finding.toDeviation(deviation));
 		}
 		return raised;
 	}
 
 	/** Adds up the month and finds every figure above what was declared (plus the tolerance). */
-	private Evaluation evaluate(ExpectedActivity declared, List<AccountMovement> monthMovements, YearMonth month) {
+	private Evaluation evaluate(ExpectedActivity declared, List<AccountMovement> monthMovements, YearMonth month,
+			int tolerancePercent) {
 		BigDecimal inflow = BigDecimal.ZERO;
 		BigDecimal outflow = BigDecimal.ZERO;
 		int inflowCount = 0;
@@ -212,29 +220,32 @@ public class ProfileTrackingService {
 
 		List<Finding> findings = new ArrayList<>();
 		MonthlyAmountRange range = declared.getMonthlyAmountRange();
-		if (range.getMaxUsd() != null && exceeds(inflow, range.getMaxUsd())) {
+		if (range.getMaxUsd() != null && exceeds(inflow, range.getMaxUsd(), tolerancePercent)) {
 			findings.add(new Finding(ProfileDeviationType.INFLOW_ABOVE_RANGE, range.getMaxUsd(), inflow,
-					limit(range.getMaxUsd()), "Recibió USD %s en %s; el rango declarado «%s» llega hasta USD %s"
+					limit(range.getMaxUsd(), tolerancePercent), tolerancePercent, "Recibió USD %s en %s; el rango declarado «%s» llega hasta USD %s"
 						.formatted(usd(inflow), month, range.getLabel(), usd(range.getMaxUsd()))));
 		}
-		if (declared.getMonthlyAmountUsd() != null && exceeds(inflow, declared.getMonthlyAmountUsd())) {
+		if (declared.getMonthlyAmountUsd() != null
+				&& exceeds(inflow, declared.getMonthlyAmountUsd(), tolerancePercent)) {
 			findings.add(new Finding(ProfileDeviationType.INFLOW_ABOVE_DECLARED_AMOUNT,
-					declared.getMonthlyAmountUsd(), inflow, limit(declared.getMonthlyAmountUsd()),
+					declared.getMonthlyAmountUsd(), inflow, limit(declared.getMonthlyAmountUsd(), tolerancePercent),
+					tolerancePercent,
 					"Recibió USD %s en %s; declaró que recibiría unos USD %s al mes"
 						.formatted(usd(inflow), month, usd(declared.getMonthlyAmountUsd()))));
 		}
 		if (declared.getMonthlyTransactionCount() != null) {
 			BigDecimal expected = BigDecimal.valueOf(declared.getMonthlyTransactionCount());
 			BigDecimal received = BigDecimal.valueOf(inflowCount);
-			if (exceeds(received, expected)) {
+			if (exceeds(received, expected, tolerancePercent)) {
 				findings.add(new Finding(ProfileDeviationType.MORE_TRANSACTIONS_THAN_DECLARED, expected, received,
-						limit(expected), "Recibió %d depósitos o pagos en %s; declaró %d al mes"
+						limit(expected, tolerancePercent), tolerancePercent, "Recibió %d depósitos o pagos en %s; declaró %d al mes"
 							.formatted(inflowCount, month, declared.getMonthlyTransactionCount())));
 			}
 		}
-		if (declared.getMonthlyOutflowUsd() != null && exceeds(outflow, declared.getMonthlyOutflowUsd())) {
+		if (declared.getMonthlyOutflowUsd() != null
+				&& exceeds(outflow, declared.getMonthlyOutflowUsd(), tolerancePercent)) {
 			findings.add(new Finding(ProfileDeviationType.OUTFLOW_ABOVE_DECLARED, declared.getMonthlyOutflowUsd(),
-					outflow, limit(declared.getMonthlyOutflowUsd()), "Salieron USD %s en %s; declaró salidas de USD %s al mes"
+					outflow, limit(declared.getMonthlyOutflowUsd(), tolerancePercent), tolerancePercent, "Salieron USD %s en %s; declaró salidas de USD %s al mes"
 						.formatted(usd(outflow), month, usd(declared.getMonthlyOutflowUsd()))));
 		}
 		List<TypeTotal> undeclared = byType.stream().filter(t -> !t.declared()).toList();
@@ -242,6 +253,7 @@ public class ProfileTrackingService {
 			BigDecimal amount = undeclared.stream().map(TypeTotal::amountUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
 			String types = undeclared.stream().map(TypeTotal::transactionTypeCode).collect(Collectors.joining(", "));
 			findings.add(new Finding(ProfileDeviationType.UNDECLARED_TRANSACTION_TYPE, null, amount, null,
+					tolerancePercent,
 					"Recibió USD %s en %s de tipos no declarados (%s); declaró %s"
 						.formatted(usd(amount), month, types, String.join(", ", declaredTypes))));
 		}
@@ -249,11 +261,11 @@ public class ProfileTrackingService {
 	}
 
 	/** True when {@code actual} is above {@code declared} by more than the tolerance. */
-	private boolean exceeds(BigDecimal actual, BigDecimal declared) {
-		return actual.compareTo(limit(declared)) > 0;
+	private static boolean exceeds(BigDecimal actual, BigDecimal declared, int tolerancePercent) {
+		return actual.compareTo(limit(declared, tolerancePercent)) > 0;
 	}
 
-	private BigDecimal limit(BigDecimal declared) {
+	private static BigDecimal limit(BigDecimal declared, int tolerancePercent) {
 		return declared.multiply(HUNDRED.add(BigDecimal.valueOf(tolerancePercent)))
 			.divide(HUNDRED, 2, RoundingMode.HALF_UP);
 	}
@@ -293,13 +305,31 @@ public class ProfileTrackingService {
 	}
 
 	private record Finding(ProfileDeviationType type, BigDecimal declared, BigDecimal actual, BigDecimal limit,
-			String detail) {
+			int tolerancePercent, String detail) {
 
+		/** The finding; when it was already recorded, with the tolerance (and so the limit) it was detected with. */
 		Deviation toDeviation(ProfileDeviation recorded) {
-			return new Deviation(type, type.alertTypeCode(), declared, actual, limit, detail,
-					recorded == null ? null : recorded.getAlertId(), recorded == null ? null : recorded.getDetectedAt());
+			if (recorded == null) {
+				return new Deviation(type, type.alertTypeCode(), declared, actual, limit, detail, null, null,
+						tolerancePercent);
+			}
+			return new Deviation(type, type.alertTypeCode(), declared, actual, recordedLimit(recorded), detail,
+					recorded.getAlertId(), recorded.getDetectedAt(), recorded.getTolerancePercent());
 		}
 
+	}
+
+	/** A recorded deviation the activity of the month no longer shows with the tolerance in force. */
+	private static Deviation toDeviation(ProfileDeviation recorded) {
+		ProfileDeviationType type = recorded.getId().getDeviation();
+		return new Deviation(type, type.alertTypeCode(), recorded.getDeclaredValue(), recorded.getActualValue(),
+				recordedLimit(recorded), recorded.getDetail(), recorded.getAlertId(), recorded.getDetectedAt(),
+				recorded.getTolerancePercent());
+	}
+
+	private static BigDecimal recordedLimit(ProfileDeviation recorded) {
+		return recorded.getDeclaredValue() == null ? null
+				: limit(recorded.getDeclaredValue(), recorded.getTolerancePercent());
 	}
 
 }

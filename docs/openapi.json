@@ -489,6 +489,19 @@
         "required" : [ "currentPassword", "newPassword" ],
         "type" : "object"
       },
+      "ChangeProfileToleranceRequest" : {
+        "properties" : {
+          "tolerancePercent" : {
+            "description" : "Margen sobre lo declarado antes de considerarlo una desviación, en porcentaje entero de 0 a 45",
+            "example" : 25,
+            "maximum" : 45,
+            "minimum" : 0,
+            "type" : "number"
+          }
+        },
+        "required" : [ "tolerancePercent" ],
+        "type" : "object"
+      },
       "CloseAlertRequest" : {
         "properties" : {
           "comment" : {
@@ -1865,7 +1878,7 @@
             "type" : "string"
           },
           "tolerancePercent" : {
-            "description" : "Margen sobre lo declarado antes de considerarlo una desviación",
+            "description" : "Tolerancia vigente: margen sobre lo declarado antes de considerarlo una desviación",
             "example" : 20,
             "format" : "int32",
             "type" : "integer"
@@ -1901,9 +1914,70 @@
           "limitValue" : {
             "type" : "number"
           },
+          "tolerancePercent" : {
+            "description" : "Tolerancia con la que se detectó",
+            "example" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          },
           "type" : {
             "enum" : [ "INFLOW_ABOVE_RANGE", "INFLOW_ABOVE_DECLARED_AMOUNT", "MORE_TRANSACTIONS_THAN_DECLARED", "OUTFLOW_ABOVE_DECLARED", "UNDECLARED_TRANSACTION_TYPE" ],
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ProfileToleranceChange" : {
+        "properties" : {
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "description" : "Usuario de consola que hizo el cambio; vacío en el valor inicial",
+            "type" : "string"
+          },
+          "previousPercent" : {
+            "description" : "Valor anterior; vacío en el valor inicial",
+            "example" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "tolerancePercent" : {
+            "description" : "Valor nuevo",
+            "example" : 25,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ProfileToleranceResponse" : {
+        "properties" : {
+          "changes" : {
+            "description" : "Bitácora de cambios, del más reciente al más antiguo",
+            "items" : {
+              "$ref" : "#/components/schemas/ProfileToleranceChange"
+            },
+            "type" : "array"
+          },
+          "maxPercent" : {
+            "description" : "Máximo permitido",
+            "example" : 45,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "minPercent" : {
+            "description" : "Mínimo permitido",
+            "example" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "tolerancePercent" : {
+            "description" : "Tolerancia vigente: margen sobre lo declarado antes de considerarlo una desviación",
+            "example" : 20,
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -3570,6 +3644,110 @@
         } ],
         "summary" : "Publica una versión nueva del aviso de privacidad",
         "tags" : [ "Consola · Administración de catálogos" ]
+      }
+    },
+    "/api/console/admin/profile-tolerance" : {
+      "get" : {
+        "description" : "Cada cambio trae el valor anterior y el nuevo, quién lo hizo (`changedBy`, vacío en el valor inicial) y cuándo (`changedAt`), del más reciente al más antiguo.",
+        "operationId" : "profileToleranceAdminLog",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileToleranceResponse"
+                }
+              }
+            },
+            "description" : "Tolerancia vigente y bitácora de cambios"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Tolerancia vigente y bitácora de cambios",
+        "tags" : [ "Consola · Administración del perfil transaccional" ]
+      },
+      "put" : {
+        "description" : "Aplica desde el siguiente movimiento que reporte el core, sin desplegar. Las desviaciones ya registradas conservan la tolerancia con la que se detectaron. Debe ser un entero de 0 a 45.",
+        "operationId" : "profileToleranceAdminChange",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangeProfileToleranceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileToleranceResponse"
+                }
+              }
+            },
+            "description" : "Tolerancia cambiada; devuelve la vigente y la bitácora"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Fuera de rango, vacía o igual a la vigente: `errors` dice por qué, en español, y no se guarda nada"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Cambia la tolerancia de desviación del perfil declarado",
+        "tags" : [ "Consola · Administración del perfil transaccional" ]
       }
     },
     "/api/console/admin/score-model/versions" : {
@@ -6374,5 +6552,8 @@
   }, {
     "description" : "Modelo de ponderación del score (solo lectura)",
     "name" : "Consola · Modelo de score"
+  }, {
+    "description" : "Tolerancia de desviación del perfil declarado (administradores)",
+    "name" : "Consola · Administración del perfil transaccional"
   } ]
 }

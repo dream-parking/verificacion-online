@@ -14,7 +14,8 @@ import org.hibernate.annotations.Immutable;
 
 /**
  * Tracking of the declared profile (VDI-3): a deviation found in a month of an account, with the declared and the real
- * value and the alert it raised. Recorded once per account, month and kind, so it alerts only the first time.
+ * value and the alert it raised. Recorded once per account, month and kind, so it alerts only the first time. It keeps
+ * the tolerance in force when it was detected (VDI-137), since an administrator can change it later.
  */
 @Entity
 @Immutable
@@ -37,6 +38,9 @@ public class ProfileDeviation {
 	@Column(name = "alert_id", nullable = false)
 	private UUID alertId;
 
+	@Column(name = "tolerance_percent", nullable = false)
+	private short tolerancePercent;
+
 	@CreationTimestamp
 	@Column(name = "detected_at", nullable = false)
 	private Instant detectedAt;
@@ -45,12 +49,13 @@ public class ProfileDeviation {
 	}
 
 	public ProfileDeviation(ProfileDeviationId id, BigDecimal declaredValue, BigDecimal actualValue, String detail,
-			UUID alertId) {
+			UUID alertId, int tolerancePercent) {
 		this.id = id;
 		this.declaredValue = declaredValue;
 		this.actualValue = actualValue;
 		this.detail = detail;
 		this.alertId = alertId;
+		this.tolerancePercent = (short) tolerancePercent;
 	}
 
 	public ProfileDeviationId getId() {
@@ -71,6 +76,10 @@ public class ProfileDeviation {
 
 	public UUID getAlertId() {
 		return alertId;
+	}
+
+	public int getTolerancePercent() {
+		return tolerancePercent;
 	}
 
 	public Instant getDetectedAt() {

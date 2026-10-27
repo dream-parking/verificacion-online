@@ -201,7 +201,7 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
                   Positioned.fill(child: session.preview),
                   const Positioned.fill(child: _FrameOverlay()),
                   if (_focusRing != null) _FocusRing(key: const Key('focus-ring'), at: _focusRing!),
-                  Positioned(left: 16, right: 16, bottom: 12, child: Center(child: _StatusPill(_hint))),
+                  Positioned(left: 16, right: 16, bottom: 12, child: Center(child: FrameStatusPill(_hint))),
                 ],
               ),
             ),
@@ -222,7 +222,7 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
         ),
         Padding(
           padding: EdgeInsets.fromLTRB(24, 16, 24, 20 + MediaQuery.paddingOf(context).bottom),
-          child: _Shutter(busy: _taking, blocked: _hint.blocksShutter, onPressed: _take),
+          child: Shutter(busy: _taking, blocked: _hint.blocksShutter, onPressed: _take),
         ),
       ],
     );
@@ -384,9 +384,9 @@ class _FramePainter extends CustomPainter {
   bool shouldRepaint(_FramePainter old) => old.frame != frame;
 }
 
-/// «Bien, mantén el teléfono quieto», or what to fix: light, movement.
-class _StatusPill extends StatelessWidget {
-  const _StatusPill(this.hint);
+/// «Bien, mantén el teléfono quieto», or what to fix: light, movement. The selfie uses it too (VDI-116).
+class FrameStatusPill extends StatelessWidget {
+  const FrameStatusPill(this.hint, {super.key});
 
   final FrameHint hint;
 
@@ -447,8 +447,9 @@ class _Tip extends StatelessWidget {
   }
 }
 
-class _Shutter extends StatelessWidget {
-  const _Shutter({required this.busy, required this.blocked, required this.onPressed});
+/// Round shutter of the camera screens (DUI and selfie); off while a photo is being taken or it is too dark.
+class Shutter extends StatelessWidget {
+  const Shutter({super.key, required this.busy, required this.blocked, required this.onPressed});
 
   final bool busy;
 

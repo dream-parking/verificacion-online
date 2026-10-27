@@ -13,7 +13,6 @@ import 'package:onboarding/identity/frame_quality.dart';
 import 'package:onboarding/onboarding/privacy_notice.dart';
 import 'package:onboarding/onboarding/saved_request.dart';
 import 'package:onboarding/identity/identity_document.dart';
-import 'package:onboarding/liveness/face_camera.dart';
 import 'package:onboarding/main.dart';
 import 'package:onboarding/onboarding/application_form.dart';
 import 'package:onboarding/onboarding/onboarding_flow.dart';
@@ -118,75 +117,6 @@ class FakeCameraSession implements CameraSession {
     _camera.disposed++;
     await controller.close();
   }
-}
-
-/// Fake front camera of the selfie (VDI-116): the test pushes what the phone "sees".
-class FakeFaceCamera implements FaceCamera {
-  FakeFaceCamera({this.denied = false});
-
-  final bool denied;
-  var opens = 0;
-  var photos = 0;
-  FakeFaceSession? current;
-
-  /// A face in the middle of the oval, with the head turned [yaw] degrees and the eyes open as [eyes] says.
-  static FaceFrame face({double yaw = 0, double eyes = 0.95, int trackingId = 1}) => FaceFrame(
-        faces: [
-          DetectedFace(
-            box: const Rect.fromLTWH(0.25, 0.2, 0.5, 0.5),
-            yaw: yaw,
-            leftEyeOpen: eyes,
-            rightEyeOpen: eyes,
-            trackingId: trackingId,
-          ),
-        ],
-        light: FrameHint.good,
-      );
-
-  /// Looks at the camera, turns the head, blinks and looks at the camera again: the selfie is taken.
-  static final challenge = [
-    for (var i = 0; i < 3; i++) face(),
-    face(yaw: 32),
-    face(),
-    face(eyes: 0.05),
-    face(),
-    for (var i = 0; i < 3; i++) face(),
-  ];
-
-  /// Sends [frames] one by one, as the camera would.
-  Future<void> show(WidgetTester tester, List<FaceFrame> frames) async {
-    for (final f in frames) {
-      current!.controller.add(f);
-      await tester.pump();
-    }
-    await tester.pumpAndSettle();
-  }
-
-  @override
-  Future<FaceSession> open() async {
-    opens++;
-    if (denied) throw const CameraUnavailable(permissionDenied: true);
-    return current = FakeFaceSession(this);
-  }
-}
-
-class FakeFaceSession implements FaceSession {
-  FakeFaceSession(this._camera);
-
-  final FakeFaceCamera _camera;
-  final controller = StreamController<FaceFrame>.broadcast();
-
-  @override
-  Stream<FaceFrame> get frames => controller.stream;
-
-  @override
-  Widget get preview => const ColoredBox(color: Colors.grey);
-
-  @override
-  Future<Uint8List> takePhoto() async => Uint8List.fromList([0xFF, 0xD8, 0x5E, ++_camera.photos]);
-
-  @override
-  Future<void> dispose() => controller.close();
 }
 
 /// Fake API: answers the catalog and every request step, and records the calls.
@@ -533,13 +463,13 @@ void main() {
 
     final shutter = find.byKey(const Key('shutter'));
 
-    /// The fake front camera of the app being tested, to push faces into it.
-    late FakeFaceCamera faces;
+    /// The fake front camera of the app being tested (VDI-116).
+    late FakeCamera selfieCamera;
 
-    /// The selfie with the liveness check (VDI-116), up to «Continuar con mis ingresos».
+    /// The selfie (VDI-116), up to «Continuar con mis ingresos».
     Future<void> passSelfie(WidgetTester tester) async {
-      await tap(tester, find.text('Empezar la prueba'));
-      await faces.show(tester, FakeFaceCamera.challenge);
+      await tap(tester, find.text('Tomar mi selfie'));
+      await tap(tester, shutter);
       await tap(tester, find.text('Continuar con mis ingresos'));
     }
 
@@ -558,7 +488,7 @@ void main() {
       DeviceLocationSource? location,
       DateTime Function()? clock,
       FakeCamera? camera,
-      FakeFaceCamera? faceCamera,
+      FakeCamera? faceCamera,
       SavedRequestStore? store,
     }) =>
         OnboardingApp(
@@ -567,7 +497,7 @@ void main() {
             deviceInfo: device ?? FakeDeviceInfo(),
             location: location ?? FakeLocation(),
             camera: camera ?? FakeCamera(),
-            faceCamera: faces = faceCamera ?? FakeFaceCamera(),
+            faceCamera: selfieCamera = faceCamera ?? FakeCamera(),
             savedRequest: store ?? FakeSavedRequestStore(),
             clock: clock ?? DateTime.now,
           ),
@@ -811,7 +741,7 @@ void main() {
       expect(find.text('SOL-2026-00420'), findsOneWidget);
     });
 
-    group('selfie with the liveness check (VDI-116)', () {
+    group('selfie for the liveness check (VDI-116)', () {
       /// Up to the selfie explanation, after confirming the DUI.
       Future<void> toSelfie(WidgetTester tester) async {
         await tap(tester, find.text('Empezar'));
@@ -825,7 +755,7 @@ void main() {
         await tap(tester, find.text('Mis datos son correctos'));
       }
 
-      testWidgets('explains it first, does the check without touching and sends one selfie', (tester) async {
+      testWidgets('explains it first, then the person takes it with the shutter and one selfie is sent', (tester) async {
         final fake = FakeApi();
         final store = FakeSavedRequestStore();
         await tester.pumpWidget(app(fake, store: store));
@@ -834,22 +764,16 @@ void main() {
         expect(find.text('Paso 3 de 6'), findsOneWidget);
         expect(find.text('Ahora, una selfie rápida'), findsOneWidget);
         expect(find.text('Quítate lentes oscuros, gorra o cubrebocas.'), findsOneWidget);
-        expect(faces.opens, 0, reason: 'the camera opens only when the person starts');
+        expect(selfieCamera.opens, 0, reason: 'the camera opens only when the person starts');
 
-        await tap(tester, find.text('Empezar la prueba'));
+        await tap(tester, find.text('Tomar mi selfie'));
         expect(find.text('Paso 3 de 6 · Tu selfie'), findsOneWidget);
-        expect(find.text('Mira de frente a la pantalla'), findsOneWidget);
-        expect(find.text('Se termina sola al completar los 3 pasos'), findsOneWidget);
+        expect(find.text('Coloca tu rostro dentro del óvalo y mira a la cámara'), findsOneWidget);
+        expect(selfieCamera.opens, 1);
+        expect(fake.livenessChecks, isEmpty, reason: 'nothing is taken until the person taps the shutter');
 
-        await faces.show(tester, [FakeFaceCamera.face(), FakeFaceCamera.face(), FakeFaceCamera.face()]);
-        expect(find.text('Gira la cabeza hacia un lado'), findsOneWidget);
-        expect(find.text('Bien, tu rostro está dentro del óvalo'), findsOneWidget);
-        await faces.show(tester, [FakeFaceCamera.face(yaw: 30)]);
-        expect(find.text('Parpadea despacio'), findsOneWidget);
-        expect(fake.livenessChecks, isEmpty);
-
-        await faces.show(tester, FakeFaceCamera.challenge.sublist(4));
-        expect(faces.photos, 1);
+        await tap(tester, shutter);
+        expect(selfieCamera.photos, 1);
         final sent = fake.livenessChecks.single;
         expect(sent.method, 'PUT');
         expect(sent.url.path, '/api/onboarding/requests/$requestId/liveness');
@@ -860,6 +784,27 @@ void main() {
         expect(store.selfieId, requestId, reason: 'kept so it is not asked again when the request is picked up');
         await tap(tester, find.text('Continuar con mis ingresos'));
         expect(find.text('Paso 4 de 6'), findsOneWidget);
+      });
+
+      testWidgets('dim light only warns; a scene too dark turns the shutter off until there is light', (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await toSelfie(tester);
+        await tap(tester, find.text('Tomar mi selfie'));
+
+        selfieCamera.hint(FrameHint.veryDark);
+        await tester.pumpAndSettle();
+        expect(find.text(FrameHint.veryDark.message), findsOneWidget);
+        await tester.tap(shutter);
+        await tester.pumpAndSettle();
+        expect(selfieCamera.photos, 0);
+
+        selfieCamera.hint(FrameHint.tooDark);
+        await tester.pumpAndSettle();
+        expect(find.text(FrameHint.tooDark.message), findsOneWidget);
+        await tap(tester, shutter);
+        expect(selfieCamera.photos, 1, reason: 'an ordinary room on an iPhone reads as dim; it must not stop the selfie');
+        expect(find.text('Listo, recibimos tu selfie'), findsOneWidget);
       });
 
       testWidgets('the selfie is in the review, and is not asked again when coming back', (tester) async {
@@ -881,61 +826,41 @@ void main() {
         expect(fake.livenessChecks, hasLength(1));
       });
 
-      testWidgets('a still face (a photo or a screen) never takes the selfie, and in time it asks to try again',
-          (tester) async {
-        final fake = FakeApi();
-        await tester.pumpWidget(app(fake));
-        await toSelfie(tester);
-        await tap(tester, find.text('Empezar la prueba'));
-        await faces.show(tester, [for (var i = 0; i < 30; i++) FakeFaceCamera.face()]);
-        expect(faces.photos, 0);
-
-        await tester.pump(const Duration(seconds: 46));
-        await tester.pumpAndSettle();
-        expect(find.text('No pudimos completar la prueba'), findsOneWidget);
-        expect(find.text('Pasa seguido y se arregla fácil. Prueba así y vuelve a intentarlo:'), findsOneWidget);
-        expect(fake.livenessChecks, isEmpty, reason: 'nothing was sent, so it is not an attempt');
-        for (final hint in ['sospech', 'foto de una pantalla', 'impres', 'falso', 'fraude']) {
-          expect(find.textContaining(RegExp(hint, caseSensitive: false)), findsNothing, reason: 'never says why: $hint');
-        }
-
-        await tap(tester, find.text('Intentar de nuevo'));
-        await faces.show(tester, FakeFaceCamera.challenge);
-        expect(find.text('Listo, recibimos tu selfie'), findsOneWidget);
-      });
-
-      testWidgets('a selfie the API cannot judge (422) says what to fix and lets the person try again', (tester) async {
+      testWidgets('a selfie the API cannot judge (422) says what to fix and lets the person take another', (tester) async {
         final fake = FakeApi(livenessResponses: [
           (422, '{"status":422,"detail":"The selfie cannot be judged: TOO_DARK","reason":"TOO_DARK"}'),
         ]);
         await tester.pumpWidget(app(fake));
         await toSelfie(tester);
-        await tap(tester, find.text('Empezar la prueba'));
-        await faces.show(tester, FakeFaceCamera.challenge);
+        await tap(tester, find.text('Tomar mi selfie'));
+        await tap(tester, shutter);
 
-        expect(find.text('No pudimos completar la prueba'), findsOneWidget);
+        expect(find.text('No pudimos usar tu selfie'), findsOneWidget);
         expect(find.text('Había poca luz en tu rostro.'), findsOneWidget);
         expect(find.textContaining('TOO_DARK'), findsNothing);
+        for (final hint in ['sospech', 'foto de una pantalla', 'impres', 'falso', 'fraude']) {
+          expect(find.textContaining(RegExp(hint, caseSensitive: false)), findsNothing, reason: 'never says why: $hint');
+        }
         await tap(tester, find.text('Intentar de nuevo'));
-        await faces.show(tester, FakeFaceCamera.challenge);
+        await tap(tester, shutter);
         expect(fake.livenessChecks, hasLength(2));
         expect(find.text('Listo, recibimos tu selfie'), findsOneWidget);
       });
 
-      testWidgets('without connection the same selfie is sent again, without repeating the check', (tester) async {
+      testWidgets('without connection the same selfie is sent again, without taking another', (tester) async {
         final fake = FakeApi(livenessResponses: [(503, '{"status":503,"detail":"Service unavailable"}')]);
         await tester.pumpWidget(app(fake));
         await toSelfie(tester);
-        await tap(tester, find.text('Empezar la prueba'));
-        await faces.show(tester, FakeFaceCamera.challenge);
+        await tap(tester, find.text('Tomar mi selfie'));
+        await tap(tester, shutter);
 
         expect(find.text('No pudimos enviar tu selfie'), findsOneWidget);
-        expect(find.text('Empezar la prueba'), findsNothing);
+        expect(find.text('Tomar mi selfie'), findsNothing);
         await tap(tester, find.text('Reintentar'));
         expect(fake.livenessChecks, hasLength(2));
-        expect(faces.photos, 1, reason: 'the camera was not opened again');
+        expect(selfieCamera.photos, 1, reason: 'the camera was not opened again');
         // The multipart boundary changes; the photo inside is the same.
-        bool carriesPhoto(http.Request r) => latin1.decode(r.bodyBytes).contains(latin1.decode([0xFF, 0xD8, 0x5E, 1]));
+        bool carriesPhoto(http.Request r) => latin1.decode(r.bodyBytes).contains(latin1.decode([0xFF, 0xD8, 1]));
         expect(fake.livenessChecks.every(carriesPhoto), isTrue);
         expect(find.text('Listo, recibimos tu selfie'), findsOneWidget);
       });
@@ -949,16 +874,16 @@ void main() {
       });
 
       testWidgets('without the camera permission it says how to allow it', (tester) async {
-        await tester.pumpWidget(app(FakeApi(), faceCamera: FakeFaceCamera(denied: true)));
+        await tester.pumpWidget(app(FakeApi(), faceCamera: FakeCamera(denied: true)));
         await toSelfie(tester);
-        await tap(tester, find.text('Empezar la prueba'));
+        await tap(tester, find.text('Tomar mi selfie'));
         expect(find.textContaining('Para tomar tu selfie necesitamos usar la cámara'), findsOneWidget);
       });
 
       testWidgets('back from the camera goes to the explanation', (tester) async {
         await tester.pumpWidget(app(FakeApi()));
         await toSelfie(tester);
-        await tap(tester, find.text('Empezar la prueba'));
+        await tap(tester, find.text('Tomar mi selfie'));
         await tap(tester, find.byTooltip('Volver al paso anterior'));
         expect(find.text('Ahora, una selfie rápida'), findsOneWidget);
       });

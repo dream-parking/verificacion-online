@@ -17,6 +17,10 @@ public enum RequestEventType {
 	SCORE_ASSIGNED,
 	ENHANCED_REVIEW_REQUIRED,
 	RNPN_CHECKED,
+	/** The customer signed the account contract (VDI-130). */
+	CONTRACT_SIGNED,
+	/** The signature service rejected the signature; the customer can try again (VDI-130). */
+	CONTRACT_SIGNATURE_REJECTED,
 	REQUEST_ABANDONED
 
 }

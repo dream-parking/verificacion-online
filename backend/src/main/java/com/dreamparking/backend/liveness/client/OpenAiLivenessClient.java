@@ -14,6 +14,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -27,8 +28,12 @@ import com.dreamparking.backend.identity.ocr.DocumentPhoto;
  * provider from retaining the selfie. A vision model looks at one still image, so it catches a photo of a screen, a
  * printout or a mask less reliably than a dedicated liveness service: the confidence is a signal for the score, never
  * a decision by itself.
+ * <p>
+ * Only one {@link LivenessClient} exists at run time ({@code app.liveness.provider} picks it), so {@code @Primary}
+ * changes nothing there: it tells the static analysis which one is meant when it sees both.
  */
 @Component
+@Primary
 @ConditionalOnProperty(name = "app.liveness.provider", havingValue = "openai", matchIfMissing = true)
 public class OpenAiLivenessClient implements LivenessClient {
 

@@ -88,6 +88,8 @@ Reglas:
 | `GET /score-model` (rangos y pesos del modelo vigente) | cualquiera | VDI-82 |
 | `GET /admin/score-model/versions` (historial de versiones del modelo: umbrales, `publishedBy`, `validFrom`, `validTo` e `inForce`) | `ADMIN` | VDI-120 |
 | `POST /admin/score-model/versions` con `{ lowMax, mediumMax }` (publica una versión nueva con los umbrales nuevos y los pesos de la vigente) | `ADMIN` | VDI-120 |
+| `GET /admin/profile-tolerance` (tolerancia vigente del perfil declarado y bitácora de cambios) | `ADMIN` | VDI-137 |
+| `PUT /admin/profile-tolerance` con `{ tolerancePercent }` (cambia la tolerancia; entero de 0 a 45) | `ADMIN` | VDI-137 |
 | `GET /score-rules` (reglas vigentes; R-01 está retirada) | cualquiera | VDI-57 |
 | `GET /alerts?status=&assigneeId=&account=&from=&to=` | cualquiera | VDI-62 |
 | `POST /alerts/{id}/take` (la toma el usuario de la sesión) | `FRAUD_ANALYST`, `ADMIN` | VDI-61 |
@@ -104,6 +106,16 @@ Un administrador cambia dónde terminan los niveles del score sin desplegar cód
 - **Bitácora:** cada versión guarda quién la publicó (`publishedBy`, el nombre del usuario de la consola; vacío en las versiones publicadas por una migración) y cuándo (`validFrom`). `GET /api/console/admin/score-model/versions` las devuelve de la más reciente a la más antigua, con la vigente en `inForce: true`. Cada publicación también queda en la auditoría de accesos (`SCORE_MODEL_PUBLISH`).
 - **Permisos:** solo `ADMIN`; un analista recibe `403` (puede seguir leyendo el modelo vigente con `GET /api/console/score-model`).
 - **Pesos:** este endpoint no los cambia. Un cambio de pesos es una versión publicada por una migración, como el v2 de VDI-115.
+
+### Tolerancia de desviación del perfil configurable (VDI-137)
+
+El contraste del perfil declarado (VDI-3) marca una desviación cuando una cifra del mes pasa lo declarado más la tolerancia: con 20 % y USD 350 declarados, 420.00 está dentro y 420.01 es desviación. Un administrador cambia la tolerancia sin desplegar: `PUT /api/console/admin/profile-tolerance` con `{ "tolerancePercent": 25 }`. Antes era la variable `APP_PROFILE_TOLERANCE_PERCENT`, que ya no se usa; la migración V34 empieza con 20.
+
+- **Aplica al siguiente movimiento** que reporte el core: la tolerancia se lee de la base con cada movimiento.
+- **Validación:** entero de 0 a 45 y distinto del vigente. Si no se cumple responde `400` con `errors.tolerancePercent` en español, y no se guarda nada.
+- **Bitácora:** `GET /api/console/admin/profile-tolerance` devuelve la vigente (`tolerancePercent`, con `minPercent` y `maxPercent`) y `changes`, del más reciente al más antiguo: valor nuevo, anterior (`previousPercent`), quién (`changedBy`) y cuándo (`changedAt`). El valor inicial no tiene autor. La base no deja editar ni borrar un cambio, y cada uno queda también en la auditoría de accesos (`PROFILE_TOLERANCE_CHANGE`).
+- **Cada desviación guarda su tolerancia:** `tolerancePercent` en cada desviación de `profile-comparison` y de `newDeviations`, y en la evidencia de su alerta. Las registradas antes de V34 quedan con 20. Si después sube la tolerancia, una desviación ya registrada sigue apareciendo en la comparación del mes con la tolerancia y el límite con que se detectó, porque ya levantó una alerta.
+- **Permisos:** solo `ADMIN`; los demás roles reciben `403`. La tolerancia vigente también sale en `tolerancePercent` de `GET /accounts/{id}/profile-comparison`.
 
 ## Usuarios y primer acceso
 

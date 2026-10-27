@@ -5,6 +5,13 @@ public enum RequestStatus {
 
 	IN_PROGRESS,
 	COMPLETED,
+
+	/** Submitted, but its score went above the threshold: it is not approved automatically (VDI-117). */
+	ENHANCED_REVIEW,
+
+	/** Submitted, but the RNPN did not answer after the retries: it is not approved automatically (VDI-111). */
+	AWAITING_RNPN,
+
 	ABANDONED
 
 }

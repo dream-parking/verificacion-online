@@ -17,15 +17,21 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.dreamparking.backend.catalog.entity.MonthlyAmountRange;
+import com.dreamparking.backend.identity.entity.EncryptedImage;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
 import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.ocr.DuiReading;
+import com.dreamparking.backend.liveness.entity.LivenessCheck;
+import com.dreamparking.backend.liveness.entity.LivenessStatus;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 import com.dreamparking.backend.risk.entity.ScoreModel;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 import com.dreamparking.backend.risk.entity.enums.ScoreSignal;
+import com.dreamparking.backend.rnpn.entity.RnpnCheck;
+import com.dreamparking.backend.rnpn.entity.enums.RnpnField;
+import com.dreamparking.backend.rnpn.entity.enums.RnpnOutcome;
 import com.dreamparking.backend.risk.service.ScoreEngine.Contribution;
 import com.dreamparking.backend.risk.service.ScoreEngine.Inputs;
 import com.dreamparking.backend.risk.service.ScoreEngine.Result;
@@ -68,13 +74,59 @@ class ScoreEngineTests {
 		// Not available yet: the city (weight, but nothing to read it from) and the signals with no weight
 		assertThat(contribution(result, ScoreSignal.CITY).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.CITY).maxPoints()).isEqualTo(20);
-		for (ScoreSignal pending : new ScoreSignal[] { ScoreSignal.RNPN, ScoreSignal.LIVENESS,
-				ScoreSignal.INTERNAL_LISTS }) {
-			assertThat(contribution(result, pending).points()).isNull();
-			assertThat(contribution(result, pending).maxPoints()).isNull();
-			assertThat(contribution(result, pending).observation()).startsWith("Aún no disponible");
-		}
+		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).points()).isNull();
+		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).maxPoints()).isNull();
+		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).observation()).startsWith("Aún no disponible");
+		// The RNPN is read when the request is submitted: before that there is no check and the model gives it no weight
+		assertThat(contribution(result, ScoreSignal.RNPN).points()).isNull();
+		assertThat(contribution(result, ScoreSignal.RNPN).observation()).isEqualTo("The RNPN has not been checked yet");
 		assertThat(result.contributions()).hasSize(ScoreSignal.values().length);
+	}
+
+	@Test
+	void anRnpnThatMatchesAddsNothingButCountsAsRead() {
+		Contribution rnpn = contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(rnpn(RnpnOutcome.MATCH, 1))),
+				ScoreSignal.RNPN);
+
+		assertThat(rnpn.points()).isZero();
+		assertThat(rnpn.maxPoints()).isEqualTo(15);
+		assertThat(rnpn.observation()).isEqualTo("RNPN check (simulated): the data matches");
+	}
+
+	@Test
+	void anRnpnThatDoesNotAnswerAddsHalfThePoints() {
+		Contribution rnpn = contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(rnpn(RnpnOutcome.UNAVAILABLE, 3))),
+				ScoreSignal.RNPN);
+
+		assertThat(rnpn.points()).isEqualTo(8);
+		assertThat(rnpn.observation()).isEqualTo("RNPN check (simulated): the RNPN did not answer after 3 tries");
+	}
+
+	@Test
+	void anRnpnThatDoesNotMatchAddsAllThePointsAndSaysWhichFields() {
+		Result result = ScoreEngine.score(modelWithRnpn(), withRnpn(rnpn(RnpnOutcome.NO_MATCH, 1)));
+
+		assertThat(contribution(result, ScoreSignal.RNPN).points()).isEqualTo(15);
+		assertThat(contribution(result, ScoreSignal.RNPN).observation())
+			.isEqualTo("RNPN check (simulated): the data does not match (last names, birth date)");
+		assertThat(result.score()).isEqualTo(15);
+	}
+
+	@Test
+	void aModelWithoutAWeightForTheRnpnIgnoresTheCheck() {
+		Result result = ScoreEngine.score(model, withRnpn(rnpn(RnpnOutcome.NO_MATCH, 1)));
+
+		assertThat(contribution(result, ScoreSignal.RNPN).points()).isNull();
+		assertThat(contribution(result, ScoreSignal.RNPN).maxPoints()).isNull();
+		assertThat(result.score()).isZero();
+	}
+
+	@Test
+	void theRnpnCheckOfARealProviderIsNotLabelledAsSimulated() {
+		RnpnCheck real = new RnpnCheck(null, RnpnOutcome.MATCH, "rnpn-sv", 1, List.of(), null);
+
+		assertThat(contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(real)), ScoreSignal.RNPN).observation())
+			.isEqualTo("RNPN check: the data matches");
 	}
 
 	@ParameterizedTest
@@ -267,6 +319,77 @@ class ScoreEngineTests {
 		assertThat(model.levelOf(score)).isEqualTo(level);
 	}
 
+	@ParameterizedTest
+	@CsvSource({ "0.90, 1", "0.50, 5", "0.20, 8", "0.00, 10" })
+	void theLivenessConfidenceIsReadAsOneMinusItsSeverity(String confidence, int points) {
+		Result result = ScoreEngine.score(modelWithLiveness(), withLiveness(liveness(LivenessStatus.CHECKED, confidence, 1)));
+
+		assertThat(contribution(result, ScoreSignal.LIVENESS).points()).isEqualTo(points);
+		assertThat(contribution(result, ScoreSignal.LIVENESS).maxPoints()).isEqualTo(10);
+		assertThat(contribution(result, ScoreSignal.LIVENESS).observation()).startsWith("Confianza de la prueba de vida:");
+	}
+
+	@Test
+	void theLivenessObservationSaysTheConfidenceAsAPercentage() {
+		Result result = ScoreEngine.score(modelWithLiveness(), withLiveness(liveness(LivenessStatus.CHECKED, "0.87", 1)));
+
+		assertThat(contribution(result, ScoreSignal.LIVENESS).observation()).isEqualTo("Confianza de la prueba de vida: 87 %");
+	}
+
+	@Test
+	void takingTheSelfieThreeTimesHasAFloorEvenWithHighConfidence() {
+		Result result = ScoreEngine.score(modelWithLiveness(), withLiveness(liveness(LivenessStatus.CHECKED, "0.95", 3)));
+
+		assertThat(contribution(result, ScoreSignal.LIVENESS).points()).isEqualTo(5);
+		assertThat(contribution(result, ScoreSignal.LIVENESS).observation()).endsWith("selfie tomada 3 veces");
+		// two tries are not repeated yet
+		Result twice = ScoreEngine.score(modelWithLiveness(), withLiveness(liveness(LivenessStatus.CHECKED, "0.95", 2)));
+		assertThat(contribution(twice, ScoreSignal.LIVENESS).points()).isEqualTo(1);
+	}
+
+	@Test
+	void theFloorDoesNotLowerAnAlreadyHighSeverity() {
+		Result result = ScoreEngine.score(modelWithLiveness(), withLiveness(liveness(LivenessStatus.CHECKED, "0.10", 4)));
+
+		assertThat(contribution(result, ScoreSignal.LIVENESS).points()).isEqualTo(9);
+	}
+
+	@Test
+	void withoutLivenessOrWithAProviderFailureTheSignalAddsNothing() {
+		for (LivenessCheck check : new LivenessCheck[] { null, liveness(LivenessStatus.FAILED, null, 1) }) {
+			Result result = ScoreEngine.score(modelWithLiveness(), withLiveness(check));
+
+			assertThat(contribution(result, ScoreSignal.LIVENESS).points()).isNull();
+			assertThat(contribution(result, ScoreSignal.LIVENESS).maxPoints()).isEqualTo(10);
+			assertThat(result.score()).isZero();
+		}
+		assertThat(contribution(ScoreEngine.score(modelWithLiveness(), withLiveness(null)), ScoreSignal.LIVENESS)
+			.observation()).isEqualTo("Sin prueba de vida en el expediente");
+		assertThat(contribution(ScoreEngine.score(modelWithLiveness(),
+				withLiveness(liveness(LivenessStatus.FAILED, null, 1))), ScoreSignal.LIVENESS).observation())
+			.isEqualTo("El proveedor de prueba de vida no estuvo disponible");
+	}
+
+	@Test
+	void livenessAtItsWorstOnlyChangesTheScoreAndTheContributionsAddUpToIt() {
+		ScoreModel withLiveness = modelWithLiveness();
+		Result result = ScoreEngine.score(withLiveness, withLiveness(liveness(LivenessStatus.CHECKED, "0.00", 1)));
+
+		assertThat(result.score()).isEqualTo(10);
+		assertThat(withLiveness.levelOf(result.score())).isEqualTo(RiskLevel.LOW);
+		assertThat(result.contributions().stream().mapToInt(c -> c.points() == null ? 0 : c.points()).sum())
+			.isEqualTo(result.score());
+	}
+
+	@Test
+	void aModelWithoutAWeightForLivenessIgnoresTheCheck() {
+		Result result = ScoreEngine.score(model, withLiveness(liveness(LivenessStatus.CHECKED, "0.00", 1)));
+
+		assertThat(contribution(result, ScoreSignal.LIVENESS).points()).isNull();
+		assertThat(contribution(result, ScoreSignal.LIVENESS).maxPoints()).isNull();
+		assertThat(result.score()).isZero();
+	}
+
 	private int points(IdentityDocument document) {
 		return contribution(ScoreEngine.score(model, inputs(null, document, null)), ScoreSignal.IDENTITY_DOCUMENT)
 			.points();
@@ -277,7 +400,46 @@ class ScoreEngineTests {
 	}
 
 	private static Inputs inputs(MonthlyAmountRange range, IdentityDocument document, RequestSignals signals) {
-		return new Inputs(range, document, signals, TODAY);
+		return new Inputs(range, document, signals, null, null, TODAY);
+	}
+
+	private static Inputs withLiveness(LivenessCheck liveness) {
+		return new Inputs(null, null, null, liveness, null, TODAY);
+	}
+
+	private static Inputs withRnpn(RnpnCheck rnpn) {
+		return new Inputs(null, null, null, null, rnpn, TODAY);
+	}
+
+	/** A check of the simulated RNPN; a result that does not match names the last names and the birth date. */
+	private static RnpnCheck rnpn(RnpnOutcome outcome, int tries) {
+		List<RnpnField> fields = outcome == RnpnOutcome.NO_MATCH ? List.of(RnpnField.LAST_NAMES, RnpnField.BIRTH_DATE)
+				: List.of();
+		return new RnpnCheck(null, outcome, "simulated", tries, fields,
+				outcome == RnpnOutcome.UNAVAILABLE ? "does not answer" : null);
+	}
+
+	private static ScoreModel modelWithRnpn() {
+		return modelWith(Map.of(ScoreSignal.RNPN, 15), 39, 69);
+	}
+
+	/** A liveness check after the given tries; the last one answered with this status and confidence. */
+	private static LivenessCheck liveness(LivenessStatus status, String confidence, int tries) {
+		LivenessCheck check = new LivenessCheck(null);
+		for (int i = 0; i < tries; i++) {
+			check.record(status, "simulated", confidence == null ? null : new BigDecimal(confidence),
+					status == LivenessStatus.FAILED ? "provider off" : null,
+					new EncryptedImage("image/jpeg", new byte[12], new byte[] { 1 }, (short) 1, "a".repeat(64), 1),
+					Instant.now());
+		}
+		return check;
+	}
+
+	/** Model v1 with a weight for the liveness check, as the next model will have. */
+	private static ScoreModel modelWithLiveness() {
+		return modelWith(Map.of(ScoreSignal.AMOUNT, 25, ScoreSignal.IDENTITY_DOCUMENT, 20, ScoreSignal.TYPING_PACE, 15,
+				ScoreSignal.DEVICE, 10, ScoreSignal.TIME_OF_DAY, 10, ScoreSignal.CITY, 20, ScoreSignal.LIVENESS, 10), 39,
+				69);
 	}
 
 	private static MonthlyAmountRange range(BigDecimal maxUsd) {

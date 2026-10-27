@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -14,9 +15,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import com.dreamparking.backend.identity.entity.enums.DocumentSide;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
@@ -42,24 +40,8 @@ public class IdentityDocumentImage {
 	@Column(name = "side", nullable = false, length = 5)
 	private DocumentSide side;
 
-	@Column(name = "content_type", nullable = false, length = 20)
-	private String contentType;
-
-	@Column(name = "ciphertext", nullable = false)
-	private byte[] ciphertext;
-
-	@Column(name = "iv", nullable = false)
-	private byte[] iv;
-
-	@Column(name = "key_version", nullable = false)
-	private short keyVersion;
-
-	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(name = "sha256", nullable = false, length = 64)
-	private String sha256;
-
-	@Column(name = "size_bytes", nullable = false)
-	private int sizeBytes;
+	@Embedded
+	private EncryptedImage image;
 
 	@Column(name = "captured_at", nullable = false)
 	private Instant capturedAt;
@@ -78,14 +60,8 @@ public class IdentityDocumentImage {
 	}
 
 	/** Replaces the photo with a new capture. */
-	public void store(String contentType, byte[] iv, byte[] ciphertext, short keyVersion, String sha256,
-			int sizeBytes, Instant capturedAt) {
-		this.contentType = contentType;
-		this.iv = iv.clone();
-		this.ciphertext = ciphertext.clone();
-		this.keyVersion = keyVersion;
-		this.sha256 = sha256;
-		this.sizeBytes = sizeBytes;
+	public void store(EncryptedImage image, Instant capturedAt) {
+		this.image = image;
 		this.capturedAt = capturedAt;
 	}
 
@@ -101,28 +77,8 @@ public class IdentityDocumentImage {
 		return side;
 	}
 
-	public String getContentType() {
-		return contentType;
-	}
-
-	public byte[] getCiphertext() {
-		return ciphertext.clone();
-	}
-
-	public byte[] getIv() {
-		return iv.clone();
-	}
-
-	public short getKeyVersion() {
-		return keyVersion;
-	}
-
-	public String getSha256() {
-		return sha256;
-	}
-
-	public int getSizeBytes() {
-		return sizeBytes;
+	public EncryptedImage getImage() {
+		return image;
 	}
 
 	public Instant getCapturedAt() {

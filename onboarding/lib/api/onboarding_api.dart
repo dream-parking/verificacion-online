@@ -29,6 +29,54 @@ class ApiException implements Exception {
   String toString() => 'ApiException($status): $message';
 }
 
+/// How a submitted request was left (`status` of `POST /submit`). The app only tells the person what happens next:
+/// never the score or why.
+enum SubmissionStatus {
+  /// Received as usual (`COMPLETED`).
+  completed,
+
+  /// Held for a person of the bank to review it (`ENHANCED_REVIEW`, VDI-118).
+  enhancedReview,
+
+  /// The identity could not be verified yet and the API keeps trying (`AWAITING_RNPN`, VDI-112). The person repeats
+  /// nothing, and the app never names the registry it is checked against.
+  awaitingVerification;
+
+  /// `null` while the request was not submitted (`IN_PROGRESS`) or was abandoned. A status this version of the app
+  /// does not know yet is told as [completed]: the request was received.
+  static SubmissionStatus? fromApi(Object? status) => switch (status) {
+    'ENHANCED_REVIEW' => enhancedReview,
+    'AWAITING_RNPN' => awaitingVerification,
+    null || 'IN_PROGRESS' || 'ABANDONED' => null,
+    _ => completed,
+  };
+}
+
+/// A submitted request: its number and how it was left.
+class Submission {
+  const Submission(this.number, this.status);
+
+  factory Submission.fromJson(Map<String, dynamic> json) =>
+      Submission(json['number'] as String, SubmissionStatus.fromApi(json['status']) ?? SubmissionStatus.completed);
+
+  final String number;
+  final SubmissionStatus status;
+}
+
+/// Answer of `PUT /liveness` (VDI-116). With [checked] false the provider was not available: the request goes on and
+/// the selfie does not count in the score. Either way the person is told the same.
+class LivenessResult {
+  const LivenessResult({required this.checked, required this.attempts});
+
+  factory LivenessResult.fromJson(Map<String, dynamic> json) =>
+      LivenessResult(checked: json['status'] == 'CHECKED', attempts: (json['attempts'] as num?)?.toInt() ?? 1);
+
+  final bool checked;
+
+  /// Selfies the API judged in this request.
+  final int attempts;
+}
+
 /// Client for `/api/onboarding/requests` (see docs/integracion-api.md and docs/openapi.json).
 class OnboardingApi {
   OnboardingApi({http.Client? client, String baseUrl = apiBaseUrl})
@@ -72,19 +120,20 @@ class OnboardingApi {
     });
   }
 
-  /// Submits the request and returns the number the server assigned to it (SOL-YYYY-NNNNN, unique).
+  /// Submits the request and returns the number the server assigned to it (SOL-YYYY-NNNNN, unique) and how it was
+  /// left.
   ///
   /// If the request was already submitted (for example, the response to a previous submit was lost
   /// and the client retried), it returns the number the request already has instead of failing.
-  Future<String> submitRequest(String requestId) async {
+  Future<Submission> submitRequest(String requestId) async {
     try {
-      final json = await _send('POST', '/api/onboarding/requests/$requestId/submit');
-      return json['number'] as String;
+      return Submission.fromJson(await _send('POST', '/api/onboarding/requests/$requestId/submit'));
     } on ApiException catch (e) {
       if (e.status != 409) rethrow;
       final current = await _send('GET', '/api/onboarding/requests/$requestId');
-      final number = current['number'];
-      if (current['status'] == 'COMPLETED' && number is String) return number;
+      if (current['number'] is String && SubmissionStatus.fromApi(current['status']) != null) {
+        return Submission.fromJson(current);
+      }
       rethrow;
     }
   }
@@ -148,6 +197,16 @@ class OnboardingApi {
       'birthDate': dateForApi(birthDate),
       'expiryDate': dateForApi(expiryDate),
     });
+  }
+
+  /// Selfie with the liveness check (VDI-116): JPEG up to 5 MB. Returns whether the provider checked it; the level of
+  /// confidence stays in the API. A selfie that cannot be judged because of how it was taken throws an
+  /// [ApiException] 422 with `reason`, and does not count as an attempt.
+  Future<LivenessResult> checkLiveness(String requestId, Uint8List selfie) async {
+    final req = http.MultipartRequest('PUT', _base.resolve('/api/onboarding/requests/$requestId/liveness'))
+      ..headers['Accept'] = 'application/json'
+      ..files.add(http.MultipartFile.fromBytes('selfie', selfie, filename: 'selfie.jpg'));
+    return LivenessResult.fromJson(await _deliver(req));
   }
 
   /// VDI-87: where a request was left and what was saved. Throws an [ApiException] 404 if it does not exist.

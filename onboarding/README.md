@@ -127,6 +127,31 @@ Cada push a `dev` o `QA` compila el APK y lo envía por **Firebase App Distribut
 
 Dev (`com.dreamparking.onboarding.dev`, *Tangamandapio Dev*) y QA (`com.dreamparking.onboarding.qa`, *Tangamandapio QA*) se pueden tener instaladas a la vez. Para agregar testers: Firebase Console → App Distribution → Testers & Groups.
 
+## 8. Correr en iPhone (iOS)
+
+Se necesita una Mac con **Xcode** (Mac App Store). No hace falta CocoaPods: todos los plugins se instalan con Swift Package Manager.
+
+1. Configurar Xcode (pide la contraseña de la Mac):
+   ```bash
+   sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+   ```
+   ```bash
+   sudo xcodebuild -runFirstLaunch
+   ```
+2. Descargar el simulador de iOS (unos 8 GB; solo si se va a usar):
+   ```bash
+   xcodebuild -downloadPlatform iOS
+   ```
+3. Conectar el iPhone por cable, desbloquearlo y aceptar «Confiar en esta computadora». En el iPhone, activar **Ajustes → Privacidad y seguridad → Modo de desarrollador** (se reinicia).
+4. Firmar la app con un Apple ID (gratis): abrir `ios/Runner.xcworkspace` en Xcode → target **Runner** → **Signing & Capabilities** → marcar *Automatically manage signing* → en **Team** elegir o agregar tu Apple ID. Si el *Bundle Identifier* ya está tomado, cambiarlo por uno propio (por ejemplo, agregarle tu nombre). **No subir** este cambio al repo.
+5. Dentro de `onboarding/`:
+   ```bash
+   flutter run
+   ```
+   La primera vez, el iPhone pide confiar en el desarrollador: **Ajustes → General → VPN y gestión de dispositivos** → tu Apple ID → *Confiar*.
+
+**Simulador de iOS:** la app corre (`flutter run` con el simulador abierto), pero el simulador no tiene cámara: sirve para las pantallas, no para el DUI ni la selfie. Para esos pasos hay que usar un iPhone real.
+
 ## Problemas comunes
 
 - **"No supported devices connected":** el emulador no está encendido o el celular no tiene la depuración USB activada.
@@ -139,4 +164,4 @@ Dev (`com.dreamparking.onboarding.dev`, *Tangamandapio Dev*) y QA (`com.dreampar
   ```bash
   flutter pub get
   ```
-- **iPhone:** se necesita una Mac con Xcode instalado; mientras tanto se puede usar el emulador de Android.
+- **iPhone:** ver la sección 8.

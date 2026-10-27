@@ -26,6 +26,7 @@ import com.dreamparking.backend.customer.service.CustomerService;
 import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.repository.IdentityDocumentRepository;
+import com.dreamparking.backend.liveness.entity.LivenessStatus;
 import com.dreamparking.backend.onboarding.dto.BasicDataRequest;
 import com.dreamparking.backend.onboarding.dto.ExpectedActivityRequest;
 import com.dreamparking.backend.onboarding.dto.IncomeDeclarationRequest;
@@ -48,6 +49,12 @@ import com.dreamparking.backend.onboarding.repository.PrivacyConsentRepository;
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
 import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 import com.dreamparking.backend.risk.service.RiskAssessmentService;
+import com.dreamparking.backend.risk.service.RiskDecisionService;
+import com.dreamparking.backend.rnpn.client.RnpnQuery;
+import com.dreamparking.backend.rnpn.entity.RnpnCheck;
+import com.dreamparking.backend.rnpn.entity.enums.RnpnOutcome;
+import com.dreamparking.backend.rnpn.repository.RnpnCheckRepository;
+import com.dreamparking.backend.rnpn.service.RnpnService;
 
 /**
  * Steps of the mobile onboarding flow: privacy notice → basic data → identity document (DUI) → income → expected
@@ -80,6 +87,10 @@ public class OnboardingService {
 
 	private final RiskAssessmentService riskAssessmentService;
 
+	private final RiskDecisionService riskDecisionService;
+
+	private final RnpnCheckRepository rnpnChecks;
+
 	private final IdentityDocumentRepository identityDocuments;
 
 	private final ExpectedActivityVersionRepository profileVersions;
@@ -90,7 +101,8 @@ public class OnboardingService {
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestEventRepository events, CatalogService catalogService,
 			PrivacyNoticeService privacyNoticeService, CustomerService customerService,
-			RiskAssessmentService riskAssessmentService, IdentityDocumentRepository identityDocuments,
+			RiskAssessmentService riskAssessmentService, RiskDecisionService riskDecisionService,
+			RnpnCheckRepository rnpnChecks, IdentityDocumentRepository identityDocuments,
 			ExpectedActivityVersionRepository profileVersions,
 			@Value("${app.onboarding.identity-document-required:true}") boolean identityDocumentRequired) {
 		this.requests = requests;
@@ -102,6 +114,8 @@ public class OnboardingService {
 		this.privacyNoticeService = privacyNoticeService;
 		this.customerService = customerService;
 		this.riskAssessmentService = riskAssessmentService;
+		this.riskDecisionService = riskDecisionService;
+		this.rnpnChecks = rnpnChecks;
 		this.identityDocuments = identityDocuments;
 		this.profileVersions = profileVersions;
 		this.identityDocumentRequired = identityDocumentRequired;
@@ -172,6 +186,14 @@ public class OnboardingService {
 		};
 		recordEvent(request, RequestEventType.IDENTITY_DOCUMENT_CAPTURED, description,
 				Map.of("ocrStatus", ocrStatus.name()));
+	}
+
+	/** The selfie of the request went through the liveness check (VDI-114); the confidence stays in the file, not in the timeline. */
+	@Transactional
+	public void recordLivenessChecked(OnboardingRequest request, LivenessStatus status) {
+		String description = status == LivenessStatus.CHECKED ? "Prueba de vida realizada"
+				: "Prueba de vida capturada; el proveedor no estuvo disponible";
+		recordEvent(request, RequestEventType.LIVENESS_CHECKED, description, Map.of("livenessStatus", status.name()));
 	}
 
 	/** The customer tried to confirm an expired DUI or dates that do not agree; the step does not advance. */
@@ -289,18 +311,35 @@ public class OnboardingService {
 		return amount;
 	}
 
-	/** Review and submit: assigns the SOL-YYYY-NNNNN number, closes the request and scores it with every signal. */
+	/**
+	 * Checks that the request can be submitted and returns the confirmed DUI data the RNPN is asked about (VDI-111);
+	 * empty when there is no confirmed DUI to check. It changes nothing, so the RNPN can be asked before the
+	 * transaction of {@link #submit(UUID, RnpnService.Answer)} starts.
+	 */
+	@Transactional(readOnly = true)
+	public Optional<RnpnQuery> prepareSubmission(UUID requestId) {
+		OnboardingRequest request = findInProgress(requestId);
+		validateSubmittable(request);
+		return identityDocuments.findById(requestId)
+			.map(document -> new RnpnQuery(document.getConfirmedDui(), document.getConfirmedFirstNames(),
+					document.getConfirmedLastNames(), document.getConfirmedBirthDate()));
+	}
+
+	/** Review and submit without checking the RNPN: assigns the SOL-YYYY-NNNNN number and scores the request. */
 	@Transactional
 	public OnboardingRequestResponse submit(UUID requestId) {
+		return submit(requestId, null);
+	}
+
+	/**
+	 * Review and submit: assigns the SOL-YYYY-NNNNN number, closes the request and scores it with every signal.
+	 * {@code rnpnAnswer} is what the RNPN answered about the confirmed DUI, stored in the file before scoring so it counts
+	 * in the score; when the RNPN did not answer the request waits and is not approved automatically.
+	 */
+	@Transactional
+	public OnboardingRequestResponse submit(UUID requestId, RnpnService.Answer rnpnAnswer) {
 		OnboardingRequest request = findInProgress(requestId);
-		int stepsBeforeReview = OnboardingStep.REVIEW.ordinal();
-		if (request.getCompletedSteps() < stepsBeforeReview) {
-			throw new InvalidStateException("Complete the " + stepsBeforeReview + " previous steps before submitting");
-		}
-		if (identityDocuments.findById(requestId).filter(document -> !document.isConfirmed()).isPresent()) {
-			// New DUI photos after confirming: the customer has to confirm their data again.
-			throw new InvalidStateException("Confirm the data of the identity document before submitting");
-		}
+		validateSubmittable(request);
 
 		Instant now = Instant.now();
 		completeStep(request, OnboardingStep.REVIEW);
@@ -309,10 +348,46 @@ public class OnboardingService {
 		request.setSubmittedAt(now);
 		recordEvent(request, RequestEventType.REQUEST_SUBMITTED, "Solicitud enviada",
 				Map.of("number", request.getNumber()));
+		// The customer gets their permanent number with the first request they submit; a customer that has one keeps it.
+		if (request.getCustomer() != null) {
+			customerService.assignNumber(request.getCustomer().getId());
+		}
+		if (rnpnAnswer != null) {
+			recordRnpnCheck(request, rnpnAnswer);
+		}
 		// The signals captured after the amount was declared (telemetry, DUI) count in the final score.
 		expectedActivities.findById(requestId)
 			.ifPresent(activity -> riskAssessmentService.evaluate(request, activity.getMonthlyAmountRange()));
+		// Above the threshold of the score model the request is not approved automatically (VDI-117).
+		riskDecisionService.decideOnSubmission(request);
 		return OnboardingRequestResponse.of(request);
+	}
+
+	private void validateSubmittable(OnboardingRequest request) {
+		int stepsBeforeReview = OnboardingStep.REVIEW.ordinal();
+		if (request.getCompletedSteps() < stepsBeforeReview) {
+			throw new InvalidStateException("Complete the " + stepsBeforeReview + " previous steps before submitting");
+		}
+		if (identityDocuments.findById(request.getId()).filter(document -> !document.isConfirmed()).isPresent()) {
+			// New DUI photos after confirming: the customer has to confirm their data again.
+			throw new InvalidStateException("Confirm the data of the identity document before submitting");
+		}
+	}
+
+	/** Stores the RNPN check in the file and the timeline; an RNPN that did not answer leaves the request waiting. */
+	private void recordRnpnCheck(OnboardingRequest request, RnpnService.Answer answer) {
+		rnpnChecks.save(new RnpnCheck(request, answer.outcome(), answer.provider(), answer.attempts(),
+				answer.mismatchedFields(), answer.failure()));
+		String description = switch (answer.outcome()) {
+			case MATCH -> "RNPN check done: the data matches";
+			case NO_MATCH -> "RNPN check done: the data does not match";
+			case UNAVAILABLE -> "RNPN check not done: the RNPN did not answer";
+		};
+		recordEvent(request, RequestEventType.RNPN_CHECKED, description,
+				Map.of("outcome", answer.outcome().name(), "attempts", answer.attempts(), "provider", answer.provider()));
+		if (answer.outcome() == RnpnOutcome.UNAVAILABLE) {
+			request.setStatus(RequestStatus.AWAITING_RNPN);
+		}
 	}
 
 	/** Request entity for other onboarding services. */

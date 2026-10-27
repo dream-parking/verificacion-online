@@ -1,6 +1,7 @@
 package com.dreamparking.backend.risk.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,10 +11,14 @@ import com.dreamparking.backend.identity.entity.IdentityDocument;
 import com.dreamparking.backend.identity.entity.enums.DuiDateProblem;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.service.DuiValidator;
+import com.dreamparking.backend.liveness.entity.LivenessCheck;
+import com.dreamparking.backend.liveness.entity.LivenessStatus;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
 import com.dreamparking.backend.risk.entity.ScoreModel;
 import com.dreamparking.backend.risk.entity.enums.ScoreSignal;
+import com.dreamparking.backend.rnpn.entity.RnpnCheck;
+import com.dreamparking.backend.rnpn.entity.enums.RnpnField;
 
 /**
  * Scores a request with a {@link ScoreModel}. Each signal is read as a severity from 0 (nothing unusual) to 1 (as
@@ -24,13 +29,20 @@ import com.dreamparking.backend.risk.entity.enums.ScoreSignal;
 public final class ScoreEngine {
 
 	/** Signals with no way to be read yet; they are listed in the breakdown as not available. */
-	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.CITY, ScoreSignal.RNPN, ScoreSignal.LIVENESS,
-			ScoreSignal.INTERNAL_LISTS);
+	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.CITY, ScoreSignal.INTERNAL_LISTS);
 
 	private static final BigDecimal LOW_CONFIDENCE = new BigDecimal("0.70");
 
 	/** From this many captures of the DUI photos, each one more adds to the score. */
 	private static final int REPEATED_CAPTURES = 3;
+
+	/** From this many tries of the liveness check, the signal cannot be lower than {@link #REPEATED_TRIES_SEVERITY}. */
+	private static final int REPEATED_LIVENESS_TRIES = 3;
+
+	private static final double REPEATED_TRIES_SEVERITY = 0.5;
+
+	/** An RNPN that did not answer is neither good nor bad news: half of the points of the signal. */
+	private static final double RNPN_UNAVAILABLE_SEVERITY = 0.5;
 
 	/** Highest ceiling (USD) of the declared monthly range for each severity step: up to 200, 500 and 1,000. */
 	private static final int[] AMOUNT_CEILINGS = { 200, 500, 1000 };
@@ -50,7 +62,7 @@ public final class ScoreEngine {
 
 	/** Everything the signals are read from; any part can be null while it has not been captured. */
 	public record Inputs(MonthlyAmountRange amountRange, IdentityDocument document, RequestSignals signals,
-			LocalDate today) {
+			LivenessCheck liveness, RnpnCheck rnpn, LocalDate today) {
 	}
 
 	public static Result score(ScoreModel model, Inputs inputs) {
@@ -60,6 +72,8 @@ public final class ScoreEngine {
 		contributions.add(typingPace(model, inputs.signals()));
 		contributions.add(device(model, inputs.signals()));
 		contributions.add(timeOfDay(model, inputs.signals()));
+		contributions.add(liveness(model, inputs.liveness()));
+		contributions.add(rnpn(model, inputs.rnpn()));
 		for (ScoreSignal signal : PENDING) {
 			String note = signal == ScoreSignal.CITY ? "Aún no disponible: llega con la ubicación de la solicitud"
 					: "Aún no disponible: llega en otro sprint";
@@ -175,6 +189,49 @@ public final class ScoreEngine {
 		}
 		return night ? contribution(model, ScoreSignal.TIME_OF_DAY, 1.0, "Nocturno: entre las 9 p. m. y las 5 a. m.")
 				: contribution(model, ScoreSignal.TIME_OF_DAY, 0.0, "Diurno");
+	}
+
+	/**
+	 * The provider's confidence read as a severity: 1 minus the confidence, and at least {@code 0.5} from the third try,
+	 * since repeating the selfie until it passes is itself unusual. A provider that did not answer adds nothing.
+	 */
+	private static Contribution liveness(ScoreModel model, LivenessCheck check) {
+		if (check == null) {
+			return unavailable(model, ScoreSignal.LIVENESS, "Sin prueba de vida en el expediente");
+		}
+		if (check.getStatus() == LivenessStatus.FAILED) {
+			return unavailable(model, ScoreSignal.LIVENESS, "El proveedor de prueba de vida no estuvo disponible");
+		}
+		double severity = BigDecimal.ONE.subtract(check.getConfidence()).doubleValue();
+		String observation = "Confianza de la prueba de vida: %d %%".formatted(
+				check.getConfidence().movePointRight(2).setScale(0, RoundingMode.HALF_UP).intValue());
+		if (check.getAttempts() >= REPEATED_LIVENESS_TRIES) {
+			severity = Math.max(severity, REPEATED_TRIES_SEVERITY);
+			observation += "; selfie tomada %d veces".formatted(check.getAttempts());
+		}
+		return contribution(model, ScoreSignal.LIVENESS, severity, observation);
+	}
+
+	/**
+	 * The last RNPN check read as a severity (VDI-111): no points when the data matches, all of them when it does not,
+	 * and half when the RNPN did not answer. It adds to the score without deciding anything by itself.
+	 */
+	private static Contribution rnpn(ScoreModel model, RnpnCheck check) {
+		if (check == null) {
+			return unavailable(model, ScoreSignal.RNPN, "The RNPN has not been checked yet");
+		}
+		String source = check.isSimulated() ? "RNPN check (simulated)" : "RNPN check";
+		return switch (check.getOutcome()) {
+			case MATCH -> contribution(model, ScoreSignal.RNPN, 0.0, source + ": the data matches");
+			case NO_MATCH -> contribution(model, ScoreSignal.RNPN, 1.0, source + ": the data does not match ("
+					+ String.join(", ", check.getMismatchedFields().stream().map(ScoreEngine::fieldName).toList()) + ")");
+			case UNAVAILABLE -> contribution(model, ScoreSignal.RNPN, RNPN_UNAVAILABLE_SEVERITY,
+					source + ": the RNPN did not answer after %d tries".formatted(check.getAttempts()));
+		};
+	}
+
+	private static String fieldName(RnpnField field) {
+		return field.name().toLowerCase().replace('_', ' ');
 	}
 
 	private static Contribution contribution(ScoreModel model, ScoreSignal signal, double severity, String observation) {

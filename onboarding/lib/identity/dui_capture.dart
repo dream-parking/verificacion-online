@@ -201,7 +201,7 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
                   Positioned.fill(child: session.preview),
                   const Positioned.fill(child: _FrameOverlay()),
                   if (_focusRing != null) _FocusRing(key: const Key('focus-ring'), at: _focusRing!),
-                  Positioned(left: 16, right: 16, bottom: 12, child: Center(child: _StatusPill(_hint))),
+                  Positioned(left: 16, right: 16, bottom: 12, child: Center(child: FrameStatusPill(_hint))),
                 ],
               ),
             ),
@@ -214,22 +214,22 @@ class _DuiCaptureViewState extends State<DuiCaptureView> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _Tip(Icons.light_mode_outlined, 'Buena luz'),
-              _Tip(Icons.flare_outlined, 'Sin reflejos'),
-              _Tip(Icons.crop_free, 'Se ven las 4 esquinas'),
+              CaptureTip(Icons.light_mode_outlined, 'Buena luz'),
+              CaptureTip(Icons.flare_outlined, 'Sin reflejos'),
+              CaptureTip(Icons.crop_free, 'Se ven las 4 esquinas'),
             ],
           ),
         ),
         Padding(
           padding: EdgeInsets.fromLTRB(24, 16, 24, 20 + MediaQuery.paddingOf(context).bottom),
-          child: _Shutter(busy: _taking, blocked: _hint.blocksShutter, onPressed: _take),
+          child: Shutter(busy: _taking, blocked: _hint.blocksShutter, onPressed: _take),
         ),
       ],
     );
   }
 }
 
-/// Back arrow, «Paso 2 de 5 · Tu DUI» and help.
+/// Back arrow, «Paso 2 de 6 · Tu DUI» and help.
 class _Header extends StatelessWidget {
   const _Header({required this.onBack, required this.onHelp});
 
@@ -249,7 +249,7 @@ class _Header extends StatelessWidget {
           ),
           const Expanded(
             child: Text(
-              'Paso 2 de 5 · Tu DUI',
+              'Paso 2 de 6 · Tu DUI',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w700),
             ),
@@ -384,9 +384,9 @@ class _FramePainter extends CustomPainter {
   bool shouldRepaint(_FramePainter old) => old.frame != frame;
 }
 
-/// «Bien, mantén el teléfono quieto», or what to fix: light, movement.
-class _StatusPill extends StatelessWidget {
-  const _StatusPill(this.hint);
+/// «Bien, mantén el teléfono quieto», or what to fix: light, movement. The selfie uses it too (VDI-116).
+class FrameStatusPill extends StatelessWidget {
+  const FrameStatusPill(this.hint, {super.key});
 
   final FrameHint hint;
 
@@ -422,33 +422,9 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _Tip extends StatelessWidget {
-  const _Tip(this.icon, this.text);
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: ShapeDecoration(
-        shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.25))),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: Colors.white70),
-          const SizedBox(width: 6),
-          Text(text, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-        ],
-      ),
-    );
-  }
-}
-
-class _Shutter extends StatelessWidget {
-  const _Shutter({required this.busy, required this.blocked, required this.onPressed});
+/// Round shutter of the camera screens (DUI and selfie); off while a photo is being taken or it is too dark.
+class Shutter extends StatelessWidget {
+  const Shutter({super.key, required this.busy, required this.blocked, required this.onPressed});
 
   final bool busy;
 

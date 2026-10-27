@@ -9,6 +9,8 @@ import '../api/resume.dart';
 import '../identity/document_camera.dart';
 import '../identity/dui_capture.dart';
 import '../identity/identity_document.dart';
+import '../liveness/selfie_capture.dart';
+import '../liveness/selfie_problem.dart';
 import '../signals/device_fingerprint.dart';
 import '../signals/device_location.dart';
 import '../signals/signals.dart';
@@ -19,13 +21,14 @@ import 'resume_view.dart';
 import 'saved_request.dart';
 import 'widgets.dart';
 
-/// Account opening flow: welcome → privacy → location permission → 5 steps → confirmation.
+/// Account opening flow: welcome → privacy → location permission → 6 steps → confirmation.
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({
     super.key,
     this.api,
     this.deviceInfo,
     this.camera = const PlatformDocumentCamera(),
+    this.faceCamera = const PlatformDocumentCamera(front: true),
     this.location,
     this.savedRequest = const PreferencesSavedRequestStore(),
     this.clock = DateTime.now,
@@ -39,6 +42,9 @@ class OnboardingFlow extends StatefulWidget {
 
   /// Camera that photographs the DUI (VDI-77); tests pass a fake one.
   final DocumentCamera camera;
+
+  /// Front camera of the selfie, with the faces it finds (VDI-116); tests pass a fake one.
+  final DocumentCamera faceCamera;
 
   /// Approximate location reader (VDI-73); tests pass a fake one.
   final DeviceLocationSource? location;
@@ -60,7 +66,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     Screen.location: Screen.basicData,
     Screen.basicData: Screen.identityDocument,
     Screen.identityDocument: Screen.identityConfirmation,
-    Screen.identityConfirmation: Screen.income,
+    Screen.identityConfirmation: Screen.selfie,
+    Screen.selfie: Screen.income,
     Screen.income: Screen.expectedActivity,
     Screen.expectedActivity: Screen.review,
   };
@@ -70,7 +77,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     Screen.basicData: Screen.location,
     Screen.identityDocument: Screen.basicData,
     Screen.identityConfirmation: Screen.identityDocument,
-    Screen.income: Screen.identityConfirmation,
+    Screen.selfie: Screen.identityConfirmation,
+    Screen.income: Screen.selfie,
     Screen.expectedActivity: Screen.income,
     Screen.review: Screen.expectedActivity,
   };
@@ -78,9 +86,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     Screen.basicData: 1,
     Screen.identityDocument: 2,
     Screen.identityConfirmation: 2,
-    Screen.income: 3,
-    Screen.expectedActivity: 4,
-    Screen.review: 5,
+    Screen.selfie: 3,
+    Screen.income: 4,
+    Screen.expectedActivity: 5,
+    Screen.review: 6,
   };
 
   final _scroll = ScrollController();
@@ -123,6 +132,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   var _submitFailed = false;
   var _copied = false;
 
+  /// How the request was left when it was submitted: it decides the last screen.
+  var _submitted = SubmissionStatus.completed;
+
   // DUI step (VDI-77).
   /// Photos taken so far; the API gets both together.
   final _duiPhotos = <DuiSide, Uint8List>{};
@@ -151,6 +163,23 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   /// The person came from the confirmation to repeat a photo: the other one and the data are kept.
   var _retakingDui = false;
+
+  // Selfie step (VDI-116).
+  var _selfie = _SelfiePhase.intro;
+
+  /// Why it has to be taken again, on the screen to try again.
+  SelfieProblem? _selfieProblem;
+
+  /// The selfie taken, kept only until the API has it, to send it again after a connection error.
+  Uint8List? _selfiePhoto;
+  String? _selfieError;
+  var _uploadingSelfie = false;
+
+  /// The API has the selfie of this request: it is not asked again, since every new one counts as another attempt.
+  var _selfieTaken = false;
+
+  /// Whether the selfie of the request that can be picked up was already taken (kept in the phone).
+  var _resumableSelfieTaken = false;
 
   @override
   void dispose() {
@@ -202,11 +231,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     if (id == null) return;
     try {
       final info = await _api.resume(id);
+      final selfieTaken = await _readSelfieTaken(id);
       if (!mounted) return;
       if (info.resumable && info.step != null) {
         setState(() {
           _resumable = info;
           _resumableId = id;
+          _resumableSelfieTaken = selfieTaken;
         });
       } else {
         await _forgetSavedRequest();
@@ -214,6 +245,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     } on ApiException catch (e) {
       debugPrint('Could not check the saved request: $e');
       if (e.status == 404) await _forgetSavedRequest();
+    }
+  }
+
+  Future<bool> _readSelfieTaken(String id) async {
+    try {
+      return await widget.savedRequest.selfieTaken(id);
+    } on Exception catch (e) {
+      debugPrint('Could not read whether the selfie was taken: $e');
+      return false;
     }
   }
 
@@ -234,10 +274,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   /// Step a request picked up goes to. The DUI photos are not kept in the phone: if the DUI was not confirmed it is done
-  /// again, even if the API moved on.
-  static Screen _resumeTarget(ResumeInfo info) {
+  /// again, even if the API moved on. The API does not count the selfie as a step, so the phone remembers it.
+  Screen _resumeTarget(ResumeInfo info) {
     final afterDui = const [Screen.income, Screen.expectedActivity, Screen.review].contains(info.step);
-    return info.step == Screen.identityDocument || (afterDui && !info.identityConfirmed) ? Screen.identityDocument : info.step!;
+    if (info.step == Screen.identityDocument || (afterDui && !info.identityConfirmed)) return Screen.identityDocument;
+    if (afterDui && !_resumableSelfieTaken) return Screen.selfie;
+    return info.step!;
   }
 
   /// VDI-87: «Continuar donde quedé». The screens are filled with what the API saved and it goes to the step where it
@@ -273,6 +315,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final askAgain = target == Screen.identityDocument;
     _duiConfirmedBeforeResume = !askAgain && const [Screen.income, Screen.expectedActivity, Screen.review].contains(info.step);
     _duiConfirmed = info.identityConfirmed;
+    _selfieTaken = _resumableSelfieTaken;
     _goTo(target);
     if (askAgain) unawaited(_explainPhotosAgain());
   }
@@ -315,6 +358,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     // VDI-43: the step start stays in memory; it is only sent after the notice is accepted.
     _signals.steps.start(s, widget.clock());
     if (s == Screen.identityDocument && !keepDui) _resetDuiCapture();
+    if (s == Screen.selfie) _resetSelfie();
     if (_signalsPending) unawaited(_sendSignals());
   }
 
@@ -507,6 +551,79 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     });
   }
 
+  /// The selfie step starts on its explanation, or on «Listo» if the API already has the selfie.
+  void _resetSelfie() {
+    setState(() {
+      _selfie = _selfieTaken ? _SelfiePhase.done : _SelfiePhase.intro;
+      _selfieProblem = null;
+      _selfieError = null;
+      _selfiePhoto = null;
+    });
+  }
+
+  /// VDI-116: «Tomar mi selfie» or «Intentar de nuevo» opens the camera.
+  void _startSelfie() => setState(() {
+        _selfie = _SelfiePhase.camera;
+        _selfieProblem = null;
+      });
+
+  void _onSelfieCaptured(Uint8List photo) {
+    _selfiePhoto = photo;
+    _uploadSelfie();
+  }
+
+  /// VDI-116: sends the selfie. The person is told the same whether the provider checked it or not.
+  Future<void> _uploadSelfie() async {
+    final photo = _selfiePhoto;
+    if (photo == null) return;
+    setState(() {
+      _uploadingSelfie = true;
+      _selfieError = null;
+    });
+    try {
+      await _api.checkLiveness(_form.id!, photo);
+      if (!mounted) return;
+      setState(() {
+        _uploadingSelfie = false;
+        _selfieTaken = true;
+        _selfiePhoto = null;
+        _selfie = _SelfiePhase.done;
+      });
+      unawaited(_keepSelfieTaken(_form.id!));
+    } on ApiException catch (e) {
+      debugPrint('Could not send the selfie: $e');
+      if (!mounted) return;
+      setState(() {
+        _uploadingSelfie = false;
+        switch (e.status) {
+          case 422 || 413 || 400:
+            _selfie = _SelfiePhase.retry;
+            _selfieProblem = e.status == 422 ? SelfieProblem.fromReason(e.reason) : SelfieProblem.other;
+            _selfiePhoto = null;
+          case 409:
+            _selfieError = 'Tu solicitud ya fue enviada y no se puede modificar.';
+          default:
+            _selfieError = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+        }
+      });
+    }
+  }
+
+  Future<void> _keepSelfieTaken(String id) async {
+    try {
+      await widget.savedRequest.saveSelfieTaken(id);
+    } on Exception catch (e) {
+      debugPrint('Could not keep that the selfie was taken: $e');
+    }
+  }
+
+  /// «Guardar y seguir después»: every step is already in the API. It goes back to the start, which offers to pick
+  /// the request up.
+  Future<void> _saveForLater() async {
+    _restart();
+    await _checkSavedRequest();
+  }
+
   /// Saves the current step in the API and only moves on if it was saved.
   Future<void> _saveAndContinue(Future<void> Function() save, {String? conflictMessage}) async {
     final returnToConfirmation = _correctingBasicData && _screen == Screen.basicData;
@@ -556,7 +673,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         : 'Revisa estos datos e inténtalo de nuevo: ${names.join(', ')}.';
   }
 
-  bool get _busy => _submitting || _starting || _saving || _uploadingDui || _locating;
+  bool get _busy => _submitting || _starting || _saving || _uploadingDui || _uploadingSelfie || _locating;
 
   /// VDI-40: reads the device and sends its fingerprint. It only runs after the notice is accepted.
   /// If it fails it does not interrupt the customer: signals feed the score, they do not block the flow.
@@ -662,10 +779,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     _signals.steps.complete(Screen.review, widget.clock());
     await _sendSignals();
     try {
-      final number = await _api.submitRequest(_form.id!);
+      final submission = await _api.submitRequest(_form.id!);
       if (!mounted) return;
       setState(() {
-        _form.number = number;
+        _form.number = submission.number;
+        _submitted = submission.status;
         _submitting = false;
       });
       unawaited(_forgetSavedRequest());
@@ -694,6 +812,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _duiError = null;
       _uploadingDui = false;
       _retakingDui = false;
+      _selfie = _SelfiePhase.intro;
+      _selfieProblem = null;
+      _selfiePhoto = null;
+      _selfieError = null;
+      _uploadingSelfie = false;
+      _selfieTaken = false;
       _signals = Signals();
       _signalsPending = false;
       _resendSignals = false;
@@ -701,6 +825,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _startError = null;
       _saveError = null;
       _copied = false;
+      _submitted = SubmissionStatus.completed;
     });
     _goTo(Screen.welcome);
   }
@@ -715,7 +840,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   Widget build(BuildContext context) {
     final previous = _previousScreen;
     final step = _stepNumber[_screen];
-    final capturing = _capturingDui;
+    final capturing = _capturingDui || _capturingSelfie;
 
     // On Android the system "back" button goes to the previous step instead of closing the app.
     return PopScope(
@@ -744,6 +869,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                     // The camera takes all the space; the other screens scroll.
                     child: _capturingDui
                         ? _duiCapture()
+                        : _capturingSelfie
+                        ? _selfieCapture()
                         : SingleChildScrollView(
                             controller: _scroll,
                             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -754,7 +881,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                           ),
                   ),
                   // The DUI step has its own buttons: the shutter and "Tomar otra foto".
-                  if (_screen != Screen.confirmation && _screen != Screen.identityDocument) _actionBar(),
+                  if (_screen != Screen.confirmation && _screen != Screen.identityDocument && !_capturingSelfie) _actionBar(),
                 ],
               ),
               if (_submitting)
@@ -763,6 +890,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 const LoadingOverlay(title: 'Guardando tu información…', detail: 'Un momento, por favor.'),
               if (_uploadingDui)
                 const LoadingOverlay(title: 'Revisando tu DUI…', detail: 'Estamos leyendo tus fotos. Puede tardar unos segundos.'),
+              if (_uploadingSelfie)
+                const LoadingOverlay(title: 'Revisando tu selfie…', detail: 'Puede tardar unos segundos.'),
               if (_starting)
                 const LoadingOverlay(title: 'Preparando tu solicitud…', detail: 'Esto puede tardar unos segundos.'),
               if (_locating)
@@ -778,7 +907,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   /// Back goes to the previous step; repeating a photo goes back to the confirmation it came from.
   Screen? get _previousScreen {
     if (_screen == Screen.identityDocument && _retakingDui) return Screen.identityConfirmation;
-    if (_screen == Screen.income && _duiConfirmedBeforeResume) return Screen.basicData;
+    if (_screen == Screen.selfie && _duiConfirmedBeforeResume) return Screen.basicData;
     return _previous[_screen];
   }
 
@@ -810,6 +939,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       Screen.review => 'Enviar solicitud',
       Screen.privacy => PrivacyNotice.acceptButton,
       Screen.identityConfirmation => 'Mis datos son correctos',
+      Screen.selfie => 'Continuar con mis ingresos',
       _ => 'Continuar',
     };
     return Container(
@@ -832,6 +962,22 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   style: AppText.small,
                   textAlign: TextAlign.center,
                 ),
+              ],
+            )
+          : _screen == Screen.selfie && _selfie != _SelfiePhase.done
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // After a connection error the selfie is sent again from the message; the camera is not opened again.
+                if (_selfieError == null) ...[
+                  PrimaryButton(
+                    text: _selfie == _SelfiePhase.retry ? 'Intentar de nuevo' : 'Tomar mi selfie',
+                    onPressed: _busy ? null : _startSelfie,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                SecondaryButton(text: 'Guardar y seguir después', onPressed: _busy ? null : _saveForLater),
               ],
             )
           : _screen == Screen.location
@@ -869,6 +1015,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         Screen.basicData => _basicData(),
         Screen.identityDocument => _duiProblem(),
         Screen.identityConfirmation => _identityConfirmation(),
+        Screen.selfie => _selfieStep(),
         Screen.income => _income(),
         Screen.expectedActivity => _expectedActivity(),
         Screen.review => _review(),
@@ -1247,6 +1394,31 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
+  // ---------------------------------------------------------------- 4b. Selfie (VDI-116)
+
+  /// The camera is shown while the person does the check, and stays behind the message while the selfie is sent.
+  bool get _capturingSelfie => _screen == Screen.selfie && _selfie == _SelfiePhase.camera && _selfieError == null;
+
+  Widget _selfieCapture() => SelfieCaptureView(
+        camera: widget.faceCamera,
+        onCaptured: _onSelfieCaptured,
+        onBack: _busy ? null : () => setState(() => _selfie = _SelfiePhase.intro),
+      );
+
+  Widget _selfieStep() {
+    if (_selfieError != null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+        child: _ConnectionError(title: 'No pudimos enviar tu selfie', message: _selfieError!, onRetry: _uploadSelfie),
+      );
+    }
+    return switch (_selfie) {
+      _SelfiePhase.intro || _SelfiePhase.camera => const _SelfieIntro(),
+      _SelfiePhase.retry => _SelfieRetry(problem: _selfieProblem ?? SelfieProblem.other),
+      _SelfiePhase.done => const _SelfieDone(),
+    };
+  }
+
   // ---------------------------------------------------------------- 5. Income
 
   Widget _income() {
@@ -1441,6 +1613,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   : 'Confirmado · foto del frente y del reverso',
             ),
           ],
+          if (_selfieTaken) ...[
+            const SizedBox(height: 14),
+            const _SummaryCard(
+              title: 'Tu selfie',
+              line1: 'Recibimos tu selfie',
+              line2: 'Guardada de forma segura en tu expediente',
+            ),
+          ],
           const SizedBox(height: 14),
           _SummaryCard(
             title: 'Tus ingresos',
@@ -1466,7 +1646,50 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   // ---------------------------------------------------------------- 7. Confirmation
 
-  Widget _confirmation() {
+  Widget _confirmation() => switch (_submitted) {
+        SubmissionStatus.completed => _received(),
+        SubmissionStatus.enhancedReview => _StatusNotice(
+            key: const Key('enhanced-review'),
+            icon: Icons.manage_search_rounded,
+            title: 'Estamos revisando tu solicitud',
+            message: 'Una persona del banco la revisará con más detalle antes de abrir tu cuenta. '
+                'Es un paso normal de seguridad.',
+            number: _form.number ?? '',
+            // VDI-118: what comes next, never why. The deadline is not given until the business sets it.
+            steps: const [
+              TextSpan(text: 'No tienes que hacer nada por ahora.'),
+              TextSpan(text: 'Te contactaremos al número que nos diste cuando terminemos de revisarla.'),
+              TextSpan(text: 'Por tu seguridad, no damos detalles de cómo se hace esta revisión.'),
+            ],
+            onDone: _restart,
+          ),
+        SubmissionStatus.awaitingVerification => _StatusNotice(
+            key: const Key('awaiting-verification'),
+            icon: Icons.hourglass_top_rounded,
+            title: 'Tu solicitud quedó en espera',
+            message: 'Aún no terminamos de verificar tu identidad. Tu información está guardada: no tienes que repetir nada.',
+            number: _form.number ?? '',
+            // VDI-112: the identity check is told in general; the registry behind it is never named.
+            steps: [
+              const TextSpan(text: 'Seguimos con la verificación por nuestra cuenta.'),
+              TextSpan(children: [
+                const TextSpan(text: 'Te avisaremos por mensaje '),
+                if (_form.phone.isEmpty)
+                  const TextSpan(text: 'al número que nos diste')
+                else ...[
+                  const TextSpan(text: 'al '),
+                  TextSpan(text: _form.phone, style: const TextStyle(fontWeight: FontWeight.w700)),
+                ],
+                const TextSpan(text: ' cuando haya novedades.'),
+              ]),
+              const TextSpan(text: 'Tu solicitud no se aprueba ni se rechaza mientras tanto: solo espera.'),
+            ],
+            onDone: _restart,
+          ),
+      };
+
+  /// The request was received as usual.
+  Widget _received() {
     return Padding(
       padding: EdgeInsets.fromLTRB(24, 16, 24, 32 + MediaQuery.paddingOf(context).bottom),
       child: Column(
@@ -1639,6 +1862,7 @@ class _Welcome extends StatelessWidget {
   static const _steps = [
     ('Datos básicos', 'Tu nombre, DUI y celular.'),
     ('Tu DUI', 'Una foto del frente y otra del reverso.'),
+    ('Tu selfie', 'Una foto de tu rostro para comprobar que eres tú.'),
     ('Tus ingresos', 'De dónde viene tu dinero y cuánto ganas.'),
     ('El dinero de tu cuenta', 'Qué dinero esperas mover cada mes.'),
     ('Revisar y enviar', 'Confirmas todo antes de mandarlo.'),
@@ -1866,6 +2090,250 @@ class _NoticeIcon extends StatelessWidget {
       height: 44,
       decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.brandSoft),
       child: Icon(item.icon, size: 24, color: AppColors.brandGreen),
+    );
+  }
+}
+
+enum _SelfiePhase {
+  /// What is going to be asked, before opening the camera.
+  intro,
+
+  /// The front camera, with the shutter.
+  camera,
+
+  /// The API could not judge the selfie because of how it was taken: tips to try again.
+  retry,
+
+  /// The API has the selfie.
+  done,
+}
+
+/// «Ahora, una selfie rápida»: what is going to be asked before opening the camera. The buttons are in the action bar.
+class _SelfieIntro extends StatelessWidget {
+  const _SelfieIntro();
+
+  static const _tips = [
+    (Icons.light_mode_outlined, 'Busca un lugar con buena luz, de frente.'),
+    (Icons.face_retouching_off_outlined, 'Quítate lentes oscuros, gorra o cubrebocas.'),
+    (Icons.smartphone_outlined, 'Sostén el teléfono a la altura de tus ojos.'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 112,
+              height: 112,
+              decoration: const BoxDecoration(color: AppColors.brandSoft, shape: BoxShape.circle),
+              child: const Icon(Icons.face_outlined, size: 64, color: AppColors.brandGreen),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const ScreenTitle('Ahora, una selfie rápida'),
+          const SizedBox(height: 12),
+          const Text(
+            'Vamos a comprobar que eres tú. Coloca tu rostro dentro del óvalo, mira a la cámara y toma la foto.',
+            style: AppText.body,
+          ),
+          const SizedBox(height: 20),
+          for (final (icon, text) in _tips) ...[
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.brandSoft),
+                  child: Icon(icon, size: 24, color: AppColors.brandGreen),
+                ),
+                const SizedBox(width: 14),
+                Expanded(child: Text(text, style: AppText.body)),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: AppColors.neutral100, borderRadius: BorderRadius.circular(8)),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.lock_outline, size: 20, color: AppColors.muted),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'La imagen se guarda de forma segura en tu expediente y solo se usa para verificar tu identidad.',
+                    style: AppText.small,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// «No pudimos usar tu selfie»: what can be fixed and tips. It never says the system suspected anything.
+class _SelfieRetry extends StatelessWidget {
+  const _SelfieRetry({required this.problem});
+
+  final SelfieProblem problem;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = problem.detail;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ScreenTitle('No pudimos usar tu selfie'),
+          const SizedBox(height: 12),
+          if (detail != null) ...[
+            Text(detail, style: AppText.bodyBold),
+            const SizedBox(height: 4),
+          ],
+          const Text('Pasa seguido y se arregla fácil. Prueba así y vuelve a intentarlo:', style: AppText.body),
+          const SizedBox(height: 20),
+          for (var i = 0; i < SelfieProblem.tips.length; i++) ...[
+            IconRow(leading: NumberBadge(i + 1, soft: true), title: SelfieProblem.tips[i], description: ''),
+            const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 8),
+          const Text('Tu avance está guardado: si prefieres, puedes seguir después.', style: AppText.bodyMuted),
+        ],
+      ),
+    );
+  }
+}
+
+/// «Listo, recibimos tu selfie». The button to go on is in the action bar.
+class _SelfieDone extends StatelessWidget {
+  const _SelfieDone();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: const BoxDecoration(color: AppColors.brand, shape: BoxShape.circle),
+            child: const Icon(Icons.check_rounded, size: 40, color: AppColors.ink),
+          ),
+          const SizedBox(height: 20),
+          const ScreenTitle('Listo, recibimos tu selfie'),
+          const SizedBox(height: 12),
+          const Text(
+            'Con esto terminas la parte de identidad. Sigue con tus ingresos y el dinero que moverás en tu cuenta.',
+            style: AppText.body,
+          ),
+          const SizedBox(height: 20),
+          for (final (icon, text) in const [
+            (Icons.save_outlined, 'Tus datos y tu DUI ya están guardados.'),
+            (Icons.verified_user_outlined, 'Verificamos todo al final, cuando envíes tu solicitud.'),
+          ]) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 22, color: AppColors.brandGreen),
+                const SizedBox(width: 12),
+                Expanded(child: Text(text, style: AppText.body)),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Last screen of a request that was received but does not go on as usual (VDI-112, VDI-118): what happens now and
+/// its number. It says what comes next, never why.
+class _StatusNotice extends StatelessWidget {
+  const _StatusNotice({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.number,
+    required this.steps,
+    required this.onDone,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String number;
+
+  /// «Qué pasa ahora», in order.
+  final List<InlineSpan> steps;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 20, 24, 28 + MediaQuery.paddingOf(context).bottom),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: const BoxDecoration(color: AppColors.brandSoft, shape: BoxShape.circle),
+              child: Icon(icon, size: 62, color: AppColors.brandGreen),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Semantics(
+            header: true,
+            child: Text(title, style: AppText.heading(28, height: 1.15), textAlign: TextAlign.center),
+          ),
+          const SizedBox(height: 14),
+          Text(message, style: AppText.body, textAlign: TextAlign.center),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: AppColors.neutral100,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                const Expanded(child: Text('Número de solicitud', style: AppText.label)),
+                Text(number, style: AppText.heading(16)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          const SectionTitle('Qué pasa ahora', size: 19),
+          const SizedBox(height: 14),
+          for (var i = 0; i < steps.length; i++) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                NumberBadge(i + 1, size: 30, soft: true),
+                const SizedBox(width: 14),
+                Expanded(child: Text.rich(steps[i], style: AppText.body)),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
+          const SizedBox(height: 10),
+          PrimaryButton(text: 'Entendido', onPressed: onDone),
+        ],
+      ),
     );
   }
 }

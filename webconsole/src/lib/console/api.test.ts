@@ -64,6 +64,15 @@ describe("apiFetch", () => {
     expect(error.message).toBe("Espera");
   });
 
+  it("conserva los mensajes por campo de un 400", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(json({ title: "Bad", errors: { lowMax: "Debe ser entero" } }, { status: 400 })),
+    );
+    const error = await failure(apiFetch("/x"));
+    expect(error).toMatchObject({ status: 400, errors: { lowMax: "Debe ser entero" } });
+  });
+
   it("usa el statusText si el cuerpo del error no es JSON", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>", { status: 502, statusText: "Bad Gateway" })));
     const error = await failure(apiFetch("/x"));

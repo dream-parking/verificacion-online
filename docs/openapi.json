@@ -603,6 +603,9 @@
           "consent" : {
             "$ref" : "#/components/schemas/ConsoleRequestConsent"
           },
+          "customerNumber" : {
+            "type" : "string"
+          },
           "expectedActivity" : {
             "$ref" : "#/components/schemas/ConsoleRequestExpectedActivity"
           },
@@ -622,9 +625,18 @@
           "risk" : {
             "$ref" : "#/components/schemas/RiskAssessmentResponse"
           },
+          "riskDecisions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RiskDecisionResponse"
+            },
+            "type" : "array"
+          },
           "riskLevel" : {
             "enum" : [ "NOT_EVALUATED", "LOW", "PENDING_REVIEW", "MEDIUM", "HIGH" ],
             "type" : "string"
+          },
+          "rnpn" : {
+            "$ref" : "#/components/schemas/ConsoleRequestRnpn"
           },
           "signals" : {
             "$ref" : "#/components/schemas/ConsoleRequestSignals"
@@ -634,7 +646,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
             "type" : "string"
           },
           "steps" : {
@@ -925,7 +937,7 @@
             "type" : "integer"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
             "type" : "string"
           },
           "transactionTypeLabel" : {
@@ -983,7 +995,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1034,6 +1046,36 @@
           "version" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestRnpn" : {
+        "properties" : {
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "mismatchedFields" : {
+            "items" : {
+              "enum" : [ "DUI", "FIRST_NAMES", "LAST_NAMES", "BIRTH_DATE" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "outcome" : {
+            "enum" : [ "MATCH", "NO_MATCH", "UNAVAILABLE" ],
+            "type" : "string"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "simulated" : {
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -1148,7 +1190,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1315,6 +1357,27 @@
           },
           "mobilePhone" : {
             "type" : "string"
+          },
+          "number" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CustomerRiskHistoryResponse" : {
+        "properties" : {
+          "customerId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "customerNumber" : {
+            "type" : "string"
+          },
+          "requests" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RequestRisk"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -1487,6 +1550,22 @@
         "required" : [ "rangeCode", "sourceCode" ],
         "type" : "object"
       },
+      "LivenessCheckResponse" : {
+        "properties" : {
+          "attempts" : {
+            "description" : "Pruebas hechas en esta solicitud",
+            "example" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "description" : "`CHECKED`: la prueba se hizo. `FAILED`: el proveedor no está disponible; la solicitud sigue y esta señal no cuenta en el score",
+            "enum" : [ "CHECKED", "FAILED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "LoginRequest" : {
         "properties" : {
           "email" : {
@@ -1589,7 +1668,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
             "type" : "string"
           },
           "submittedAt" : {
@@ -1803,6 +1882,22 @@
         "required" : [ "textHash", "version" ],
         "type" : "object"
       },
+      "PublishScoreModelVersionRequest" : {
+        "properties" : {
+          "lowMax" : {
+            "description" : "Último puntaje del nivel Bajo (entero, desde 0)",
+            "example" : 39,
+            "type" : "number"
+          },
+          "mediumMax" : {
+            "description" : "Último puntaje del nivel Medio (entero, menor que 100). Arriba de este valor el nivel es Alto y la solicitud pasa a revisión reforzada",
+            "example" : 69,
+            "type" : "number"
+          }
+        },
+        "required" : [ "lowMax", "mediumMax" ],
+        "type" : "object"
+      },
       "PublishScoreRuleVersionRequest" : {
         "properties" : {
           "status" : {
@@ -1928,6 +2023,42 @@
               "$ref" : "#/components/schemas/ProfileDeviation"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "RequestRisk" : {
+        "properties" : {
+          "assessments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RiskAssessmentResponse"
+            },
+            "type" : "array"
+          },
+          "decisions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RiskDecisionResponse"
+            },
+            "type" : "array"
+          },
+          "number" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "type" : "string"
+          },
+          "submittedAt" : {
+            "format" : "date-time",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -2123,10 +2254,49 @@
         },
         "type" : "object"
       },
+      "RiskDecisionResponse" : {
+        "properties" : {
+          "decidedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decidedBy" : {
+            "description" : "Who decided: SYSTEM for the automatic rule",
+            "type" : "string"
+          },
+          "decision" : {
+            "enum" : [ "AUTOMATIC_FLOW", "ENHANCED_REVIEW" ],
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "modelVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "score" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "threshold" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ScoreModelResponse" : {
         "properties" : {
           "high" : {
             "$ref" : "#/components/schemas/Range"
+          },
+          "inForce" : {
+            "type" : "boolean"
           },
           "low" : {
             "$ref" : "#/components/schemas/Range"
@@ -2137,7 +2307,14 @@
           "name" : {
             "type" : "string"
           },
+          "publishedBy" : {
+            "type" : "string"
+          },
           "validFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "validTo" : {
             "format" : "date-time",
             "type" : "string"
           },
@@ -3335,6 +3512,123 @@
         "tags" : [ "Consola · Administración de catálogos" ]
       }
     },
+    "/api/console/admin/score-model/versions" : {
+      "get" : {
+        "description" : "Cada versión trae sus umbrales, quién la publicó (`publishedBy`, vacío si la publicó una migración) y cuándo (`validFrom`). La vigente es la que no tiene `validTo` (`inForce: true`).",
+        "operationId" : "scoreModelAdminVersions",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ScoreModelResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Versiones, de la más reciente a la más antigua"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Historial de versiones del modelo de score",
+        "tags" : [ "Consola · Administración del modelo de score" ]
+      },
+      "post" : {
+        "description" : "Copia los pesos de la versión vigente, la cierra y aplica los umbrales nuevos a las evaluaciones siguientes, sin desplegar código. Las evaluaciones ya hechas conservan la versión con la que se calcularon. Los umbrales deben ser enteros con 0 ≤ `lowMax` < `mediumMax` < 100.",
+        "operationId" : "scoreModelAdminPublish",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PublishScoreModelVersionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ScoreModelResponse"
+                }
+              }
+            },
+            "description" : "Versión publicada"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Umbral inválido o sin cambios: `errors` dice por qué, en español, y no se guarda nada"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No hay un modelo vigente, o el vigente empieza en el futuro"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Publica una versión nueva del modelo de score con otros umbrales",
+        "tags" : [ "Consola · Administración del modelo de score" ]
+      }
+    },
     "/api/console/admin/score-rules/{code}/versions" : {
       "get" : {
         "description" : "La vigente es la que no tiene `validTo` y no está en borrador.",
@@ -4209,6 +4503,60 @@
         "tags" : [ "Consola · Clientes" ]
       }
     },
+    "/api/console/customers/risk-history" : {
+      "get" : {
+        "description" : "Formato CLI-0000001. Por cada solicitud del cliente, de la más antigua a la más reciente, trae las evaluaciones del score y las decisiones de revisión reforzada.",
+        "operationId" : "customerRiskHistory",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "number",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 20,
+            "minLength" : 0,
+            "pattern" : "CLI-[0-9]{7,}",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CustomerRiskHistoryResponse"
+                }
+              }
+            },
+            "description" : "Señales de riesgo del cliente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No hay cliente con ese número"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Señales de riesgo de un cliente, por su número de cliente",
+        "tags" : [ "Consola · Clientes" ]
+      }
+    },
     "/api/console/customers/{customerId}" : {
       "get" : {
         "operationId" : "customerGet",
@@ -4313,7 +4661,7 @@
           "name" : "status",
           "required" : false,
           "schema" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
             "type" : "string"
           }
         }, {
@@ -5456,6 +5804,101 @@
         "tags" : [ "Onboarding" ]
       }
     },
+    "/api/onboarding/requests/{requestId}/liveness" : {
+      "put" : {
+        "description" : "Multipart con `selfie`, JPEG o PNG de hasta 5 MB. Guarda la selfie cifrada en el expediente y registra el nivel de confianza (de 0 a 1) que da el proveedor; ese número no se devuelve a la app, lo usan el score y la consola. Si el proveedor no está disponible responde `status: FAILED` y la solicitud sigue: esa señal no suma ni resta. Se puede repetir mientras la solicitud está en progreso; cada intento cuenta en `attempts`. Si la foto no sirve por cómo se tomó (poca luz, borrosa, sin rostro visible…) responde 422 con el motivo y no se guarda nada; nunca da motivos de sospecha.",
+        "operationId" : "livenessCheck",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "selfie" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "selfie" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LivenessCheckResponse"
+                }
+              }
+            },
+            "description" : "La prueba quedó registrada en el expediente"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta la selfie, está vacía o no es JPEG ni PNG"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud ya no está en progreso"
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La selfie pasa de 5 MB"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La selfie no se puede juzgar por cómo se tomó: `reason` dice por qué (BLURRY, TOO_DARK, GLARE, FACE_NOT_VISIBLE, MULTIPLE_FACES, OTHER) y la app pide repetirla. No se guarda ni cuenta como intento"
+          }
+        },
+        "summary" : "Prueba de vida: selfie de la persona",
+        "tags" : [ "Onboarding" ]
+      }
+    },
     "/api/onboarding/requests/{requestId}/privacy-consent" : {
       "put" : {
         "description" : "Registra la aceptación (incluida la captura de señales y, si se envía, los términos y condiciones), la versión del aviso, la fecha y hora y la IP desde la que se aceptó.",
@@ -5745,6 +6188,9 @@
   }, {
     "description" : "Cuentas abiertas a partir de solicitudes enviadas",
     "name" : "Consola · Cuentas"
+  }, {
+    "description" : "Umbrales y versiones del modelo de score (administradores)",
+    "name" : "Consola · Administración del modelo de score"
   }, {
     "description" : "Catálogos de la app y aviso de privacidad (administradores)",
     "name" : "Consola · Administración de catálogos"

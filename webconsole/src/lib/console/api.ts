@@ -1,6 +1,8 @@
 // Client of the console API. The types follow docs/openapi.json; in responses the optional
 // fields can come as null (see docs/integracion-api.md).
 
+import type { components } from "./openapi";
+
 /** The API URL comes only from NEXT_PUBLIC_API_URL (set by the deploy workflow); local development falls back to localhost. */
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -164,79 +166,45 @@ export type RnpnCheck = {
   checkedAt: string;
 };
 
-export type RequestDetail = {
-  id: string;
-  number: string | null;
-  /** Customer number such as CLI-0000001 (VDI-122). Null until the first request of the customer is submitted. */
-  customerNumber?: string | null;
-  status: RequestStatus;
-  riskLevel: RiskLevel;
-  completedSteps: number;
-  startedAt: string;
-  submittedAt: string | null;
-  applicant: { firstNames: string | null; lastNames: string | null; dui: string | null; mobilePhone: string | null } | null;
-  income: {
-    sourceCode: string;
-    sourceLabel: string | null;
-    sourceDetail: string | null;
-    rangeCode: string;
-    rangeLabel: string | null;
-    registeredAt: string;
-    updatedAt: string | null;
-  } | null;
-  expectedActivity: {
-    transactionTypeCode: string;
-    transactionTypeLabel: string | null;
-    monthlyAmountRangeCode: string;
-    monthlyAmountRangeLabel: string | null;
-    registeredAt: string;
-    updatedAt: string | null;
-    /** Every version of the declared profile, oldest first. Missing in older API versions. */
-    versions?: ProfileVersion[] | null;
-  } | null;
-  /** Null until the person reaches the DUI step; missing in older API versions. */
-  identityDocument?: IdentityDocument | null;
-  risk: Assessment | null;
-  /** Audit log of risk decisions, oldest first. Missing in older API versions. */
-  riskDecisions?: RiskDecision[] | null;
-  /** Null until the request is submitted; missing in older API versions. */
-  rnpn?: RnpnCheck | null;
-  signals: {
-    ip: string | null;
-    approximateLocation: string | null;
-    /** Whether the server could locate the IP (VDI-67). Missing in responses of older API versions. */
-    locationStatus?: "AVAILABLE" | "UNAVAILABLE" | null;
-    latitude?: number | null;
-    longitude?: number | null;
-    ipDetails?: IpDetails | null;
-    /** When the app last sent the signals (VDI-70). Missing in responses of older API versions. */
-    capturedAt?: string | null;
-    /** Location permission on the phone (VDI-73). Null when the app did not send it; missing in older API versions. */
-    deviceLocationStatus?: DeviceLocationStatus | null;
-    /** "City, Country" reported by the phone, only with permission. */
-    deviceLocation?: string | null;
-    deviceCountryIso?: string | null;
-    deviceFingerprint: string | null;
-    device: string | null;
-    nightTime: boolean | null;
-    typingPace: "SLOW" | "NORMAL" | "FAST" | null;
-    typingSpeedCpm: number | null;
-    totalDurationSeconds: number | null;
-    requestsFromSameDevice: number | null;
-  } | null;
-  steps:
-    | {
-        step: Step;
-        startedAt: string | null;
-        completedAt: string | null;
-        durationSeconds: number | null;
-        attempts: number | null;
-        /** Typing speed on that screen, in characters per second (omitted when nothing was typed). */
-        typingSpeedCps?: number | null;
-      }[]
-    | null;
-  timeline: { type: string; description: string | null; actor: string | null; occurredAt: string }[] | null;
+/**
+ * The contract (docs/openapi.json) does not mark required or nullable fields, but the API leaves out or nulls whatever
+ * it does not have yet. Every field below the top level is therefore optional and nullable, and the fields the API
+ * always sends are re-required in `RequestDetail`.
+ */
+type Loose<T> = T extends readonly (infer U)[] ? Loose<U>[] : T extends object ? { [K in keyof T]: Loose<T[K]> | null } : T;
+
+type RequestDetailSchema = components["schemas"]["ConsoleRequestDetail"];
+type AlwaysSent = "id" | "status" | "riskLevel" | "completedSteps" | "startedAt";
+type LooseDetail = Loose<Omit<RequestDetailSchema, AlwaysSent>>;
+type Item<T> = NonNullable<T> extends readonly (infer U)[] ? U : NonNullable<T>;
+
+/** `T` with the fields in `K` never null: the ones the API always sends once the section exists. */
+type Present<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
+
+type Income = Present<Item<LooseDetail["income"]>, "sourceCode" | "rangeCode" | "registeredAt">;
+type ExpectedActivity = Present<
+  Item<LooseDetail["expectedActivity"]>,
+  "transactionTypeCode" | "monthlyAmountRangeCode" | "registeredAt"
+> & {
+  versions: Present<
+    Item<NonNullable<Item<LooseDetail["expectedActivity"]>["versions"]>>,
+    "version" | "current" | "transactionTypeCode" | "monthlyAmountRangeCode" | "declaredAt"
+  >[] | null;
 };
+
+/** Detail of a request; generated from docs/openapi.json (npm run gen:api). */
+export type RequestDetail = Omit<LooseDetail, "income" | "expectedActivity" | "identityDocument" | "riskDecisions" | "rnpn" | "timeline"> &
+  Required<Pick<RequestDetailSchema, AlwaysSent>> & {
+    income: Income | null;
+    expectedActivity: ExpectedActivity | null;
+    identityDocument: Present<Item<LooseDetail["identityDocument"]>, "ocrStatus"> | null;
+    riskDecisions: Present<
+      Item<LooseDetail["riskDecisions"]>,
+      "id" | "decision" | "score" | "threshold" | "modelVersion" | "decidedAt"
+    >[] | null;
+    rnpn: Present<Item<LooseDetail["rnpn"]>, "outcome" | "simulated" | "attempts" | "checkedAt"> | null;
+    timeline: Present<Item<LooseDetail["timeline"]>, "type" | "occurredAt">[] | null;
+  };
 
 /** Score model in force: the ranges of each level and the points each signal can add (null: no weight yet). */
 export type ScoreModel = {

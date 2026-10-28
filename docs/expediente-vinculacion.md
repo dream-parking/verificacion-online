@@ -11,7 +11,7 @@ huella SHA-256 del contrato). Cada elemento lleva su fecha y hora.
 ## Inmutabilidad y retención
 - Una solicitud tiene un solo expediente. La base rechaza editarlo siempre.
 - `retainedUntil` = fecha de la firma + `app.dossier.retention-years` años (calendario de El Salvador), guardada junto con el
-  expediente. La base rechaza borrarlo antes de esa fecha, también al borrar la solicitud completa (V32). Pasada la fecha,
+  expediente. La base rechaza borrarlo antes de esa fecha, también al borrar la solicitud completa (V36). Pasada la fecha,
   se puede borrar.
 - Cambiar `app.dossier.retention-years` solo afecta a los expedientes que se firmen después: la fecha ya guardada no se mueve.
 

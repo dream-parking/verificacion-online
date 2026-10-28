@@ -239,6 +239,10 @@
     grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1.5fr) minmax(170px, 1fr) 190px 110px 110px;
     min-width: 1060px;
   }
+  .g-tolerance {
+    grid-template-columns: 210px 90px 90px minmax(150px, 1fr);
+    min-width: 560px;
+  }
   .g-versions {
     grid-template-columns: 140px 80px 80px 80px minmax(150px, 1fr) 210px;
     min-width: 800px;

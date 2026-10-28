@@ -69,12 +69,14 @@ list is configurable with `APP_SIGNATURE_SIMULATED_REJECTED_DUIS` (comma-separat
 | `APP_SIGNATURE_PROVIDER` | `simulated` | The only provider for now. |
 | `APP_SIGNATURE_SIMULATED_REJECTED_DUIS` | `00000040-8` | DUIs the simulated service rejects. |
 
+## Binding dossier
+
+Signing freezes the binding dossier (VDI-131, `BindingDossierService.freeze`) in the same transaction, with the contract version,
+the fingerprint and the signature date; a rejected signature freezes none. See `docs/expediente-vinculacion.md`. The
+migrations are `V31` (dossier) and `V32` (retention), numbered before this one's `V33`.
+
 ## Not done here
 
-- **Binding dossier (VDI-131):** the dossier is frozen when the customer signs. When VDI-131 reaches `main`, signing must
-  call `BindingDossierService.freeze(requestId, new Signature(version, fingerprint, signedAt))` in the same transaction.
-- **Migration order:** this is `V33` because `V31` (dossier, VDI-131) and `V32` (retention, VDI-134) are taken by work
-  not merged yet. It has to reach `main` after them.
 - **IP behind a proxy:** the IP is the client address the backend sees (`getRemoteAddr`), the same as the other signals.
   Behind the Azure ingress that may be the proxy unless forwarded headers are trusted.
 - **Real provider:** a real service is a network call. It should then run outside the database transaction, like the RNPN.

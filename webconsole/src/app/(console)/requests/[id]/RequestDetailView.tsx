@@ -369,7 +369,7 @@ export function RequestDetailView({ id }: { id: string }) {
 
       <Card
         id="h-expediente"
-        title="Contrato y expediente de vinculación"
+        title="Firma y expediente"
         help="El contrato que firmó la persona y la copia inmutable de la evidencia que sustentó la aprobación. Es de solo lectura."
       >
         <BindingDossierCard dossier={r.bindingDossier} />

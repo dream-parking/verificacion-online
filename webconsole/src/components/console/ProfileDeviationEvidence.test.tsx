@@ -44,4 +44,29 @@ describe("ProfileDeviationEvidence", () => {
     const { container } = render(<ProfileDeviationEvidence evidence={value} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it.each([["HORARIO_NOCTURNO"], ["DISPOSITIVO_NUEVO"], [null], [undefined]])(
+    "una alerta de otro tipo (%s) sin evidencia de perfil no muestra nada",
+    (typeCode) => {
+      const { container } = render(<ProfileDeviationEvidence evidence={{}} typeCode={typeCode} />);
+      expect(container).toBeEmptyDOMElement();
+    },
+  );
+
+  it.each([
+    ["PERFIL_EXCEDIDO", "Movimientos por encima de lo declarado en el perfil"],
+    ["ORIGEN_DISTINTO", "Dinero recibido de un tipo que no declaró"],
+  ])("una alerta %s sin evidencia dice de qué trata y que falta el detalle", (typeCode, aspect) => {
+    render(<ProfileDeviationEvidence evidence={{}} typeCode={typeCode} />);
+    expect(screen.getByText("Aspecto del perfil que se rompió")).toBeInTheDocument();
+    expect(screen.getByText(aspect)).toBeInTheDocument();
+    expect(screen.getByText(/no trae el detalle de la desviación/)).toBeInTheDocument();
+    expect(screen.queryByText("Declarado")).not.toBeInTheDocument();
+  });
+
+  it("con evidencia del seguimiento del perfil no repite el aviso de detalle faltante", () => {
+    render(<ProfileDeviationEvidence evidence={evidence()} typeCode="PERFIL_EXCEDIDO" />);
+    expect(screen.getByText("USD 1,500")).toBeInTheDocument();
+    expect(screen.queryByText(/no trae el detalle/)).not.toBeInTheDocument();
+  });
 });

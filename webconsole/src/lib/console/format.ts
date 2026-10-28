@@ -172,6 +172,12 @@ export const PROFILE_DEVIATION: Record<string, { label: string; unit: "usd" | "c
   UNDECLARED_TRANSACTION_TYPE: { label: "Dinero recibido de un tipo que no declaró", unit: "usd" },
 };
 
+/** Alert types raised when the activity strays from the declared profile (VDI-138), and the aspect each one is about. */
+export const PROFILE_ALERT_TYPE: Record<string, string> = {
+  PERFIL_EXCEDIDO: "Movimientos por encima de lo declarado en el perfil",
+  ORIGEN_DISTINTO: "Dinero recibido de un tipo que no declaró",
+};
+
 /** What the declared profile card says when the person has not declared the expected movement yet. */
 export const NO_PROFILE = "Sin declaración de movimiento";
 

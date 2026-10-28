@@ -1,16 +1,36 @@
 "use client";
 
 import { KeyValue } from "@/components/console/Ui";
-import { PROFILE_DEVIATION, usd } from "@/lib/console/format";
+import { PROFILE_ALERT_TYPE, PROFILE_DEVIATION, usd } from "@/lib/console/format";
 
 const num = (v: unknown) => (typeof v === "number" ? v : null);
 
 /**
  * Which aspect of the declared profile broke, for an alert raised by the profile tracking (VDI-138).
- * Returns nothing for any other alert. The evidence comes from the API, so every value is checked.
+ * An alert of a profile type that came without that evidence (older or seeded alerts) says what it is about and that
+ * the detail is missing. Returns nothing for any other alert. The evidence comes from the API, so every value is checked.
  */
-export function ProfileDeviationEvidence({ evidence }: { evidence: Record<string, unknown> | null | undefined }) {
-  if (evidence?.source !== "PROFILE_TRACKING") return null;
+export function ProfileDeviationEvidence({
+  evidence,
+  typeCode,
+}: {
+  evidence: Record<string, unknown> | null | undefined;
+  typeCode?: string | null;
+}) {
+  if (evidence?.source !== "PROFILE_TRACKING") {
+    const aspect = typeCode ? PROFILE_ALERT_TYPE[typeCode] : undefined;
+    if (!aspect) return null;
+    return (
+      <section className="flex flex-col gap-2" aria-label="Aspecto del perfil que se rompió">
+        <div className="text-sm font-extrabold">Aspecto del perfil que se rompió</div>
+        <div className="text-base leading-6 font-semibold">{aspect}</div>
+        <p className="m-0 text-sm leading-5 text-muted">
+          Esta alerta no trae el detalle de la desviación (lo declarado, lo real y la tolerancia). Pasa con las alertas
+          anteriores al seguimiento del perfil.
+        </p>
+      </section>
+    );
+  }
   const kind = typeof evidence.deviation === "string" ? PROFILE_DEVIATION[evidence.deviation] : undefined;
   const show = (v: unknown) => {
     const n = num(v);

@@ -224,6 +224,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/console/admin/profile-tolerance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tolerancia vigente y bitácora de cambios
+         * @description Cada cambio trae el valor anterior y el nuevo, quién lo hizo (`changedBy`, vacío en el valor inicial) y cuándo (`changedAt`), del más reciente al más antiguo.
+         */
+        get: operations["profileToleranceAdminLog"];
+        /**
+         * Cambia la tolerancia de desviación del perfil declarado
+         * @description Aplica desde el siguiente movimiento que reporte el core, sin desplegar. Las desviaciones ya registradas conservan la tolerancia con la que se detectaron. Debe ser un entero de 0 a 45.
+         */
+        put: operations["profileToleranceAdminChange"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/console/admin/score-model/versions": {
         parameters: {
             query?: never;
@@ -530,6 +554,26 @@ export interface paths {
         };
         /** Cuentas de un cliente */
         get: operations["accountByCustomer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/console/dossiers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Busca el expediente de vinculación por número de solicitud o de cliente
+         * @description Envía uno de los dos filtros. El expediente es la copia inmutable que se congeló al firmar. Trae datos personales: cada consulta queda en la auditoría de accesos (`VIEW_BINDING_DOSSIER`, con el número consultado, el usuario y la IP) y la respuesta no se guarda en caché.
+         */
+        get: operations["dossierFind"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1167,11 +1211,42 @@ export interface components {
             defaultCriticality: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
             description: string;
         };
+        ArchivedDossierResponse: {
+            /**
+             * @description Número del cliente; vacío si la solicitud aún no tenía cliente numerado
+             * @example CLI-0000001
+             */
+            customerNumber: string;
+            dossier: components["schemas"]["BindingDossierResponse"];
+            /**
+             * @description Número de la solicitud del expediente
+             * @example SOL-2026-00001
+             */
+            requestNumber: string;
+        };
         BasicDataRequest: {
             dui: string;
             firstNames: string;
             lastNames: string;
             mobilePhone: string;
+        };
+        BindingDossierResponse: {
+            evidence: components["schemas"]["DossierEvidence"];
+            /**
+             * Format: date-time
+             * @description Cuándo se congeló el expediente
+             */
+            frozenAt: string;
+            /** Format: int64 */
+            id: number;
+            /** Format: uuid */
+            requestId: string;
+            /**
+             * Format: date-time
+             * @description Hasta cuándo se retiene (VDI-134): la fecha de la firma más el plazo de retención; antes de ella no se puede borrar
+             */
+            retainedUntil: string;
+            signature: components["schemas"]["DossierSignature"];
         };
         CaptureSignalsRequest: {
             /**
@@ -1263,6 +1338,13 @@ export interface components {
             currentPassword: string;
             newPassword: string;
         };
+        ChangeProfileToleranceRequest: {
+            /**
+             * @description Margen sobre lo declarado antes de considerarlo una desviación, en porcentaje entero de 0 a 45
+             * @example 25
+             */
+            tolerancePercent: number;
+        };
         CloseAlertRequest: {
             /**
              * @description Comentario para el historial de la alerta
@@ -1325,6 +1407,7 @@ export interface components {
         };
         ConsoleRequestDetail: {
             applicant: components["schemas"]["ConsoleRequestApplicant"];
+            bindingDossier: components["schemas"]["BindingDossierResponse"];
             /** Format: int32 */
             completedSteps: number;
             consent: components["schemas"]["ConsoleRequestConsent"];
@@ -1711,6 +1794,71 @@ export interface components {
             rangeMinUsd: number;
             transactionTypeCodes: string[];
         };
+        DossierConsent: {
+            /** Format: date-time */
+            acceptedAt: string;
+            noticeVersion: string;
+            signalsAccepted: boolean;
+            termsAccepted: boolean;
+        };
+        DossierEvidence: {
+            consent: components["schemas"]["DossierConsent"];
+            decisions: components["schemas"]["RiskDecisionResponse"][];
+            identity: components["schemas"]["DossierIdentity"];
+            liveness: components["schemas"]["DossierLiveness"];
+            risk: components["schemas"]["DossierRisk"];
+            rnpn: components["schemas"]["DossierRnpn"];
+            /** Format: int32 */
+            schemaVersion: number;
+        };
+        DossierIdentity: {
+            /** Format: date */
+            birthDate: string;
+            /** Format: date-time */
+            confirmedAt: string;
+            customerNumber: string;
+            dui: string;
+            /** Format: date */
+            expiryDate: string;
+            firstNames: string;
+            lastNames: string;
+        };
+        DossierLiveness: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            checkedAt: string;
+            confidence: number;
+            provider: string;
+            /** @enum {string} */
+            status: "CHECKED" | "FAILED";
+        };
+        DossierRisk: {
+            assessment: components["schemas"]["RiskAssessmentResponse"];
+            /** Format: int32 */
+            lowMax: number;
+            /** Format: int32 */
+            mediumMax: number;
+            /** Format: int32 */
+            reviewThreshold: number;
+        };
+        DossierRnpn: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            checkedAt: string;
+            mismatchedFields: ("DUI" | "FIRST_NAMES" | "LAST_NAMES" | "BIRTH_DATE")[];
+            /** @enum {string} */
+            outcome: "MATCH" | "NO_MATCH" | "UNAVAILABLE";
+            provider: string;
+            simulated: boolean;
+        };
+        DossierSignature: {
+            contractFingerprint: string;
+            contractVersion: string;
+            /** Format: date-time */
+            signedAt: string;
+        };
         ExpectedActivityRequest: {
             /** @description Otros tipos de dinero que también moverá, además del principal (opcional, hasta 3) */
             additionalTransactionTypes?: components["schemas"]["AdditionalTransactionType"][];
@@ -1946,7 +2094,7 @@ export interface components {
             requestId: string;
             /**
              * Format: int32
-             * @description Margen sobre lo declarado antes de considerarlo una desviación
+             * @description Tolerancia vigente: margen sobre lo declarado antes de considerarlo una desviación
              * @example 20
              */
             tolerancePercent: number;
@@ -1962,8 +2110,54 @@ export interface components {
             /** Format: date-time */
             detectedAt: string;
             limitValue: number;
+            /**
+             * Format: int32
+             * @description Tolerancia con la que se detectó
+             * @example 20
+             */
+            tolerancePercent: number;
             /** @enum {string} */
             type: "INFLOW_ABOVE_RANGE" | "INFLOW_ABOVE_DECLARED_AMOUNT" | "MORE_TRANSACTIONS_THAN_DECLARED" | "OUTFLOW_ABOVE_DECLARED" | "UNDECLARED_TRANSACTION_TYPE";
+        };
+        ProfileToleranceChange: {
+            /** Format: date-time */
+            changedAt: string;
+            /** @description Usuario de consola que hizo el cambio; vacío en el valor inicial */
+            changedBy: string;
+            /**
+             * Format: int32
+             * @description Valor anterior; vacío en el valor inicial
+             * @example 20
+             */
+            previousPercent: number;
+            /**
+             * Format: int32
+             * @description Valor nuevo
+             * @example 25
+             */
+            tolerancePercent: number;
+        };
+        ProfileToleranceResponse: {
+            /** @description Bitácora de cambios, del más reciente al más antiguo */
+            changes: components["schemas"]["ProfileToleranceChange"][];
+            /**
+             * Format: int32
+             * @description Máximo permitido
+             * @example 45
+             */
+            maxPercent: number;
+            /**
+             * Format: int32
+             * @description Mínimo permitido
+             * @example 0
+             */
+            minPercent: number;
+            /**
+             * Format: int32
+             * @description Tolerancia vigente: margen sobre lo declarado antes de considerarlo una desviación
+             * @example 20
+             */
+            tolerancePercent: number;
         };
         PublishPrivacyNoticeRequest: {
             /**
@@ -3048,6 +3242,95 @@ export interface operations {
             };
         };
     };
+    profileToleranceAdminLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tolerancia vigente y bitácora de cambios */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProfileToleranceResponse"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    profileToleranceAdminChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeProfileToleranceRequest"];
+            };
+        };
+        responses: {
+            /** @description Tolerancia cambiada; devuelve la vigente y la bitácora */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProfileToleranceResponse"];
+                };
+            };
+            /** @description Fuera de rango, vacía o igual a la vigente: `errors` dice por qué, en español, y no se guarda nada */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     scoreModelAdminVersions: {
         parameters: {
             query?: never;
@@ -3914,6 +4197,64 @@ export interface operations {
             };
             /** @description Falta el token o ya no es válido */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    dossierFind: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Número de solicitud
+                 * @example SOL-2026-00001
+                 */
+                requestNumber?: string;
+                /**
+                 * @description Número de cliente
+                 * @example CLI-0000001
+                 */
+                customerNumber?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Por `requestNumber`, el expediente; por `customerNumber`, la lista de expedientes del cliente (uno por solicitud firmada), del más reciente al más antiguo, vacía si no ha firmado */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchivedDossierResponse"] | components["schemas"]["ArchivedDossierResponse"][];
+                };
+            };
+            /** @description Ninguno o los dos filtros, o un número con formato inválido */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description No hay solicitud o cliente con ese número, o la solicitud aún no firmó */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

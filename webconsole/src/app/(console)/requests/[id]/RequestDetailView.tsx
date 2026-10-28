@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
 import { RiskDecisionLog } from "@/components/console/RiskDecisionLog";
+import { BindingDossierCard } from "@/components/console/BindingDossierCard";
 import { RnpnCheckCard } from "@/components/console/RnpnCheckCard";
 import { CustomerNumber } from "@/components/console/CustomerNumber";
 import { LocationMap } from "./LocationMap";
@@ -364,6 +365,14 @@ export function RequestDetailView({ id }: { id: string }) {
         help="Bitácora de lo que decidió la regla de riesgo al enviar la solicitud. Es de solo lectura: ninguna decisión se edita ni se borra."
       >
         <RiskDecisionLog decisions={r.riskDecisions} />
+      </Card>
+
+      <Card
+        id="h-expediente"
+        title="Contrato y expediente de vinculación"
+        help="El contrato que firmó la persona y la copia inmutable de la evidencia que sustentó la aprobación. Es de solo lectura."
+      >
+        <BindingDossierCard dossier={r.bindingDossier} />
       </Card>
 
       <Card

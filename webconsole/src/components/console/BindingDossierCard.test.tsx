@@ -23,7 +23,17 @@ const dossier = (extra: Partial<NonNullable<RequestDetail["bindingDossier"]>> = 
     consent: { noticeVersion: "v3", acceptedAt: "2026-10-28T13:00:00Z", signalsAccepted: true, termsAccepted: true },
     rnpn: { outcome: "MATCH", simulated: true, attempts: 1, provider: "sim", checkedAt: "2026-10-28T14:30:00Z", mismatchedFields: [] },
     liveness: { status: "CHECKED", confidence: 0.93, attempts: 1, provider: "p", checkedAt: "2026-10-28T14:10:00Z" },
-    risk: { lowMax: 39, mediumMax: 69, reviewThreshold: 70, assessment: { level: "LOW", score: 22 } },
+    risk: { lowMax: 39, mediumMax: 69, reviewThreshold: 70, assessment: {
+        level: "LOW",
+        score: 22,
+        modelVersion: 2,
+        signals: [
+          { signal: "AMOUNT", name: "Monto declarado", points: 10, maxPoints: 25, observation: "Rango 200 a 500" },
+          { signal: "CITY", name: "Ciudad", points: null, maxPoints: 20, observation: null },
+          { signal: "RNPN", name: "Cotejo RNPN", points: null, maxPoints: null, observation: null },
+        ],
+      },
+    },
     decisions: [{}, {}],
   },
   ...extra,
@@ -59,6 +69,24 @@ describe("BindingDossierCard", () => {
     expect(screen.getByText(/Confianza 93 %/)).toBeInTheDocument();
     expect(screen.getByText("Umbrales con los que se calculó: Bajo hasta 39, Medio hasta 69, revisión reforzada sobre 70.")).toBeInTheDocument();
     expect(screen.getByText("2 registradas")).toBeInTheDocument();
+  });
+
+  it("muestra la versión del modelo y las señales con las que se aprobó, tal como quedaron en el expediente", () => {
+    render(<BindingDossierCard dossier={dossier()} />);
+    expect(screen.getByText(/Modelo de score v2/)).toBeInTheDocument();
+    expect(screen.getByText("Señales")).toBeInTheDocument();
+    expect(screen.getByText("10 de 25 puntos")).toBeInTheDocument();
+    expect(screen.getByText("Rango 200 a 500")).toBeInTheDocument();
+    expect(screen.getByText("No disponible · 0 de 20")).toBeInTheDocument();
+    expect(screen.getByText("Sin peso aún")).toBeInTheDocument();
+  });
+
+  it("sin señales ni versión del modelo no inventa filas", () => {
+    const base = dossier()!;
+    const assessment = { ...base.evidence!.risk!.assessment!, signals: null, modelVersion: null };
+    render(<BindingDossierCard dossier={{ ...base, evidence: { ...base.evidence!, risk: { ...base.evidence!.risk!, assessment } } }} />);
+    expect(screen.queryByText("Señales")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Modelo de score/)).not.toBeInTheDocument();
   });
 
   it("no se rompe si al expediente le faltan partes", () => {

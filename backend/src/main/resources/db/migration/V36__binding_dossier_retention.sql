@@ -2,7 +2,7 @@
 -- retention period (app.dossier.retention-years, see BindingDossierService). Until that date the database refuses to
 -- delete it, and it never lets it be edited.
 --
--- V31 allowed the dossier to be deleted together with its request (cascade). That would be a way around the retention
+-- V35 allowed the dossier to be deleted together with its request (cascade). That would be a way around the retention
 -- period, so the trigger no longer makes that exception: a request with a dossier still within its period cannot be
 -- deleted. Once the date has passed the dossier can be deleted, alone or with its request.
 --

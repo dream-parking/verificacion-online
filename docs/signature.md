@@ -73,7 +73,7 @@ list is configurable with `APP_SIGNATURE_SIMULATED_REJECTED_DUIS` (comma-separat
 
 Signing freezes the binding dossier (VDI-131, `BindingDossierService.freeze`) in the same transaction, with the contract version,
 the fingerprint and the signature date; a rejected signature freezes none. See `docs/expediente-vinculacion.md`. The
-migrations are `V31` (dossier) and `V32` (retention), numbered before this one's `V33`.
+migrations are `V35` (dossier) and `V36` (retention), numbered after this one's `V33` and `V34`.
 
 ## Not done here
 

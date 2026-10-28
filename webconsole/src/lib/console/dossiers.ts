@@ -1,15 +1,19 @@
 // Search of the archived binding dossier (VDI-136). Contract: docs/openapi.json, GET /api/console/dossiers.
 
-import { ApiError, apiFetch, type RequestDetail } from "./api";
+import type { components } from "./openapi";
+import { ApiError, apiFetch, type Loose, type RequestDetail } from "./api";
 
 export type DossierSearch = "request" | "customer";
 
-export type ArchivedDossier = {
-  requestNumber: string;
-  /** Empty when the request had no numbered customer yet. */
-  customerNumber: string | null;
-  dossier: NonNullable<RequestDetail["bindingDossier"]>;
-};
+type ArchivedDossierSchema = components["schemas"]["ArchivedDossierResponse"];
+
+/**
+ * What the dossier search returns, from the contract (docs/openapi.json). The contract does not mark nullable fields, so
+ * the customer number is loose (it comes empty when the request had no numbered customer yet); the request number and
+ * the dossier are always there.
+ */
+export type ArchivedDossier = Omit<Loose<ArchivedDossierSchema>, "requestNumber" | "dossier"> &
+  Pick<ArchivedDossierSchema, "requestNumber"> & { dossier: NonNullable<RequestDetail["bindingDossier"]> };
 
 type Rules = { param: "requestNumber" | "customerNumber"; pattern: RegExp; example: string; label: string };
 

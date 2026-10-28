@@ -118,6 +118,19 @@ El contraste del perfil declarado (VDI-3) marca una desviación cuando una cifra
 - **Cada desviación guarda su tolerancia:** `tolerancePercent` en cada desviación de `profile-comparison` y de `newDeviations`, y en la evidencia de su alerta. Las registradas antes de V34 quedan con 20. Si después sube la tolerancia, una desviación ya registrada sigue apareciendo en la comparación del mes con la tolerancia y el límite con que se detectó, porque ya levantó una alerta.
 - **Permisos:** solo `ADMIN`; los demás roles reciben `403`. La tolerancia vigente también sale en `tolerancePercent` de `GET /accounts/{id}/profile-comparison`.
 
+### Listas internas de riesgo (VDI-142, historia VDI-13)
+
+El banco guarda listas de datos de casos de fraude ya conocidos para cruzar contra ellas cada solicitud. Esta parte es la base: las tablas, la consulta y el alta y baja de entradas. **Todavía no alimenta el score ni se llama al enviar la solicitud**; eso es el motor de cruce (otra subtarea de VDI-13), que usará `RiskListLookupService.findMatches(documento, teléfono, huella del dispositivo)`.
+
+- **Listas:** `GET /api/console/admin/risk-lists`. Cada una tiene un tipo (`CONFIRMED_FRAUD`, `UNDER_INVESTIGATION`, `WATCH`) y un peso de 1 a 100 para el score. La migración V37 siembra tres (`FRAUDE_CONFIRMADO` 100, `EN_INVESTIGACION` 60, `VIGILANCIA` 30); los pesos son **provisionales** hasta que el motor de cruce los calibre con el modelo de score.
+- **Alta:** `POST /api/console/admin/risk-lists/{code}/entries` con `{ "dataType": "DOCUMENT", "value": "04567891-2", "reason": "..." }`. `dataType` es `DOCUMENT` (DUI), `PHONE` (celular) o `DEVICE` (huella). Un dato con otro formato responde `400`; si ya está activo en esa lista, `409`.
+- **Baja:** `POST /api/console/admin/risk-lists/entries/{id}/deactivate` con `{ "reason": "..." }`. **No borra**: marca la entrada inactiva (quién, cuándo y por qué), deja de coincidir y queda en el historial. Una entrada ya inactiva responde `409`; el mismo dato se puede dar de alta otra vez.
+- **Bitácora:** `GET /api/console/admin/risk-lists/entries/{id}/changes` devuelve el alta y la baja con quién, cuándo y el motivo; `GET .../{code}/entries` lista las entradas activas e inactivas. Cada cambio queda también en la auditoría de accesos (`RISK_LIST_ENTRY_ADD`, `RISK_LIST_ENTRY_REMOVE`). La base no deja borrar entradas ni cambiarlas salvo para darlas de baja, ni tocar la bitácora.
+- **Datos personales:** el valor se guarda solo como huella (HMAC-SHA256 con sal) y ninguna respuesta lo trae, ni a él ni a su huella. La coincidencia usa solo documento, teléfono y dispositivo: el nombre no interviene.
+- **Qué se compara y cómo se normaliza** (para que coincida con lo que llega de una solicitud real): el documento son los 9 dígitos del DUI sin guion (`04567891-2` y `045678912` son lo mismo); el teléfono son los 8 dígitos del celular sin guion ni `+503` (empieza con 6 o 7, como lo valida la solicitud); la huella del dispositivo se compara tal cual la manda la app, solo sin espacios en los extremos y distinguiendo mayúsculas.
+- **Sal:** `APP_RISK_LISTS_SALT` (16 caracteres o más, `openssl rand -base64 24`), secret de la Container App. Sin ella la aplicación no arranca, salvo con el perfil `dev`, que usa una sal pública local. Un DUI o un teléfono tiene pocos valores posibles, así que la huella solo protege mientras la sal sea secreta. Cambiarla deja sin efecto todas las huellas guardadas.
+- **Permisos:** solo `ADMIN`; los demás roles reciben `403`.
+
 ### Consulta del expediente de vinculación (VDI-135)
 
 Al firmar el contrato (VDI-130) se congela el expediente de vinculación de la solicitud (VDI-131, `docs/expediente-vinculacion.md`). La consola lo busca con `GET /api/console/dossiers` y **uno** de dos filtros:

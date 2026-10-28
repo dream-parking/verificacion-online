@@ -90,6 +90,7 @@ Reglas:
 | `POST /admin/score-model/versions` con `{ lowMax, mediumMax }` (publica una versión nueva con los umbrales nuevos y los pesos de la vigente) | `ADMIN` | VDI-120 |
 | `GET /admin/profile-tolerance` (tolerancia vigente del perfil declarado y bitácora de cambios) | `ADMIN` | VDI-137 |
 | `PUT /admin/profile-tolerance` con `{ tolerancePercent }` (cambia la tolerancia; entero de 0 a 45) | `ADMIN` | VDI-137 |
+| `GET /dossiers?requestNumber=` o `?customerNumber=` (expediente de vinculación archivado; cada consulta queda en la auditoría de accesos) | cualquiera | VDI-135 |
 | `GET /score-rules` (reglas vigentes; R-01 está retirada) | cualquiera | VDI-57 |
 | `GET /alerts?status=&assigneeId=&account=&from=&to=` | cualquiera | VDI-62 |
 | `POST /alerts/{id}/take` (la toma el usuario de la sesión) | `FRAUD_ANALYST`, `ADMIN` | VDI-61 |
@@ -116,6 +117,17 @@ El contraste del perfil declarado (VDI-3) marca una desviación cuando una cifra
 - **Bitácora:** `GET /api/console/admin/profile-tolerance` devuelve la vigente (`tolerancePercent`, con `minPercent` y `maxPercent`) y `changes`, del más reciente al más antiguo: valor nuevo, anterior (`previousPercent`), quién (`changedBy`) y cuándo (`changedAt`). El valor inicial no tiene autor. La base no deja editar ni borrar un cambio, y cada uno queda también en la auditoría de accesos (`PROFILE_TOLERANCE_CHANGE`).
 - **Cada desviación guarda su tolerancia:** `tolerancePercent` en cada desviación de `profile-comparison` y de `newDeviations`, y en la evidencia de su alerta. Las registradas antes de V34 quedan con 20. Si después sube la tolerancia, una desviación ya registrada sigue apareciendo en la comparación del mes con la tolerancia y el límite con que se detectó, porque ya levantó una alerta.
 - **Permisos:** solo `ADMIN`; los demás roles reciben `403`. La tolerancia vigente también sale en `tolerancePercent` de `GET /accounts/{id}/profile-comparison`.
+
+### Consulta del expediente de vinculación (VDI-135)
+
+Al firmar el contrato (VDI-130) se congela el expediente de vinculación de la solicitud (VDI-131, `docs/expediente-vinculacion.md`). La consola lo busca con `GET /api/console/dossiers` y **uno** de dos filtros:
+
+- `requestNumber=SOL-2026-00001`: el expediente de esa solicitud, `{ requestNumber, customerNumber, dossier }`. `404` si no hay solicitud con ese número o si aún no firmó.
+- `customerNumber=CLI-0000001`: la lista de expedientes del cliente, uno por solicitud firmada (un cliente puede tener varias solicitudes, una por tipo de cuenta), del más reciente al más antiguo. `404` si no hay cliente con ese número; `[]` si el cliente aún no firmó ninguna.
+- Ninguno o los dos filtros, o un número con otro formato: `400`.
+- Una solicitud tiene un solo expediente, así que buscarla por su número o por el del cliente devuelve el mismo (`dossier.id`).
+- **Auditoría:** cada consulta con respuesta queda en la auditoría de accesos (`VIEW_BINDING_DOSSIER`, `entity_name = binding_dossier`, `entity_id` = el número consultado), con el usuario, la IP y la fecha y hora. La respuesta no se guarda en caché.
+- **Permisos:** cualquier usuario de la consola con sesión, igual que el detalle de una solicitud.
 
 ## Usuarios y primer acceso
 

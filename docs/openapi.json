@@ -258,6 +258,24 @@
         },
         "type" : "object"
       },
+      "ArchivedDossierResponse" : {
+        "properties" : {
+          "customerNumber" : {
+            "description" : "Número del cliente; vacío si la solicitud aún no tenía cliente numerado",
+            "example" : "CLI-0000001",
+            "type" : "string"
+          },
+          "dossier" : {
+            "$ref" : "#/components/schemas/BindingDossierResponse"
+          },
+          "requestNumber" : {
+            "description" : "Número de la solicitud del expediente",
+            "example" : "SOL-2026-00001",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "BasicDataRequest" : {
         "properties" : {
           "dui" : {
@@ -5087,6 +5105,91 @@
         "tags" : [ "Consola · Cuentas" ]
       }
     },
+    "/api/console/dossiers" : {
+      "get" : {
+        "description" : "Envía uno de los dos filtros. El expediente es la copia inmutable que se congeló al firmar. Trae datos personales: cada consulta queda en la auditoría de accesos (`VIEW_BINDING_DOSSIER`, con el número consultado, el usuario y la IP) y la respuesta no se guarda en caché.",
+        "operationId" : "dossierFind",
+        "parameters" : [ {
+          "description" : "Número de solicitud",
+          "example" : "SOL-2026-00001",
+          "in" : "query",
+          "name" : "requestNumber",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 20,
+            "minLength" : 0,
+            "pattern" : "SOL-[0-9]{4}-[0-9]{5,}",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Número de cliente",
+          "example" : "CLI-0000001",
+          "in" : "query",
+          "name" : "customerNumber",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 20,
+            "minLength" : 0,
+            "pattern" : "CLI-[0-9]{7,}",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ArchivedDossierResponse"
+                  }, {
+                    "items" : {
+                      "$ref" : "#/components/schemas/ArchivedDossierResponse"
+                    },
+                    "type" : "array"
+                  } ]
+                }
+              }
+            },
+            "description" : "Por `requestNumber`, el expediente; por `customerNumber`, la lista de expedientes del cliente (uno por solicitud firmada), del más reciente al más antiguo, vacía si no ha firmado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Ninguno o los dos filtros, o un número con formato inválido"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No hay solicitud o cliente con ese número, o la solicitud aún no firmó"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Busca el expediente de vinculación por número de solicitud o de cliente",
+        "tags" : [ "Consola · Expedientes" ]
+      }
+    },
     "/api/console/requests" : {
       "get" : {
         "description" : "Filtra por estado, nivel de riesgo y texto (nombre o número). `page` empieza en 0; `size` máximo 100.",
@@ -6718,6 +6821,9 @@
   }, {
     "description" : "Umbrales y versiones del modelo de score (administradores)",
     "name" : "Consola · Administración del modelo de score"
+  }, {
+    "description" : "Expediente de vinculación archivado, por número de solicitud o de cliente",
+    "name" : "Consola · Expedientes"
   }, {
     "description" : "Catálogos de la app y aviso de privacidad (administradores)",
     "name" : "Consola · Administración de catálogos"

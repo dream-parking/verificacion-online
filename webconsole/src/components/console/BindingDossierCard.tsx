@@ -10,6 +10,15 @@ type Dossier = NonNullable<RequestDetail["bindingDossier"]>;
 const RNPN_OUTCOME = { MATCH: "Coincide", NO_MATCH: "No coincide", UNAVAILABLE: "No disponible" } as const;
 
 const when = (iso: string | null | undefined) => (iso ? formatDateTime(iso) : "—");
+type Contribution = NonNullable<NonNullable<NonNullable<Dossier["evidence"]>["risk"]>["assessment"]>["signals"];
+
+/** What one signal added to the score at the moment of the approval; the same wording as the request detail. */
+const points = (c: NonNullable<Contribution>[number]) => {
+  if (c.maxPoints == null) return "Sin peso aún";
+  if (c.points == null) return `No disponible · 0 de ${c.maxPoints}`;
+  return `${c.points} de ${c.maxPoints} puntos`;
+};
+
 const percent = (n: number | null | undefined) => (n == null ? "—" : `${Math.round(n * 100)} %`);
 
 /** Rows of what the dossier froze about the evidence: only what it has, each with the moment it was taken. */
@@ -50,7 +59,9 @@ function evidenceRows(evidence: NonNullable<Dossier["evidence"]>): Pair[] {
       k: "Score de riesgo",
       v: (
         <>
-          {assessment.score ?? "—"} {level && <span className={`badge ${level.cls}`}>{level.label}</span>}
+          {assessment.score ?? "—"}
+          {assessment.modelVersion != null && <span className="text-muted"> · Modelo de score v{assessment.modelVersion}</span>}{" "}
+          {level && <span className={`badge ${level.cls}`}>{level.label}</span>}
           {risk?.lowMax != null && risk.mediumMax != null && (
             <span className="block text-[13px] leading-[18px] text-muted">
               Umbrales con los que se calculó: Bajo hasta {risk.lowMax}, Medio hasta {risk.mediumMax}
@@ -58,6 +69,22 @@ function evidenceRows(evidence: NonNullable<Dossier["evidence"]>): Pair[] {
             </span>
           )}
         </>
+      ),
+    });
+  }
+  const signals = assessment?.signals;
+  if (signals && signals.length > 0) {
+    rows.push({
+      k: "Señales",
+      v: (
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {signals.map((c, i) => (
+            <li key={c.signal ?? i}>
+              {c.name ?? c.signal ?? "—"}: <strong>{points(c)}</strong>
+              {c.observation && <span className="block text-[13px] leading-[18px] text-muted">{c.observation}</span>}
+            </li>
+          ))}
+        </ul>
       ),
     });
   }

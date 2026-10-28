@@ -191,7 +191,7 @@ public class ConsoleRequestService {
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
 				request.getSubmittedAt(), applicant, dossier.consent(), dossier.identityDocument(), income,
 				expectedActivity, dossier.risk(), dossier.riskDecisions(), dossier.rnpn(), signalsView, stepTimes,
-				timeline);
+				timeline, dossier.bindingDossier());
 	}
 
 	/** Every version of the declared profile, the oldest first; the last one is the one in force. */

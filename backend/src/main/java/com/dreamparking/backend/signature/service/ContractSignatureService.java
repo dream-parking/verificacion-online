@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dreamparking.backend.common.exception.InvalidStateException;
 import com.dreamparking.backend.common.exception.NotFoundException;
+import com.dreamparking.backend.dossier.dto.BindingDossierResponse;
+import com.dreamparking.backend.dossier.service.BindingDossierService;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
 import com.dreamparking.backend.onboarding.entity.RequestEvent;
 import com.dreamparking.backend.onboarding.entity.RequestSignals;
@@ -29,7 +31,8 @@ import com.dreamparking.backend.signature.repository.ContractSignatureRepository
 /**
  * Electronic signature of the account contract (VDI-130). Only a submitted and approved request ({@code COMPLETED})
  * signs, once, the contract version in force; the same rule as opening an account. The evidence is stored in an
- * append-only table and the timeline gets an event, also when the signature service rejects it.
+ * append-only table and the timeline gets an event, also when the signature service rejects it. Signing also freezes the
+ * binding dossier (VDI-131).
  */
 @Service
 public class ContractSignatureService {
@@ -46,14 +49,18 @@ public class ContractSignatureService {
 
 	private final ContractSigner signer;
 
+	private final BindingDossierService dossiers;
+
 	public ContractSignatureService(ContractSignatureRepository signatures, OnboardingRequestRepository requests,
-			RequestSignalsRepository signals, RequestEventRepository events, ContractTerms terms, ContractSigner signer) {
+			RequestSignalsRepository signals, RequestEventRepository events, ContractTerms terms, ContractSigner signer,
+			BindingDossierService dossiers) {
 		this.signatures = signatures;
 		this.requests = requests;
 		this.signals = signals;
 		this.events = events;
 		this.terms = terms;
 		this.signer = signer;
+		this.dossiers = dossiers;
 	}
 
 	/**
@@ -91,6 +98,9 @@ public class ContractSignatureService {
 			// Two signatures of the same request at the same time: the unique request_id lets only one through.
 			throw new InvalidStateException("Request " + requestId + " already signed the contract");
 		}
+		// VDI-131: the evidence that backed the approval is frozen with the signature, in the same transaction.
+		dossiers.freeze(requestId, new BindingDossierResponse.Signature(terms.version(), terms.fingerprint(),
+				signature.getSignedAt()));
 		recordEvent(request, RequestEventType.CONTRACT_SIGNED, "Contract signed",
 				Map.of("contractVersion", terms.version(), "contractFingerprint", terms.fingerprint(), "provider",
 						signer.provider()));

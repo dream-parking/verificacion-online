@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dreamparking.backend.console.dto.ConsoleRequestDetail;
+import com.dreamparking.backend.dossier.dto.BindingDossierResponse;
+import com.dreamparking.backend.dossier.service.BindingDossierService;
 import com.dreamparking.backend.identity.entity.IdentityDocument;
 import com.dreamparking.backend.identity.entity.enums.OcrStatus;
 import com.dreamparking.backend.identity.repository.IdentityDocumentImageRepository;
@@ -23,7 +25,8 @@ import com.dreamparking.backend.rnpn.repository.RnpnCheckRepository;
 
 /**
  * The part of a request's detail that is the evidence behind an approval: the privacy consent, the DUI, the RNPN check,
- * the risk assessment and the log of decisions. It comes out of {@link ConsoleRequestService#detail} (VDI-126) so the
+ * the risk assessment and the log of decisions, plus the binding dossier frozen when the customer signed (VDI-131).
+ * It comes out of {@link ConsoleRequestService#detail} (VDI-126) so the
  * stories that work on the binding file (VDI-131, VDI-134) change this class and not the whole detail.
  */
 @Component
@@ -45,20 +48,25 @@ class ConsoleDossierSection {
 
 	private final RiskDecisionService riskDecisions;
 
+	private final BindingDossierService bindingDossiers;
+
 	ConsoleDossierSection(PrivacyConsentRepository consents, IdentityDocumentRepository identityDocuments,
 			IdentityDocumentImageRepository identityDocumentImages, RnpnCheckRepository rnpnChecks,
-			RiskAssessmentService riskAssessments, RiskDecisionService riskDecisions) {
+			RiskAssessmentService riskAssessments, RiskDecisionService riskDecisions,
+			BindingDossierService bindingDossiers) {
 		this.consents = consents;
 		this.identityDocuments = identityDocuments;
 		this.identityDocumentImages = identityDocumentImages;
 		this.rnpnChecks = rnpnChecks;
 		this.riskAssessments = riskAssessments;
 		this.riskDecisions = riskDecisions;
+		this.bindingDossiers = bindingDossiers;
 	}
 
 	/** What the detail shows of the file; each part is null (the decisions, empty) until the request reaches it. */
 	record Section(ConsoleRequestDetail.Consent consent, ConsoleRequestDetail.IdentityDocument identityDocument,
-			ConsoleRequestDetail.Rnpn rnpn, RiskAssessmentResponse risk, List<RiskDecisionResponse> riskDecisions) {
+			ConsoleRequestDetail.Rnpn rnpn, RiskAssessmentResponse risk, List<RiskDecisionResponse> riskDecisions,
+			BindingDossierResponse bindingDossier) {
 	}
 
 	Section of(UUID requestId) {
@@ -72,7 +80,8 @@ class ConsoleDossierSection {
 					c.getMismatchedFields(), c.getCheckedAt()))
 			.orElse(null);
 		var risk = riskAssessments.findCurrent(requestId).orElse(null);
-		return new Section(consent, identityDocument, rnpn, risk, riskDecisions.log(requestId));
+		return new Section(consent, identityDocument, rnpn, risk, riskDecisions.log(requestId),
+				bindingDossiers.find(requestId).orElse(null));
 	}
 
 	private ConsoleRequestDetail.IdentityDocument toIdentityDocument(IdentityDocument d) {

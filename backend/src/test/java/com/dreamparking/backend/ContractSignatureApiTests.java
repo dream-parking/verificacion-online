@@ -115,6 +115,37 @@ class ContractSignatureApiTests {
 	}
 
 	@Test
+	void signingFreezesTheBindingDossierWithTheSignatureAndTheRetentionDate() throws Exception {
+		String requestId = approved(DUI);
+
+		sign(requestId, terms.version()).andExpect(status().isCreated());
+		em.flush();
+
+		perform(get("/api/console/requests/{id}", requestId))
+			.andExpect(jsonPath("$.bindingDossier.signature.contractVersion").value(terms.version()))
+			.andExpect(jsonPath("$.bindingDossier.signature.contractFingerprint").value(terms.fingerprint()))
+			.andExpect(jsonPath("$.bindingDossier.signature.signedAt").isNotEmpty())
+			.andExpect(jsonPath("$.bindingDossier.retainedUntil").isNotEmpty())
+			.andExpect(jsonPath("$.bindingDossier.evidence.identity.dui").value(DUI))
+			.andExpect(jsonPath("$.bindingDossier.evidence.risk.assessment.signals").isNotEmpty());
+		assertThat(jdbc.queryForObject("select count(*) from binding_dossier where request_id = ?::uuid", Integer.class,
+				requestId))
+			.isEqualTo(1);
+	}
+
+	@Test
+	void aSignatureTheServiceRejectsFreezesNoDossier() throws Exception {
+		String requestId = approved(REJECTED_SIGNATURE_DUI);
+
+		sign(requestId, terms.version()).andExpect(status().isUnprocessableEntity());
+		em.flush();
+
+		assertThat(jdbc.queryForObject("select count(*) from binding_dossier where request_id = ?::uuid", Integer.class,
+				requestId))
+			.isZero();
+	}
+
+	@Test
 	void aSecondTryIsRefusedAndTheFirstSignatureStays() throws Exception {
 		String requestId = approved(DUI);
 		sign(requestId, terms.version()).andExpect(status().isCreated());

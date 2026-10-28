@@ -25,6 +25,8 @@ resultados distintos.
   tiempo va a lo que sí cobra intereses (hallazgos 1, 2, 3, 4 y 8).
 + Una prueba de consistencia (VDI-129, 1 h) falla si la regla de la vista y la de `ScoreEngine.java`
   dejan de coincidir, así que olvidar uno de los dos ya no pasa inadvertido.
+  Es `NightTimeRuleConsistencyTests`: lee las horas que `ScoreEngine` anuncia y las compara con lo que
+  responde la vista para cada hora del día, a ambos lados de cada borde.
 - Cambiar la regla del horario nocturno sigue exigiendo editar la vista (nueva migración) y
   `ScoreEngine.java`; la prueba avisa si se olvida uno, pero el doble trabajo sigue.
 - Cada migración nueva de la vista copia el SQL completo, así que las diferencias entre versiones

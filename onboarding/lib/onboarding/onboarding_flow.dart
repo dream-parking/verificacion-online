@@ -15,6 +15,7 @@ import '../signals/device_fingerprint.dart';
 import '../signals/device_location.dart';
 import '../signals/signals.dart';
 import '../theme.dart';
+import 'api_error_messages.dart';
 import 'application_form.dart';
 import 'privacy_notice.dart';
 import 'resume_view.dart';
@@ -411,7 +412,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _warnIdentityMismatch(differences);
         return;
       }
-      _saveAndContinue(_confirmIdentity, conflictMessage: 'No pudimos guardar los datos de tu DUI. Vuelve a tomar las fotos e inténtalo de nuevo.');
+      _saveAndContinue(_confirmIdentity, conflictMessage: ApiErrorMessages.duiDataNotSaved);
       return;
     }
     _completeStep(_screen);
@@ -533,10 +534,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             _unreadable = const UnreadablePhotos.tooLarge();
           case 400:
             _unreadable = const UnreadablePhotos(UnreadableReason.other, Retake.both);
-          case 409:
-            _duiError = 'No pudimos guardar tu DUI. Revisa que tus datos básicos estén completos e inténtalo de nuevo.';
           default:
-            _duiError = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+            _duiError = ApiErrorMessages.forDuiUpload(e);
         }
       });
     }
@@ -600,10 +599,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             _selfie = _SelfiePhase.retry;
             _selfieProblem = e.status == 422 ? SelfieProblem.fromReason(e.reason) : SelfieProblem.other;
             _selfiePhoto = null;
-          case 409:
-            _selfieError = 'Tu solicitud ya fue enviada y no se puede modificar.';
           default:
-            _selfieError = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+            _selfieError = ApiErrorMessages.forSelfieUpload(e);
         }
       });
     }
@@ -644,33 +641,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _saveError = switch (e.status) {
-          409 => conflictMessage ?? 'Tu solicitud ya fue enviada y no se puede modificar.',
-          400 => _invalidDataMessage(e.fields),
-          _ => 'Revisa tu conexión a internet e inténtalo de nuevo.',
-        };
+        _saveError = ApiErrorMessages.forSave(e, conflict: conflictMessage);
       });
     }
-  }
-
-  /// Message in Spanish for a 400: names the rejected fields, never the server text.
-  static String _invalidDataMessage(List<String> fields) {
-    const labels = {
-      'firstNames': 'nombres',
-      'lastNames': 'apellidos',
-      'dui': 'DUI',
-      'mobilePhone': 'celular',
-      'birthDate': 'fecha de nacimiento',
-      'expiryDate': 'fecha de vencimiento',
-      'sourceDetail': 'origen de tus ingresos',
-    };
-    final names = [
-      for (final f in fields)
-        if (labels[f] != null) labels[f]!,
-    ];
-    return names.isEmpty
-        ? 'Revisa tus datos e inténtalo de nuevo.'
-        : 'Revisa estos datos e inténtalo de nuevo: ${names.join(', ')}.';
   }
 
   bool get _busy => _submitting || _starting || _saving || _uploadingDui || _uploadingSelfie || _locating;
@@ -764,7 +737,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       if (!mounted) return;
       setState(() {
         _starting = false;
-        _startError = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+        _startError = ApiErrorMessages.connection;
       });
     }
   }

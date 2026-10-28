@@ -63,6 +63,15 @@ Reglas:
 - **Score:** el nivel de confianza pasa al score como la señal «Prueba de vida» (VDI-115), con peso 10 en el modelo v2.
 - **App (VDI-116):** la selfie es el paso 3 de 6, después de confirmar el DUI. La persona la toma con el obturador de la cámara frontal, dentro de un óvalo, igual que las fotos del DUI; solo una escena demasiado oscura apaga el obturador. La prueba de vida la decide el API con esa foto: la app no hace un reto propio (el reto con ML Kit se quitó porque no terminaba en los teléfonos de prueba y ML Kit impedía usar el simulador de iOS). El API no reporta la selfie al retomar una solicitud, así que la app recuerda en el teléfono si ya la mandó, para no pedirla otra vez. Batería de ataques de presentación: [prueba-de-vida-ataques.md](prueba-de-vida-ataques.md).
 
+### Firma electrónica del contrato (VDI-130)
+
+- **Contrato vigente:** `GET /api/onboarding/contract` devuelve `{ version, text, fingerprint }`. La app muestra `text` y, al firmar, manda esa misma `version`. El texto lo guarda el backend, así que la app nunca manda el texto ni la huella.
+- **Firmar:** `POST /api/onboarding/requests/{id}/signature` con `{ "contractVersion": "2026.1" }`. Responde `201` con `{ requestId, contractVersion, contractFingerprint, signedAt, provider, simulated }`.
+- **Quién puede firmar:** solo una solicitud enviada y aprobada (`COMPLETED`), **una sola vez**. Una en progreso, abandonada, en revisión reforzada (`ENHANCED_REVIEW`) o en espera del RNPN (`AWAITING_RNPN`) responde `409`, igual que la apertura de cuenta. También responde `409` un segundo intento o una versión que no es la vigente (la app vuelve a pedir el contrato).
+- **Rechazo (`422`):** el servicio de firma puede rechazarla. No se guarda la firma, queda el evento `CONTRACT_SIGNATURE_REJECTED` y se puede intentar de nuevo.
+- **Evidencia:** en `contract_signature`, una fila por solicitud que nadie puede cambiar ni borrar. Guarda la versión, la huella SHA-256 del texto, la fecha y hora, el proveedor, la IP de la conexión, el `User-Agent` y la huella del dispositivo que mandó la app en `/signals`. En la línea de tiempo queda `CONTRACT_SIGNED`. La app no recibe la IP ni el dispositivo.
+- **Simulado:** todavía no hay proveedor de firma (`APP_SIGNATURE_PROVIDER=simulated`). Rechaza el DUI `00000040-8` y firma cualquier otro. Detalle: [signature.md](signature.md).
+
 ## Consola web — `/api/console` (requiere sesión)
 
 1. `POST /api/console/auth/login` con `{ email, password }` devuelve `accessToken` (vigencia `expiresIn` segundos, 8 h) y el usuario.
@@ -79,6 +88,9 @@ Reglas:
 | `GET /score-model` (rangos y pesos del modelo vigente) | cualquiera | VDI-82 |
 | `GET /admin/score-model/versions` (historial de versiones del modelo: umbrales, `publishedBy`, `validFrom`, `validTo` e `inForce`) | `ADMIN` | VDI-120 |
 | `POST /admin/score-model/versions` con `{ lowMax, mediumMax }` (publica una versión nueva con los umbrales nuevos y los pesos de la vigente) | `ADMIN` | VDI-120 |
+| `GET /admin/profile-tolerance` (tolerancia vigente del perfil declarado y bitácora de cambios) | `ADMIN` | VDI-137 |
+| `PUT /admin/profile-tolerance` con `{ tolerancePercent }` (cambia la tolerancia; entero de 0 a 45) | `ADMIN` | VDI-137 |
+| `GET /dossiers?requestNumber=` o `?customerNumber=` (expediente de vinculación archivado; cada consulta queda en la auditoría de accesos) | cualquiera | VDI-135 |
 | `GET /score-rules` (reglas vigentes; R-01 está retirada) | cualquiera | VDI-57 |
 | `GET /alerts?status=&assigneeId=&account=&from=&to=` | cualquiera | VDI-62 |
 | `POST /alerts/{id}/take` (la toma el usuario de la sesión) | `FRAUD_ANALYST`, `ADMIN` | VDI-61 |
@@ -95,6 +107,27 @@ Un administrador cambia dónde terminan los niveles del score sin desplegar cód
 - **Bitácora:** cada versión guarda quién la publicó (`publishedBy`, el nombre del usuario de la consola; vacío en las versiones publicadas por una migración) y cuándo (`validFrom`). `GET /api/console/admin/score-model/versions` las devuelve de la más reciente a la más antigua, con la vigente en `inForce: true`. Cada publicación también queda en la auditoría de accesos (`SCORE_MODEL_PUBLISH`).
 - **Permisos:** solo `ADMIN`; un analista recibe `403` (puede seguir leyendo el modelo vigente con `GET /api/console/score-model`).
 - **Pesos:** este endpoint no los cambia. Un cambio de pesos es una versión publicada por una migración, como el v2 de VDI-115.
+
+### Tolerancia de desviación del perfil configurable (VDI-137)
+
+El contraste del perfil declarado (VDI-3) marca una desviación cuando una cifra del mes pasa lo declarado más la tolerancia: con 20 % y USD 350 declarados, 420.00 está dentro y 420.01 es desviación. Un administrador cambia la tolerancia sin desplegar: `PUT /api/console/admin/profile-tolerance` con `{ "tolerancePercent": 25 }`. Antes era la variable `APP_PROFILE_TOLERANCE_PERCENT`, que ya no se usa; la migración V34 empieza con 20.
+
+- **Aplica al siguiente movimiento** que reporte el core: la tolerancia se lee de la base con cada movimiento.
+- **Validación:** entero de 0 a 45 y distinto del vigente. Si no se cumple responde `400` con `errors.tolerancePercent` en español, y no se guarda nada.
+- **Bitácora:** `GET /api/console/admin/profile-tolerance` devuelve la vigente (`tolerancePercent`, con `minPercent` y `maxPercent`) y `changes`, del más reciente al más antiguo: valor nuevo, anterior (`previousPercent`), quién (`changedBy`) y cuándo (`changedAt`). El valor inicial no tiene autor. La base no deja editar ni borrar un cambio, y cada uno queda también en la auditoría de accesos (`PROFILE_TOLERANCE_CHANGE`).
+- **Cada desviación guarda su tolerancia:** `tolerancePercent` en cada desviación de `profile-comparison` y de `newDeviations`, y en la evidencia de su alerta. Las registradas antes de V34 quedan con 20. Si después sube la tolerancia, una desviación ya registrada sigue apareciendo en la comparación del mes con la tolerancia y el límite con que se detectó, porque ya levantó una alerta.
+- **Permisos:** solo `ADMIN`; los demás roles reciben `403`. La tolerancia vigente también sale en `tolerancePercent` de `GET /accounts/{id}/profile-comparison`.
+
+### Consulta del expediente de vinculación (VDI-135)
+
+Al firmar el contrato (VDI-130) se congela el expediente de vinculación de la solicitud (VDI-131, `docs/expediente-vinculacion.md`). La consola lo busca con `GET /api/console/dossiers` y **uno** de dos filtros:
+
+- `requestNumber=SOL-2026-00001`: el expediente de esa solicitud, `{ requestNumber, customerNumber, dossier }`. `404` si no hay solicitud con ese número o si aún no firmó.
+- `customerNumber=CLI-0000001`: la lista de expedientes del cliente, uno por solicitud firmada (un cliente puede tener varias solicitudes, una por tipo de cuenta), del más reciente al más antiguo. `404` si no hay cliente con ese número; `[]` si el cliente aún no firmó ninguna.
+- Ninguno o los dos filtros, o un número con otro formato: `400`.
+- Una solicitud tiene un solo expediente, así que buscarla por su número o por el del cliente devuelve el mismo (`dossier.id`).
+- **Auditoría:** cada consulta con respuesta queda en la auditoría de accesos (`VIEW_BINDING_DOSSIER`, `entity_name = binding_dossier`, `entity_id` = el número consultado), con el usuario, la IP y la fecha y hora. La respuesta no se guarda en caché.
+- **Permisos:** cualquier usuario de la consola con sesión, igual que el detalle de una solicitud.
 
 ## Usuarios y primer acceso
 

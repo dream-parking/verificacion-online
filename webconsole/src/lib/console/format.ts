@@ -22,12 +22,18 @@ export const RISK: Record<RiskLevel, Badge> = {
 };
 
 export const REQUEST_STATUS: Record<RequestStatus, Badge> = {
-  COMPLETED: { cls: "s-ok", label: "✓ Completada" },
   IN_PROGRESS: { cls: "s-progress", label: "… En progreso" },
+  COMPLETED: { cls: "s-ok", label: "✓ Completada" },
   ENHANCED_REVIEW: { cls: "s-enhanced", label: "⚑ Revisión reforzada" },
   AWAITING_RNPN: { cls: "s-waiting", label: "◷ En espera" },
   ABANDONED: { cls: "s-abandoned", label: "✕ Abandonada" },
 };
+
+/** Options of the status filter, in the order of REQUEST_STATUS and without the symbol that precedes each badge label. */
+export const REQUEST_STATUS_OPTIONS = Object.entries(REQUEST_STATUS).map(([value, { label }]) => ({
+  value,
+  label: label.replace(/^\S+\s/, ""),
+}));
 
 /** The person already sent the request: approved automatically, held for enhanced review or waiting for the RNPN. */
 export const isSubmitted = (status: RequestStatus) =>
@@ -156,6 +162,15 @@ export const minSec = (s: number) => `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 export const duration = (s: number) => `${Math.floor(s / 60)} min ${pad2(s % 60)} s`;
 
 export const usd = (n: number, currency = "USD") => `${currency} ${n.toLocaleString("en-US")}`;
+
+/** What each way of straying from the declared profile means (VDI-138), as the alert evidence names it. */
+export const PROFILE_DEVIATION: Record<string, { label: string; unit: "usd" | "count" }> = {
+  INFLOW_ABOVE_RANGE: { label: "Ingresos por encima del rango mensual declarado", unit: "usd" },
+  INFLOW_ABOVE_DECLARED_AMOUNT: { label: "Ingresos por encima del monto mensual declarado", unit: "usd" },
+  MORE_TRANSACTIONS_THAN_DECLARED: { label: "Más movimientos de entrada que los declarados", unit: "count" },
+  OUTFLOW_ABOVE_DECLARED: { label: "Salidas por encima de lo declarado", unit: "usd" },
+  UNDECLARED_TRANSACTION_TYPE: { label: "Dinero recibido de un tipo que no declaró", unit: "usd" },
+};
 
 /** What the declared profile card says when the person has not declared the expected movement yet. */
 export const NO_PROFILE = "Sin declaración de movimiento";

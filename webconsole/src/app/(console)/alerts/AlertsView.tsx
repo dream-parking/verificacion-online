@@ -438,7 +438,7 @@ function Preview({
   const close = useRef<HTMLButtonElement>(null);
   // The evidence of the alert says which aspect of the profile broke; the summary alone does not carry it.
   const detail = useLoad(`alerta-${a.id}`, (t) =>
-    apiFetch<{ evidence?: Record<string, unknown> | null }>(`/api/console/alerts/${a.id}`, { token: t }),
+    apiFetch<{ typeCode?: string | null; evidence?: Record<string, unknown> | null }>(`/api/console/alerts/${a.id}`, { token: t }),
   );
 
   // When it opens, focus moves to the panel; Escape closes it.
@@ -476,7 +476,7 @@ function Preview({
             { k: "Fecha", v: formatShortDate(a.raisedAt) },
           ]}
         />
-        <ProfileDeviationEvidence evidence={detail.data?.evidence} />
+        <ProfileDeviationEvidence evidence={detail.data?.evidence} typeCode={detail.data?.typeCode} />
         <div className="border border-dashed border-line-strong bg-soft px-4 py-3.5 text-sm leading-5 text-ink-soft">
           <strong className="text-ink">Detalle: próximamente.</strong> En esta versión solo puedes ver el resumen y tomar
           alertas sin dueño.

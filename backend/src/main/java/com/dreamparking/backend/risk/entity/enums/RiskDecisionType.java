@@ -7,6 +7,9 @@ public enum RiskDecisionType {
 	AUTOMATIC_FLOW,
 
 	/** The score goes above the threshold: the request is not approved automatically and waits for enhanced review. */
-	ENHANCED_REVIEW
+	ENHANCED_REVIEW,
+
+	/** An analyst sent a request held for enhanced review to a video call or to a branch (VDI-143). */
+	ESCALATED
 
 }

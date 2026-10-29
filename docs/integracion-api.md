@@ -90,6 +90,7 @@ Reglas:
 | `POST /admin/score-model/versions` con `{ lowMax, mediumMax }` (publica una versión nueva con los umbrales nuevos y los pesos de la vigente) | `ADMIN` | VDI-120 |
 | `GET /admin/profile-tolerance` (tolerancia vigente del perfil declarado y bitácora de cambios) | `ADMIN` | VDI-137 |
 | `PUT /admin/profile-tolerance` con `{ tolerancePercent }` (cambia la tolerancia; entero de 0 a 45) | `ADMIN` | VDI-137 |
+| `POST /requests/{id}/escalation` con `{ channel, reason }` (escala una solicitud en revisión reforzada a videollamada o agencia) | cualquiera | VDI-143 |
 | `GET /dossiers?requestNumber=` o `?customerNumber=` (expediente de vinculación archivado; cada consulta queda en la auditoría de accesos) | cualquiera | VDI-135 |
 | `GET /score-rules` (reglas vigentes; R-01 está retirada) | cualquiera | VDI-57 |
 | `GET /alerts?status=&assigneeId=&account=&from=&to=` | cualquiera | VDI-62 |
@@ -141,6 +142,18 @@ Al firmar el contrato (VDI-130) se congela el expediente de vinculación de la s
 - Una solicitud tiene un solo expediente, así que buscarla por su número o por el del cliente devuelve el mismo (`dossier.id`).
 - **Auditoría:** cada consulta con respuesta queda en la auditoría de accesos (`VIEW_BINDING_DOSSIER`, `entity_name = binding_dossier`, `entity_id` = el número consultado), con el usuario, la IP y la fecha y hora. La respuesta no se guarda en caché.
 - **Permisos:** cualquier usuario de la consola con sesión, igual que el detalle de una solicitud.
+
+### Escalamiento de una solicitud en revisión reforzada (VDI-143, historia VDI-36)
+
+Una solicitud con score alto queda en `ENHANCED_REVIEW` (VDI-117). El analista la escala con `POST /api/console/requests/{id}/escalation` y `{ "channel": "VIDEO_CALL", "reason": "El monto declarado no coincide con los ingresos" }`. `channel` es `VIDEO_CALL` (videollamada) o `BRANCH` (agencia); `reason` es obligatorio, hasta 250 caracteres.
+
+- **Estado:** la solicitud pasa a `ESCALATED` y guarda el canal. Conserva sus pasos, su número y su fecha de envío. No puede firmar ni abrir cuenta (solo `COMPLETED` puede).
+- **Solo desde revisión reforzada:** cualquier otro estado, incluso una ya escalada, responde `409` con el estado en que está. Una solicitud que no existe responde `404`. Si falta el canal o el motivo, o tienen otro formato, responde `400`.
+- **Bitácora de decisiones:** el escalamiento es una decisión más en `riskDecisions` del detalle: `decision: "ESCALATED"`, `channel`, `reason` (en español, con el analista y su motivo), `decidedBy` (nombre del analista) y `decidedAt`. Copia el score y el umbral vigentes, como las automáticas. La base no deja editarla ni borrarla, y exige canal y analista en un escalamiento y ninguno de los dos en una decisión automática. Responde `201` con esa decisión.
+- **Línea de tiempo:** evento `REQUEST_ESCALATED`, «Solicitud escalada a videollamada: …». Cada escalamiento queda también en la auditoría de accesos (`ESCALATE_REQUEST`).
+- **App:** `GET /api/onboarding/requests/{id}` trae `status: "ESCALATED"` y `escalationChannel`, nunca el score ni el motivo. `resume` la trata como enviada (`COMPLETED`).
+- **Permisos:** cualquier usuario de la consola con sesión.
+- **Fuera de esta parte:** el resultado del escalamiento (aprobada, rechazada o abandonada) y las pantallas de la consola y la app (VDI-36). La consola solo sabe mostrar el estado «Escalada» y la decisión en la bitácora.
 
 ## Usuarios y primer acceso
 

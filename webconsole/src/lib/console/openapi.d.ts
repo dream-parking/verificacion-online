@@ -726,6 +726,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/console/requests/{requestId}/escalation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Escala una solicitud en revisión reforzada
+         * @description La solicitud pasa a `ESCALATED` con el canal elegido y conserva todo lo capturado. El escalamiento queda en la bitácora de decisiones (`ESCALATED`) con el canal, el motivo, quién lo decidió y la fecha y hora; la bitácora no se puede editar. La app ve el estado y el canal, nunca el score ni los criterios. Cualquier usuario de la consola.
+         */
+        post: operations["escalationEscalate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/console/requests/{requestId}/identity-document/{side}": {
         parameters: {
             query?: never;
@@ -1535,7 +1555,7 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
             steps: components["schemas"]["ConsoleRequestStepTime"][];
             /** Format: date-time */
             submittedAt: string;
@@ -1647,7 +1667,7 @@ export interface components {
             /** Format: int32 */
             score: number;
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
             transactionTypeLabel: string;
         };
         ConsoleRequestLocation: {
@@ -1680,7 +1700,7 @@ export interface components {
             /** @enum {string} */
             riskLevel: "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
         };
         ConsoleRequestProfileVersion: {
             additionalTransactionTypeCodes: string[];
@@ -1773,7 +1793,7 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
             /** @enum {string} */
-            type: "REQUEST_STARTED" | "PRIVACY_ACCEPTED" | "BASIC_DATA_COMPLETED" | "IDENTITY_DOCUMENT_CAPTURED" | "IDENTITY_DOCUMENT_CONFIRMED" | "IDENTITY_DOCUMENT_REJECTED" | "LIVENESS_CHECKED" | "INCOME_REGISTERED" | "EXPECTED_ACTIVITY_REGISTERED" | "REQUEST_SUBMITTED" | "SUBMISSION_FAILED" | "SCORE_ASSIGNED" | "ENHANCED_REVIEW_REQUIRED" | "RNPN_CHECKED" | "CONTRACT_SIGNED" | "CONTRACT_SIGNATURE_REJECTED" | "REQUEST_ABANDONED";
+            type: "REQUEST_STARTED" | "PRIVACY_ACCEPTED" | "BASIC_DATA_COMPLETED" | "IDENTITY_DOCUMENT_CAPTURED" | "IDENTITY_DOCUMENT_CONFIRMED" | "IDENTITY_DOCUMENT_REJECTED" | "LIVENESS_CHECKED" | "INCOME_REGISTERED" | "EXPECTED_ACTIVITY_REGISTERED" | "REQUEST_SUBMITTED" | "SUBMISSION_FAILED" | "SCORE_ASSIGNED" | "ENHANCED_REVIEW_REQUIRED" | "RNPN_CHECKED" | "REQUEST_ESCALATED" | "CONTRACT_SIGNED" | "CONTRACT_SIGNATURE_REJECTED" | "REQUEST_ABANDONED";
         };
         ConsoleUserResponse: {
             active: boolean;
@@ -1992,6 +2012,19 @@ export interface components {
             /** Format: date-time */
             signedAt: string;
         };
+        EscalateRequest: {
+            /**
+             * @description VIDEO_CALL (videollamada) o BRANCH (agencia)
+             * @example VIDEO_CALL
+             * @enum {string}
+             */
+            channel: "VIDEO_CALL" | "BRANCH";
+            /**
+             * @description Por qué se escala
+             * @example El monto declarado no coincide con los ingresos
+             */
+            reason: string;
+        };
         ExpectedActivityRequest: {
             /** @description Otros tipos de dinero que también moverá, además del principal (opcional, hasta 3) */
             additionalTransactionTypes?: components["schemas"]["AdditionalTransactionType"][];
@@ -2146,6 +2179,11 @@ export interface components {
         OnboardingRequestResponse: {
             /** Format: int32 */
             completedSteps: number;
+            /**
+             * @description Canal al que se escaló la solicitud (VIDEO_CALL: videollamada, BRANCH: agencia); vacío si no está escalada
+             * @enum {string}
+             */
+            escalationChannel: "VIDEO_CALL" | "BRANCH";
             /** Format: uuid */
             id: string;
             number: string;
@@ -2154,7 +2192,7 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
             /** Format: date-time */
             submittedAt: string;
         };
@@ -2425,7 +2463,7 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
             /** Format: date-time */
             submittedAt: string;
         };
@@ -2504,12 +2542,17 @@ export interface components {
             signals: components["schemas"]["SignalContribution"][];
         };
         RiskDecisionResponse: {
+            /**
+             * @description Canal del escalamiento (VIDEO_CALL: videollamada, BRANCH: agencia); vacío en las decisiones automáticas
+             * @enum {string}
+             */
+            channel: "VIDEO_CALL" | "BRANCH";
             /** Format: date-time */
             decidedAt: string;
-            /** @description Who decided: SYSTEM for the automatic rule */
+            /** @description Quién decidió: SYSTEM para la regla automática; el nombre del analista en un escalamiento */
             decidedBy: string;
             /** @enum {string} */
-            decision: "AUTOMATIC_FLOW" | "ENHANCED_REVIEW";
+            decision: "AUTOMATIC_FLOW" | "ENHANCED_REVIEW" | "ESCALATED";
             /** Format: int64 */
             id: number;
             /** Format: int32 */
@@ -4734,7 +4777,7 @@ export interface operations {
     consoleRequestList: {
         parameters: {
             query?: {
-                status?: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+                status?: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
                 riskLevel?: "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
                 q?: string;
                 page?: number;
@@ -4826,6 +4869,68 @@ export interface operations {
             };
             /** @description La solicitud no existe */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    escalationEscalate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EscalateRequest"];
+            };
+        };
+        responses: {
+            /** @description Solicitud escalada; devuelve la decisión registrada en la bitácora */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskDecisionResponse"];
+                };
+            };
+            /** @description Falta el canal o el motivo, o no tienen el formato */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no está en revisión reforzada */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

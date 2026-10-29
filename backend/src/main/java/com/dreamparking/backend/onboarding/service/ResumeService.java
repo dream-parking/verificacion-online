@@ -120,8 +120,8 @@ public class ResumeService {
 
 	private ResumeState stateOf(OnboardingRequest request, Instant expiresAt) {
 		return switch (request.getStatus()) {
-			// A request held for review or waiting for the RNPN is submitted as far as the app is concerned.
-			case COMPLETED, ENHANCED_REVIEW, AWAITING_RNPN -> ResumeState.COMPLETED;
+			// A request held for review, escalated or waiting for the RNPN is submitted as far as the app is concerned.
+			case COMPLETED, ENHANCED_REVIEW, AWAITING_RNPN, ESCALATED -> ResumeState.COMPLETED;
 			case ABANDONED -> ResumeState.ABANDONED;
 			case IN_PROGRESS -> Instant.now().isAfter(expiresAt) ? ResumeState.EXPIRED : ResumeState.RESUMABLE;
 		};

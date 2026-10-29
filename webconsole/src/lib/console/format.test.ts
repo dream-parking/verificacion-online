@@ -61,6 +61,7 @@ describe("estado de la solicitud", () => {
       COMPLETED: true,
       ENHANCED_REVIEW: true,
       AWAITING_RNPN: true,
+      ESCALATED: true,
       ABANDONED: true,
     };
     expect(REQUEST_STATUS_OPTIONS.map((o) => o.value)).toEqual(Object.keys(known));
@@ -69,6 +70,7 @@ describe("estado de la solicitud", () => {
       "Completada",
       "Revisión reforzada",
       "En espera",
+      "Escalada",
       "Abandonada",
     ]);
   });

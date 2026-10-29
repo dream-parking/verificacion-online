@@ -2423,6 +2423,26 @@
         "required" : [ "amountUsd", "direction", "externalId", "occurredAt" ],
         "type" : "object"
       },
+      "RegisterOutcomeRequest" : {
+        "properties" : {
+          "outcome" : {
+            "description" : "FRAUDE_CONFIRMADO (el DUI, el teléfono y el dispositivo pasan a la lista de fraude confirmado) o FALSO_POSITIVO (solo se registra)",
+            "enum" : [ "FRAUDE_CONFIRMADO", "FALSO_POSITIVO" ],
+            "example" : "FRAUDE_CONFIRMADO",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Por qué se cierra así",
+            "example" : "El titular del DUI negó haber abierto la cuenta",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "outcome", "reason" ],
+        "type" : "object"
+      },
       "RegisteredMovementResponse" : {
         "properties" : {
           "movement" : {
@@ -2431,6 +2451,49 @@
           "newDeviations" : {
             "items" : {
               "$ref" : "#/components/schemas/ProfileDeviation"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "RequestOutcomeResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "listed" : {
+            "description" : "Datos que este desenlace puso en la lista de fraude confirmado. Vacío si no puso ninguno (falso positivo, o ya estaban en la lista)",
+            "items" : {
+              "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "outcome" : {
+            "enum" : [ "FRAUDE_CONFIRMADO", "FALSO_POSITIVO" ],
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "registeredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "registeredBy" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "revoked" : {
+            "description" : "Datos que este desenlace sacó de las listas al corregir el anterior",
+            "items" : {
+              "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+              "type" : "string"
             },
             "type" : "array"
           }
@@ -5919,6 +5982,141 @@
         "tags" : [ "Consola · Solicitudes" ]
       }
     },
+    "/api/console/requests/{requestId}/outcome" : {
+      "get" : {
+        "description" : "Cada desenlace con quién, cuándo, el motivo y los datos que puso o sacó de las listas.",
+        "operationId" : "requestOutcomeHistory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RequestOutcomeResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Desenlaces, del más antiguo al más reciente; el último es el vigente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Desenlaces de una solicitud",
+        "tags" : [ "Consola · Desenlace de casos" ]
+      },
+      "post" : {
+        "description" : "`FRAUDE_CONFIRMADO` pone el DUI, el teléfono y el dispositivo de la solicitud en la lista de fraude confirmado (lo que ya esté en la lista no se repite). `FALSO_POSITIVO` solo lo registra. Registrar otro desenlace corrige el anterior: no lo edita, agrega una fila, y un falso positivo saca de las listas lo que los desenlaces anteriores de la solicitud habían puesto. Solo analistas de fraude y administradores.",
+        "operationId" : "requestOutcomeRegister",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterOutcomeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RequestOutcomeResponse"
+                }
+              }
+            },
+            "description" : "Desenlace registrado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el desenlace o el motivo, o no tienen el formato"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo analistas de fraude y administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Registra el desenlace de una solicitud",
+        "tags" : [ "Consola · Desenlace de casos" ]
+      }
+    },
     "/api/console/score-model" : {
       "get" : {
         "description" : "Los rangos del score (bajo, medio, alto) y los puntos máximos de cada señal. Las señales sin peso (RNPN, prueba de vida, listas internas) llegan con maxPoints nulo.",
@@ -7402,6 +7600,9 @@
   }, {
     "description" : "Listas de datos de casos de fraude ya conocidos (administradores). Los valores se guardan solo como huella y no se devuelven",
     "name" : "Consola · Administración de listas internas de riesgo"
+  }, {
+    "description" : "Cómo terminó un caso: fraude confirmado (alimenta las listas internas de riesgo) o falso positivo (solo se registra)",
+    "name" : "Consola · Desenlace de casos"
   }, {
     "description" : "Pasos de la solicitud de apertura de cuenta (app móvil)",
     "name" : "Onboarding"

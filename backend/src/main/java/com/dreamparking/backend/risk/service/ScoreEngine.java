@@ -218,20 +218,27 @@ public final class ScoreEngine {
 	 */
 	private static Contribution rnpn(ScoreModel model, RnpnCheck check) {
 		if (check == null) {
-			return unavailable(model, ScoreSignal.RNPN, "The RNPN has not been checked yet");
+			return unavailable(model, ScoreSignal.RNPN, "Aún no se ha cotejado con el RNPN");
 		}
-		String source = check.isSimulated() ? "RNPN check (simulated)" : "RNPN check";
+		String source = check.isSimulated() ? "Cotejo RNPN (simulado)" : "Cotejo RNPN";
 		return switch (check.getOutcome()) {
-			case MATCH -> contribution(model, ScoreSignal.RNPN, 0.0, source + ": the data matches");
-			case NO_MATCH -> contribution(model, ScoreSignal.RNPN, 1.0, source + ": the data does not match ("
+			case MATCH -> contribution(model, ScoreSignal.RNPN, 0.0, source + ": los datos coinciden");
+			case NO_MATCH -> contribution(model, ScoreSignal.RNPN, 1.0, source + ": los datos no coinciden ("
 					+ String.join(", ", check.getMismatchedFields().stream().map(ScoreEngine::fieldName).toList()) + ")");
 			case UNAVAILABLE -> contribution(model, ScoreSignal.RNPN, RNPN_UNAVAILABLE_SEVERITY,
-					source + ": the RNPN did not answer after %d tries".formatted(check.getAttempts()));
+					source + ": el RNPN no respondió después de %d %s".formatted(check.getAttempts(),
+							check.getAttempts() == 1 ? "intento" : "intentos"));
 		};
 	}
 
+	/** The data of the DUI as the person reading the observation knows it. */
 	private static String fieldName(RnpnField field) {
-		return field.name().toLowerCase().replace('_', ' ');
+		return switch (field) {
+			case DUI -> "número de DUI";
+			case FIRST_NAMES -> "nombres";
+			case LAST_NAMES -> "apellidos";
+			case BIRTH_DATE -> "fecha de nacimiento";
+		};
 	}
 
 	private static Contribution contribution(ScoreModel model, ScoreSignal signal, double severity, String observation) {

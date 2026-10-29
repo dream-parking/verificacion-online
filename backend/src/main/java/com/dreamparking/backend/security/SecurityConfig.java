@@ -35,6 +35,7 @@ public class SecurityConfig {
 				.hasRole("ADMIN")
 				.requestMatchers(HttpMethod.PUT, "/api/console/users/*").hasRole("ADMIN")
 				.requestMatchers(HttpMethod.POST, "/api/console/alerts/*/take").hasAnyRole("FRAUD_ANALYST", "ADMIN")
+				.requestMatchers(HttpMethod.POST, "/api/console/requests/*/outcome").hasAnyRole("FRAUD_ANALYST", "ADMIN")
 				.requestMatchers("/api/console/admin/**").hasRole("ADMIN")
 				.requestMatchers("/api/console/**").authenticated()
 				.anyRequest().denyAll())

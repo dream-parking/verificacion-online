@@ -23,6 +23,8 @@ public enum RequestEventType {
 	CONTRACT_SIGNED,
 	/** The signature service rejected the signature; the customer can try again (VDI-130). */
 	CONTRACT_SIGNATURE_REJECTED,
+	/** The customer chose a product of the catalog for the approved request (VDI-148). */
+	PRODUCT_REQUESTED,
 	REQUEST_ABANDONED
 
 }

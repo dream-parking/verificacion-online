@@ -888,6 +888,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/onboarding/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Productos a los que califica la solicitud
+         * @description Devuelve solo los productos a los que califica la solicitud, con sus condiciones principales; los que no califica no aparecen. Solo una solicitud enviada y aprobada (`COMPLETED`) puede consultarlos. Regla de elegibilidad provisional: una solicitud aprobada califica a todos los productos activos.
+         */
+        get: operations["productProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/onboarding/requests": {
         parameters: {
             query?: never;
@@ -2187,6 +2207,32 @@ export interface components {
             title: string;
             /** @example about:blank */
             type: string;
+        };
+        ProductResponse: {
+            /**
+             * @description Interés anual en porcentaje
+             * @example 0.5
+             */
+            annualInterestRate: number;
+            /**
+             * @description Código estable del producto
+             * @example AHORRO_BASICA
+             */
+            code: string;
+            /** @description Qué ofrece, para comparar productos */
+            description: string;
+            /**
+             * @description Depósito mínimo para abrir, en USD
+             * @example 10
+             */
+            minimumOpeningDepositUsd: number;
+            /**
+             * @description Cuota mensual en USD
+             * @example 0
+             */
+            monthlyFeeUsd: number;
+            /** @example Cuenta de ahorro básica */
+            name: string;
         };
         ProfileComparisonResponse: {
             /** Format: uuid */
@@ -5200,6 +5246,56 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ContractResponse"];
+                };
+            };
+        };
+    };
+    productProducts: {
+        parameters: {
+            query: {
+                /** @description Id de la solicitud, el mismo que usa la app en el resto del flujo */
+                requestId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Los productos a los que califica la solicitud, con sus condiciones */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponse"][];
+                };
+            };
+            /** @description Falta `requestId` o no es un UUID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no está aprobada (en progreso, en revisión reforzada, en espera del RNPN o abandonada) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
         };

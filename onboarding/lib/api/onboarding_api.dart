@@ -77,6 +77,31 @@ class LivenessResult {
   final int attempts;
 }
 
+/// The contract in force (`GET /contract`, VDI-130): the text to show and the version to sign. The fingerprint stays in
+/// the API, which computes it again when the signature arrives.
+class Contract {
+  const Contract({required this.version, required this.text});
+
+  factory Contract.fromJson(Map<String, dynamic> json) =>
+      Contract(version: json['version'] as String, text: json['text'] as String);
+
+  final String version;
+  final String text;
+}
+
+/// Answer of `POST /signature` (VDI-130). The provider, the fingerprint and the simulation flag are not shown.
+class ContractSignature {
+  const ContractSignature({required this.contractVersion, required this.signedAt});
+
+  factory ContractSignature.fromJson(Map<String, dynamic> json) => ContractSignature(
+    contractVersion: json['contractVersion'] as String,
+    signedAt: DateTime.parse(json['signedAt'] as String),
+  );
+
+  final String contractVersion;
+  final DateTime signedAt;
+}
+
 /// Client for `/api/onboarding/requests` (see docs/integracion-api.md and docs/openapi.json).
 class OnboardingApi {
   OnboardingApi({http.Client? client, String baseUrl = apiBaseUrl})
@@ -208,6 +233,16 @@ class OnboardingApi {
       ..files.add(http.MultipartFile.fromBytes('selfie', selfie, filename: 'selfie.jpg'));
     return LivenessResult.fromJson(await _deliver(req));
   }
+
+  /// VDI-132: the contract text in force, to show before signing.
+  Future<Contract> contract() async => Contract.fromJson(await _send('GET', '/api/onboarding/contract'));
+
+  /// VDI-132: signs the [contractVersion] the person was shown. A 409 means the request already signed, is not
+  /// approved or the version is no longer in force; a 422 means the signature service rejected it and the person can
+  /// try again.
+  Future<ContractSignature> signContract(String requestId, String contractVersion) async => ContractSignature.fromJson(
+    await _send('POST', '/api/onboarding/requests/$requestId/signature', body: {'contractVersion': contractVersion}),
+  );
 
   /// VDI-87: where a request was left and what was saved. Throws an [ApiException] 404 if it does not exist.
   Future<ResumeInfo> resume(String requestId) async =>

@@ -69,17 +69,26 @@ La primera vez tarda varios minutos. Con la app abierta, en la terminal:
 
 ### ¿A qué API se conecta?
 
-Por defecto la app usa la API de **Dev** (`https://api.dev.identidad.alambritos.online`), así que no hace falta levantar el backend. La primera petición puede tardar hasta un minuto si el servidor estaba dormido.
+La app **no trae ninguna URL en el código**: la dirección del API sale solo de `--dart-define=API_URL=...` (VDI-141). Si se corre sin ella, la pantalla dice que falta `API_URL` en lugar de llamar a otro ambiente. Por eso `flutter run` ya no basta: hay que indicar a qué API conectarse.
 
-Para usar la API de **QA**:
+Contra el API de **Dev**, sin levantar el backend (la primera petición puede tardar hasta un minuto si el servidor estaba dormido):
 ```bash
-flutter run --dart-define=APP_ENV=qa
+flutter run --dart-define=API_URL=https://api.dev.identidad.alambritos.online
 ```
 
-Para usar el backend corriendo en tu Mac (desde el emulador de Android, `10.0.2.2` es tu Mac):
+Contra el API de **QA**:
+```bash
+flutter run --dart-define=API_URL=https://api.qa.identidad.alambritos.online
+```
+
+Contra el backend corriendo en tu Mac (desde el emulador de Android, `10.0.2.2` es tu Mac):
 ```bash
 flutter run --dart-define=API_URL=http://10.0.2.2:8080
 ```
+
+`APP_ENV=dev|qa` solo cambia el nombre y el identificador de la app instalada (para tener Dev y QA a la vez); no elige el API. Un build con `APP_ENV=dev` o `qa` rechaza una `API_URL` que apunte a `localhost` o a `10.0.2.2`.
+
+Los APK de Dev y QA los compila `onboarding-build.yml`, que pasa la `API_URL` de su ambiente. Un ambiente nuevo (por ejemplo Prod) se agrega ahí, no en el código.
 
 ## 5. Ver los cambios nuevos del equipo
 

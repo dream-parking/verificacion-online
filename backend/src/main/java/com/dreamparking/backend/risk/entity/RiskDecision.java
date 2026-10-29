@@ -16,13 +16,15 @@ import jakarta.persistence.Table;
 
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.dreamparking.backend.console.entity.ConsoleUser;
 import com.dreamparking.backend.onboarding.entity.OnboardingRequest;
+import com.dreamparking.backend.onboarding.entity.enums.EscalationChannel;
 import com.dreamparking.backend.risk.entity.enums.RiskDecisionType;
 
 /**
  * Entry of the audit log of risk decisions: what was decided about a submitted request, why, and when. It is never
  * changed or deleted (the database refuses it), and it copies the score, the threshold and the model version so it can
- * be explained without the model.
+ * be explained without the model. An escalation (VDI-143) also keeps the channel and the analyst who decided it.
  */
 @Entity
 @Table(name = "risk_decision_log")
@@ -57,8 +59,16 @@ public class RiskDecision {
 	@Column(name = "model_version", nullable = false, updatable = false)
 	private Short modelVersion;
 
-	@Column(name = "decided_by", nullable = false, length = 60, updatable = false)
+	@Column(name = "decided_by", nullable = false, length = 150, updatable = false)
 	private String decidedBy = "SYSTEM";
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "channel", length = 12, updatable = false)
+	private EscalationChannel channel;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "decided_by_user", updatable = false)
+	private ConsoleUser decidedByUser;
 
 	@CreationTimestamp
 	@Column(name = "decided_at", nullable = false, updatable = false)
@@ -76,6 +86,16 @@ public class RiskDecision {
 		this.score = assessment.getScore();
 		this.threshold = threshold;
 		this.modelVersion = assessment.getModelVersion();
+	}
+
+	/** An analyst escalates the request: the score and threshold in force are copied, as in the automatic decisions. */
+	public static RiskDecision escalation(OnboardingRequest request, RiskAssessment assessment, short threshold,
+			EscalationChannel channel, String reason, ConsoleUser analyst) {
+		RiskDecision decision = new RiskDecision(request, assessment, RiskDecisionType.ESCALATED, reason, threshold);
+		decision.channel = channel;
+		decision.decidedByUser = analyst;
+		decision.decidedBy = analyst.getFullName();
+		return decision;
 	}
 
 	public Long getId() {
@@ -112,6 +132,14 @@ public class RiskDecision {
 
 	public String getDecidedBy() {
 		return decidedBy;
+	}
+
+	public EscalationChannel getChannel() {
+		return channel;
+	}
+
+	public ConsoleUser getDecidedByUser() {
+		return decidedByUser;
 	}
 
 	public Instant getDecidedAt() {

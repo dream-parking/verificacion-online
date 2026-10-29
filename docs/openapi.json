@@ -709,7 +709,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "steps" : {
@@ -1000,7 +1000,7 @@
             "type" : "integer"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "transactionTypeLabel" : {
@@ -1058,7 +1058,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1253,7 +1253,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "CONTRACT_SIGNED", "CONTRACT_SIGNATURE_REJECTED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "REQUEST_ESCALATED", "CONTRACT_SIGNED", "CONTRACT_SIGNATURE_REJECTED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1731,6 +1731,26 @@
         },
         "type" : "object"
       },
+      "EscalateRequest" : {
+        "properties" : {
+          "channel" : {
+            "description" : "VIDEO_CALL (videollamada) o BRANCH (agencia)",
+            "enum" : [ "VIDEO_CALL", "BRANCH" ],
+            "example" : "VIDEO_CALL",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Por qué se escala",
+            "example" : "El monto declarado no coincide con los ingresos",
+            "maxLength" : 250,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "channel", "reason" ],
+        "type" : "object"
+      },
       "ExpectedActivityRequest" : {
         "properties" : {
           "additionalTransactionTypes" : {
@@ -1968,6 +1988,11 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "escalationChannel" : {
+            "description" : "Canal al que se escaló la solicitud (VIDEO_CALL: videollamada, BRANCH: agencia); vacío si no está escalada",
+            "enum" : [ "VIDEO_CALL", "BRANCH" ],
+            "type" : "string"
+          },
           "id" : {
             "format" : "uuid",
             "type" : "string"
@@ -1984,7 +2009,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "submittedAt" : {
@@ -2526,7 +2551,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "submittedAt" : {
@@ -2729,16 +2754,21 @@
       },
       "RiskDecisionResponse" : {
         "properties" : {
+          "channel" : {
+            "description" : "Canal del escalamiento (VIDEO_CALL: videollamada, BRANCH: agencia); vacío en las decisiones automáticas",
+            "enum" : [ "VIDEO_CALL", "BRANCH" ],
+            "type" : "string"
+          },
           "decidedAt" : {
             "format" : "date-time",
             "type" : "string"
           },
           "decidedBy" : {
-            "description" : "Who decided: SYSTEM for the automatic rule",
+            "description" : "Quién decidió: SYSTEM para la regla automática; el nombre del analista en un escalamiento",
             "type" : "string"
           },
           "decision" : {
-            "enum" : [ "AUTOMATIC_FLOW", "ENHANCED_REVIEW" ],
+            "enum" : [ "AUTOMATIC_FLOW", "ENHANCED_REVIEW", "ESCALATED" ],
             "type" : "string"
           },
           "id" : {
@@ -5768,7 +5798,7 @@
           "name" : "status",
           "required" : false,
           "schema" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           }
         }, {
@@ -5923,6 +5953,88 @@
         } ],
         "summary" : "Detalle de una solicitud",
         "tags" : [ "Consola · Solicitudes" ]
+      }
+    },
+    "/api/console/requests/{requestId}/escalation" : {
+      "post" : {
+        "description" : "La solicitud pasa a `ESCALATED` con el canal elegido y conserva todo lo capturado. El escalamiento queda en la bitácora de decisiones (`ESCALATED`) con el canal, el motivo, quién lo decidió y la fecha y hora; la bitácora no se puede editar. La app ve el estado y el canal, nunca el score ni los criterios. Cualquier usuario de la consola.",
+        "operationId" : "escalationEscalate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EscalateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RiskDecisionResponse"
+                }
+              }
+            },
+            "description" : "Solicitud escalada; devuelve la decisión registrada en la bitácora"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el canal o el motivo, o no tienen el formato"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no está en revisión reforzada"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Escala una solicitud en revisión reforzada",
+        "tags" : [ "Consola · Escalamiento" ]
       }
     },
     "/api/console/requests/{requestId}/identity-document/{side}" : {
@@ -7565,6 +7677,9 @@
     "url" : "http://localhost:8080"
   } ],
   "tags" : [ {
+    "description" : "El analista envía una solicitud en revisión reforzada a videollamada o a agencia",
+    "name" : "Consola · Escalamiento"
+  }, {
     "description" : "Movimientos reales de la cuenta comparados con el perfil declarado",
     "name" : "Consola · Perfil transaccional"
   }, {

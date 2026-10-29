@@ -12,6 +12,9 @@ public enum RequestStatus {
 	/** Submitted, but the RNPN did not answer after the retries: it is not approved automatically (VDI-111). */
 	AWAITING_RNPN,
 
+	/** Held for enhanced review and sent by an analyst to a video call or to a branch (VDI-143). */
+	ESCALATED,
+
 	ABANDONED
 
 }

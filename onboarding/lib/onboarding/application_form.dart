@@ -14,6 +14,9 @@ enum Screen {
   income,
   expectedActivity,
   review,
+
+  /// Contract and electronic signature of an approved request (VDI-132).
+  signature,
   confirmation,
 }
 

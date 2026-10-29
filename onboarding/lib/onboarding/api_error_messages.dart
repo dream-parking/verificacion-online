@@ -12,6 +12,13 @@ class ApiErrorMessages {
   static const duiDataNotSaved =
       'No pudimos guardar los datos de tu DUI. Vuelve a tomar las fotos e inténtalo de nuevo.';
 
+  static const signRejected = 'No pudimos registrar tu firma. Inténtalo de nuevo.';
+  static const contractChanged = 'El contrato se actualizó. Léelo de nuevo antes de firmar.';
+
+  /// Signing the contract: a 422 is the signature service rejecting it; anything else is taken as a connection problem
+  /// (a 409 is handled by the screen, which checks the contract in force).
+  static String forSign(ApiException e) => e.status == 422 ? signRejected : connection;
+
   /// Saving a step: a 409 means the request can no longer change (or [conflict] when the step has its own wording),
   /// a 400 names the rejected fields, anything else is taken as a connection problem.
   static String forSave(ApiException e, {String? conflict}) => switch (e.status) {

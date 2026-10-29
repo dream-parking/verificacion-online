@@ -104,9 +104,9 @@ class ContractSignature {
 
 /// Client for `/api/onboarding/requests` (see docs/integracion-api.md and docs/openapi.json).
 class OnboardingApi {
-  OnboardingApi({http.Client? client, String baseUrl = apiBaseUrl})
+  OnboardingApi({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
-      _base = Uri.parse(baseUrl);
+      _base = Uri.parse(requireApiUrl(baseUrl ?? apiBaseUrl));
 
   final http.Client _client;
   final Uri _base;

@@ -2107,6 +2107,39 @@
         },
         "type" : "object"
       },
+      "ProductResponse" : {
+        "properties" : {
+          "annualInterestRate" : {
+            "description" : "Interés anual en porcentaje",
+            "example" : 0.5,
+            "type" : "number"
+          },
+          "code" : {
+            "description" : "Código estable del producto",
+            "example" : "AHORRO_BASICA",
+            "type" : "string"
+          },
+          "description" : {
+            "description" : "Qué ofrece, para comparar productos",
+            "type" : "string"
+          },
+          "minimumOpeningDepositUsd" : {
+            "description" : "Depósito mínimo para abrir, en USD",
+            "example" : 10.0,
+            "type" : "number"
+          },
+          "monthlyFeeUsd" : {
+            "description" : "Cuota mensual en USD",
+            "example" : 0.0,
+            "type" : "number"
+          },
+          "name" : {
+            "example" : "Cuenta de ahorro básica",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ProfileComparisonResponse" : {
         "properties" : {
           "accountId" : {
@@ -6556,6 +6589,69 @@
           }
         },
         "summary" : "Contrato de apertura vigente",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/products" : {
+      "get" : {
+        "description" : "Devuelve solo los productos a los que califica la solicitud, con sus condiciones principales; los que no califica no aparecen. Solo una solicitud enviada y aprobada (`COMPLETED`) puede consultarlos. Regla de elegibilidad provisional: una solicitud aprobada califica a todos los productos activos.",
+        "operationId" : "productProducts",
+        "parameters" : [ {
+          "description" : "Id de la solicitud, el mismo que usa la app en el resto del flujo",
+          "in" : "query",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ProductResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Los productos a los que califica la solicitud, con sus condiciones"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta `requestId` o no es un UUID"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no está aprobada (en progreso, en revisión reforzada, en espera del RNPN o abandonada)"
+          }
+        },
+        "summary" : "Productos a los que califica la solicitud",
         "tags" : [ "Onboarding" ]
       }
     },

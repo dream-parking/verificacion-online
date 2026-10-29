@@ -82,7 +82,7 @@ public class ContractSignatureService {
 		SigningResult result = signer.sign(new SigningQuery(requestId, request.getCustomer().getDui(), terms.version(),
 				terms.fingerprint()));
 		if (!result.signed()) {
-			recordEvent(request, RequestEventType.CONTRACT_SIGNATURE_REJECTED, "Contract signature rejected",
+			recordEvent(request, RequestEventType.CONTRACT_SIGNATURE_REJECTED, "Firma del contrato rechazada",
 					Map.of("contractVersion", terms.version(), "provider", signer.provider(), "reason",
 							result.rejectionReason()));
 			throw new SignatureRejectedException(result.rejectionReason());
@@ -101,7 +101,7 @@ public class ContractSignatureService {
 		// VDI-131: the evidence that backed the approval is frozen with the signature, in the same transaction.
 		dossiers.freeze(requestId, new BindingDossierResponse.Signature(terms.version(), terms.fingerprint(),
 				signature.getSignedAt()));
-		recordEvent(request, RequestEventType.CONTRACT_SIGNED, "Contract signed",
+		recordEvent(request, RequestEventType.CONTRACT_SIGNED, "Contrato firmado",
 				Map.of("contractVersion", terms.version(), "contractFingerprint", terms.fingerprint(), "provider",
 						signer.provider()));
 		return ContractSignatureResponse.of(signature);

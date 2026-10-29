@@ -379,9 +379,9 @@ public class OnboardingService {
 		rnpnChecks.save(new RnpnCheck(request, answer.outcome(), answer.provider(), answer.attempts(),
 				answer.mismatchedFields(), answer.failure()));
 		String description = switch (answer.outcome()) {
-			case MATCH -> "RNPN check done: the data matches";
-			case NO_MATCH -> "RNPN check done: the data does not match";
-			case UNAVAILABLE -> "RNPN check not done: the RNPN did not answer";
+			case MATCH -> "Cotejo con el RNPN hecho: los datos coinciden";
+			case NO_MATCH -> "Cotejo con el RNPN hecho: los datos no coinciden";
+			case UNAVAILABLE -> "Cotejo con el RNPN no hecho: el RNPN no respondió";
 		};
 		recordEvent(request, RequestEventType.RNPN_CHECKED, description,
 				Map.of("outcome", answer.outcome().name(), "attempts", answer.attempts(), "provider", answer.provider()));

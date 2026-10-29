@@ -33,6 +33,9 @@ export function DossiersView() {
   const rules = SEARCH_RULES[mode];
 
   const choose = (next: DossierSearch) => {
+    // A search still pending belongs to the other tab: its answer must not show up here.
+    lastSearch.current++;
+    setSearching(false);
     setMode(next);
     setRaw("");
     setFieldError(null);

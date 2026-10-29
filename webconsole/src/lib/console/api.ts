@@ -171,7 +171,7 @@ export type RnpnCheck = {
  * it does not have yet. Every field below the top level is therefore optional and nullable, and the fields the API
  * always sends are re-required in `RequestDetail`.
  */
-type Loose<T> = T extends readonly (infer U)[] ? Loose<U>[] : T extends object ? { [K in keyof T]: Loose<T[K]> | null } : T;
+export type Loose<T> = T extends readonly (infer U)[] ? Loose<U>[] : T extends object ? { [K in keyof T]: Loose<T[K]> | null } : T;
 
 type RequestDetailSchema = components["schemas"]["ConsoleRequestDetail"];
 type AlwaysSent = "id" | "status" | "riskLevel" | "completedSteps" | "startedAt";

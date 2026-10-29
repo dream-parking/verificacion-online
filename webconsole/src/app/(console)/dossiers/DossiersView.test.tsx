@@ -1,9 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DossiersView } from "./DossiersView";
 
 vi.mock("@/components/console/ConsoleProvider", () => ({ useConsole: () => ({ token: "tok" }) }));
+const signOut = vi.fn();
+vi.mock("@/lib/console/session", () => ({ signOut: () => signOut() }));
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -27,7 +29,10 @@ const archived = (requestNumber: string) => ({
 const field = (label: string) => screen.getByLabelText(label);
 const search = () => userEvent.click(screen.getByRole("button", { name: "Buscar expediente" }));
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  signOut.mockClear();
+});
 
 describe("DossiersView", () => {
   it("avisa que cada consulta queda en la auditoría de accesos", () => {
@@ -95,5 +100,38 @@ describe("DossiersView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Número de cliente" }));
     expect(screen.queryByRole("region", { name: /Expediente de/ })).not.toBeInTheDocument();
     expect(field("Número de cliente")).toHaveValue("");
+  });
+
+  it("mientras una búsqueda está pendiente no deja lanzar otra", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => {})));
+    render(<DossiersView />);
+    await userEvent.type(field("Número de solicitud"), "SOL-2026-00001");
+    await search();
+    expect(screen.getByRole("button", { name: "Buscando…" })).toBeDisabled();
+    expect(field("Número de solicitud")).toBeDisabled();
+  });
+
+  it("si se cambia de pestaña con una búsqueda pendiente, su respuesta no aparece en la otra pestaña", async () => {
+    let answer: (r: Response) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise<Response>((resolve) => (answer = resolve))));
+    render(<DossiersView />);
+    await userEvent.type(field("Número de solicitud"), "SOL-2026-00001");
+    await search();
+
+    await userEvent.click(screen.getByRole("button", { name: "Número de cliente" }));
+    expect(field("Número de cliente")).toBeEnabled();
+
+    await act(async () => answer(json(archived("SOL-2026-00001"))));
+    expect(screen.queryByRole("region", { name: /Expediente de/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Buscar expediente" })).toBeEnabled();
+  });
+
+  it("con la sesión vencida (401) cierra la sesión", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({ title: "Unauthorized" }, 401)));
+    render(<DossiersView />);
+    await userEvent.type(field("Número de solicitud"), "SOL-2026-00001");
+    await search();
+    await screen.findByRole("alert");
+    expect(signOut).toHaveBeenCalledTimes(1);
   });
 });

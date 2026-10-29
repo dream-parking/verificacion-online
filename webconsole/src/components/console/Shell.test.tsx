@@ -103,6 +103,24 @@ describe("Shell", () => {
     expect(screen.getByRole("link", { name: "Usuarios", hidden: true })).toBeInTheDocument();
   });
 
+  it("Expedientes lo ven todos los roles y Tolerancia del perfil solo el administrador", () => {
+    for (const role of ["KYC_LEAD", "FRAUD_ANALYST"] as const) {
+      currentUser = makeUser({ role });
+      const { unmount } = render(<Shell>x</Shell>);
+      expect(screen.getByRole("link", { name: "Expedientes", hidden: true })).toHaveAttribute("href", "/dossiers");
+      expect(screen.queryByRole("link", { name: "Tolerancia del perfil", hidden: true })).not.toBeInTheDocument();
+      unmount();
+    }
+
+    currentUser = makeUser({ role: "ADMIN" });
+    render(<Shell>x</Shell>);
+    expect(screen.getByRole("link", { name: "Expedientes", hidden: true })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tolerancia del perfil", hidden: true })).toHaveAttribute(
+      "href",
+      "/profile-tolerance",
+    );
+  });
+
   it("cuenta las alertas sin asignar en el menú", () => {
     alertsData = [alert("1", "UNASSIGNED"), alert("2", "UNASSIGNED"), alert("3", "CLOSED")];
     render(<Shell>x</Shell>);

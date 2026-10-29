@@ -746,6 +746,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/console/requests/{requestId}/outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Desenlaces de una solicitud
+         * @description Cada desenlace con quién, cuándo, el motivo y los datos que puso o sacó de las listas.
+         */
+        get: operations["requestOutcomeHistory"];
+        put?: never;
+        /**
+         * Registra el desenlace de una solicitud
+         * @description `FRAUDE_CONFIRMADO` pone el DUI, el teléfono y el dispositivo de la solicitud en la lista de fraude confirmado (lo que ya esté en la lista no se repite). `FALSO_POSITIVO` solo lo registra. Registrar otro desenlace corrige el anterior: no lo edita, agrega una fila, y un falso positivo saca de las listas lo que los desenlaces anteriores de la solicitud habían puesto. Solo analistas de fraude y administradores.
+         */
+        post: operations["requestOutcomeRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/console/score-model": {
         parameters: {
             query?: never;
@@ -2405,9 +2429,38 @@ export interface components {
              */
             transactionTypeCode?: string;
         };
+        RegisterOutcomeRequest: {
+            /**
+             * @description FRAUDE_CONFIRMADO (el DUI, el teléfono y el dispositivo pasan a la lista de fraude confirmado) o FALSO_POSITIVO (solo se registra)
+             * @example FRAUDE_CONFIRMADO
+             * @enum {string}
+             */
+            outcome: "FRAUDE_CONFIRMADO" | "FALSO_POSITIVO";
+            /**
+             * @description Por qué se cierra así
+             * @example El titular del DUI negó haber abierto la cuenta
+             */
+            reason: string;
+        };
         RegisteredMovementResponse: {
             movement: components["schemas"]["MovementResponse"];
             newDeviations: components["schemas"]["ProfileDeviation"][];
+        };
+        RequestOutcomeResponse: {
+            /** Format: int64 */
+            id: number;
+            /** @description Datos que este desenlace puso en la lista de fraude confirmado. Vacío si no puso ninguno (falso positivo, o ya estaban en la lista) */
+            listed: ("DOCUMENT" | "PHONE" | "DEVICE")[];
+            /** @enum {string} */
+            outcome: "FRAUDE_CONFIRMADO" | "FALSO_POSITIVO";
+            reason: string;
+            /** Format: date-time */
+            registeredAt: string;
+            registeredBy: string;
+            /** Format: uuid */
+            requestId: string;
+            /** @description Datos que este desenlace sacó de las listas al corregir el anterior */
+            revoked: ("DOCUMENT" | "PHONE" | "DEVICE")[];
         };
         RequestRisk: {
             assessments: components["schemas"]["RiskAssessmentResponse"][];
@@ -4860,6 +4913,108 @@ export interface operations {
                 };
             };
             /** @description La solicitud no tiene esa foto */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    requestOutcomeHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Desenlaces, del más antiguo al más reciente; el último es el vigente */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RequestOutcomeResponse"][];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    requestOutcomeRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description Desenlace registrado */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RequestOutcomeResponse"];
+                };
+            };
+            /** @description Falta el desenlace o el motivo, o no tienen el formato */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo analistas de fraude y administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no existe */
             404: {
                 headers: {
                     [name: string]: unknown;

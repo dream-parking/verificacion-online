@@ -248,6 +248,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/console/admin/risk-lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listas internas de riesgo
+         * @description Cada lista tiene un tipo y el peso que sus coincidencias llevan al score.
+         */
+        get: operations["riskListAdminLists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/console/admin/risk-lists/entries/{entryId}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bitácora de una entrada
+         * @description Alta y baja, cada una con quién, cuándo y el motivo.
+         */
+        get: operations["riskListAdminHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/console/admin/risk-lists/entries/{entryId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Da de baja una entrada
+         * @description No la borra: la marca inactiva, así que deja de coincidir y queda en el historial con quién, cuándo y el motivo.
+         */
+        post: operations["riskListAdminDeactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/console/admin/risk-lists/{code}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Entradas de una lista, activas e inactivas
+         * @description No trae el dato ni su huella: solo el tipo de dato, el motivo, quién y cuándo lo agregó y, si ya salió, quién y cuándo.
+         */
+        get: operations["riskListAdminEntries"];
+        put?: never;
+        /**
+         * Da de alta un dato en una lista
+         * @description El dato (DUI, teléfono celular o huella del dispositivo) se guarda solo como huella con sal; el nombre no interviene. La alta queda en la bitácora con quién, cuándo y el motivo.
+         */
+        post: operations["riskListAdminAdd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/console/admin/score-model/versions": {
         parameters: {
             query?: never;
@@ -1750,6 +1834,24 @@ export interface components {
              */
             sortOrder?: number;
         };
+        CreateRiskListEntryRequest: {
+            /**
+             * @description DOCUMENT (DUI), PHONE o DEVICE
+             * @example DOCUMENT
+             * @enum {string}
+             */
+            dataType: "DOCUMENT" | "PHONE" | "DEVICE";
+            /**
+             * @description Motivo de la alta
+             * @example Fraude confirmado en el caso 2026-114
+             */
+            reason: string;
+            /**
+             * @description El dato: DUI (04567891-2), teléfono celular (7845-2310) o huella del dispositivo. Se guarda solo su huella
+             * @example 04567891-2
+             */
+            value: string;
+        };
         CreateUserRequest: {
             /**
              * Format: email
@@ -1782,6 +1884,13 @@ export interface components {
             customerId: string;
             customerNumber: string;
             requests: components["schemas"]["RequestRisk"][];
+        };
+        DeactivateRiskListEntryRequest: {
+            /**
+             * @description Motivo de la baja
+             * @example Se descartó el fraude tras la investigación
+             */
+            reason: string;
         };
         DeclaredProfile: {
             monthlyAmountRangeCode: string;
@@ -2357,6 +2466,42 @@ export interface components {
             score: number;
             /** Format: int32 */
             threshold: number;
+        };
+        RiskListEntryChangeResponse: {
+            /** @enum {string} */
+            action: "ADDED" | "DEACTIVATED";
+            /** Format: date-time */
+            changedAt: string;
+            changedBy: string;
+            reason: string;
+        };
+        RiskListEntryResponse: {
+            /** @description Una entrada inactiva ya no coincide, pero queda en el historial */
+            active: boolean;
+            /** Format: date-time */
+            addedAt: string;
+            addedBy: string;
+            /** @enum {string} */
+            dataType: "DOCUMENT" | "PHONE" | "DEVICE";
+            /** Format: date-time */
+            deactivatedAt: string;
+            deactivatedBy: string;
+            deactivationReason: string;
+            /** Format: int64 */
+            id: number;
+            list: components["schemas"]["RiskListResponse"];
+            reason: string;
+        };
+        RiskListResponse: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            type: "CONFIRMED_FRAUD" | "UNDER_INVESTIGATION" | "WATCH";
+            /**
+             * Format: int32
+             * @description Peso de sus coincidencias para el score, de 1 a 100
+             */
+            weight: number;
         };
         ScoreModelResponse: {
             high: components["schemas"]["Range"];
@@ -3322,6 +3467,275 @@ export interface operations {
             };
             /** @description Solo administradores */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    riskListAdminLists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Listas, de mayor a menor peso */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListResponse"][];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    riskListAdminHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entryId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cambios, del más antiguo al más reciente */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListEntryChangeResponse"][];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La entrada no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    riskListAdminDeactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entryId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeactivateRiskListEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description Entrada dada de baja */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListEntryResponse"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La entrada no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La entrada ya está inactiva */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    riskListAdminEntries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entradas, de la más reciente a la más antigua */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListEntryResponse"][];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La lista no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    riskListAdminAdd: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRiskListEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description Entrada agregada */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListEntryResponse"];
+                };
+            };
+            /** @description El dato no tiene el formato de su tipo */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La lista no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description El dato ya está activo en esa lista */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

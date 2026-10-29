@@ -44,6 +44,8 @@ jobs:
           ci=$(has '^\.github/workflows/ci\.yml$')   # si cambia este workflow, se prueba todo
           for c in backend webconsole onboarding; do
             r=$(has "^$c/")
+            # Los tipos de la consola se generan de docs/openapi.json: un cambio solo del contrato también la prueba.
+            [ "$c" = webconsole ] && [ "$(has '^docs/openapi\.json$')" = true ] && r=true
             [ "$ci" = true ] && r=true
             echo "$c=$r" >> "$GITHUB_OUTPUT"
           done
@@ -93,6 +95,16 @@ jobs:
           cache: npm
           cache-dependency-path: webconsole/package-lock.json
       - run: npm ci
+
+      # Los tipos de la consola salen de docs/openapi.json (VDI-127): si el contrato cambió y no se regeneraron, falla.
+      - name: Tipos al día con el contrato
+        run: |
+          npm run gen:api
+          git diff --exit-code -- src/lib/console/openapi.d.ts || {
+            echo "::error::openapi.d.ts no coincide con docs/openapi.json: corre 'npm run gen:api' en webconsole y sube el archivo"
+            exit 1
+          }
+
       - run: npm run lint
       - run: npm run test:coverage # genera coverage/lcov.info para Sonar
       - run: npm run build

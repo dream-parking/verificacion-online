@@ -79,7 +79,7 @@ class ScoreEngineTests {
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).observation()).startsWith("Aún no disponible");
 		// The RNPN is read when the request is submitted: before that there is no check and the model gives it no weight
 		assertThat(contribution(result, ScoreSignal.RNPN).points()).isNull();
-		assertThat(contribution(result, ScoreSignal.RNPN).observation()).isEqualTo("The RNPN has not been checked yet");
+		assertThat(contribution(result, ScoreSignal.RNPN).observation()).isEqualTo("Aún no se ha cotejado con el RNPN");
 		assertThat(result.contributions()).hasSize(ScoreSignal.values().length);
 	}
 
@@ -90,7 +90,7 @@ class ScoreEngineTests {
 
 		assertThat(rnpn.points()).isZero();
 		assertThat(rnpn.maxPoints()).isEqualTo(15);
-		assertThat(rnpn.observation()).isEqualTo("RNPN check (simulated): the data matches");
+		assertThat(rnpn.observation()).isEqualTo("Cotejo RNPN (simulado): los datos coinciden");
 	}
 
 	@Test
@@ -99,7 +99,7 @@ class ScoreEngineTests {
 				ScoreSignal.RNPN);
 
 		assertThat(rnpn.points()).isEqualTo(8);
-		assertThat(rnpn.observation()).isEqualTo("RNPN check (simulated): the RNPN did not answer after 3 tries");
+		assertThat(rnpn.observation()).isEqualTo("Cotejo RNPN (simulado): el RNPN no respondió después de 3 intentos");
 	}
 
 	@Test
@@ -108,8 +108,25 @@ class ScoreEngineTests {
 
 		assertThat(contribution(result, ScoreSignal.RNPN).points()).isEqualTo(15);
 		assertThat(contribution(result, ScoreSignal.RNPN).observation())
-			.isEqualTo("RNPN check (simulated): the data does not match (last names, birth date)");
+			.isEqualTo("Cotejo RNPN (simulado): los datos no coinciden (apellidos, fecha de nacimiento)");
 		assertThat(result.score()).isEqualTo(15);
+	}
+
+	@Test
+	void anRnpnThatDoesNotAnswerAfterOneTryUsesTheSingular() {
+		Contribution rnpn = contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(rnpn(RnpnOutcome.UNAVAILABLE, 1))),
+				ScoreSignal.RNPN);
+
+		assertThat(rnpn.observation()).isEqualTo("Cotejo RNPN (simulado): el RNPN no respondió después de 1 intento");
+	}
+
+	@Test
+	void everyDataOfTheDuiThatDoesNotMatchIsNamedInSpanish() {
+		List<RnpnField> all = List.of(RnpnField.DUI, RnpnField.FIRST_NAMES, RnpnField.LAST_NAMES, RnpnField.BIRTH_DATE);
+		RnpnCheck check = new RnpnCheck(null, RnpnOutcome.NO_MATCH, "simulated", 1, all, null);
+
+		assertThat(contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(check)), ScoreSignal.RNPN).observation())
+			.isEqualTo("Cotejo RNPN (simulado): los datos no coinciden (número de DUI, nombres, apellidos, fecha de nacimiento)");
 	}
 
 	@Test
@@ -126,7 +143,7 @@ class ScoreEngineTests {
 		RnpnCheck real = new RnpnCheck(null, RnpnOutcome.MATCH, "rnpn-sv", 1, List.of(), null);
 
 		assertThat(contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(real)), ScoreSignal.RNPN).observation())
-			.isEqualTo("RNPN check: the data matches");
+			.isEqualTo("Cotejo RNPN: los datos coinciden");
 	}
 
 	@ParameterizedTest

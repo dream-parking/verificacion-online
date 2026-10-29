@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * VDI-117: the audit log of risk decisions is append-only. Not even SQL can change or delete a decision, and the
  * database refuses a decision that does not follow the rule (held if and only if the score goes above the threshold).
+ * VDI-143: an escalation is a decision too; it always has its channel and analyst, and the automatic ones have neither.
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
@@ -89,6 +90,57 @@ class ImmutableRiskDecisionLogTests {
 				values (?::uuid, ?, 'ENHANCED_REVIEW', 'held', 69, 69, 1)""", requestId, assessmentId()))
 			.isInstanceOf(DataIntegrityViolationException.class)
 			.hasMessageContaining("ck_risk_decision_rule");
+	}
+
+	@Test
+	void anEscalationIsLoggedWithItsChannelAndAnalystWhateverTheScore() {
+		jdbc.update(ESCALATION, requestId, assessmentId(), "ESCALATED", "BRANCH", analystId());
+
+		assertThat(jdbc.queryForObject("""
+				select count(*) from risk_decision_log
+				where request_id = ?::uuid and decision = 'ESCALATED' and channel = 'BRANCH'""", Integer.class, requestId))
+			.isEqualTo(1);
+	}
+
+	@Test
+	void anEscalationNeedsItsChannel() {
+		assertThatThrownBy(() -> jdbc.update(ESCALATION, requestId, assessmentId(), "ESCALATED", null, analystId()))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("ck_risk_decision_escalation");
+	}
+
+	@Test
+	void anEscalationNeedsTheAnalystWhoDecidedIt() {
+		assertThatThrownBy(() -> jdbc.update(ESCALATION, requestId, assessmentId(), "ESCALATED", "VIDEO_CALL", null))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("ck_risk_decision_escalation");
+	}
+
+	@Test
+	void anAutomaticDecisionHasNoChannel() {
+		assertThatThrownBy(
+				() -> jdbc.update(ESCALATION, requestId, assessmentId(), "AUTOMATIC_FLOW", "VIDEO_CALL", null))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("ck_risk_decision_escalation");
+	}
+
+	@Test
+	void onlyAnEscalatedRequestHasAChannel() {
+		assertThatThrownBy(() -> jdbc.update(
+				"update onboarding_request set escalation_channel = 'BRANCH' where id = ?::uuid", requestId))
+			.isInstanceOf(DataIntegrityViolationException.class)
+			.hasMessageContaining("ck_request_escalation_channel");
+	}
+
+	/** A decision with a score within the threshold of 69, and the given decision, channel and analyst. */
+	private static final String ESCALATION = """
+			insert into risk_decision_log
+			  (request_id, assessment_id, decision, reason, score, threshold, model_version, channel, decided_by_user)
+			values (?::uuid, ?, ?, 'Escalada', 60, 69, 1, ?, ?::uuid)""";
+
+	/** A console user of the demo data. */
+	private String analystId() {
+		return jdbc.queryForObject("select id::text from console_user limit 1", String.class);
 	}
 
 	private long assessmentId() {

@@ -136,6 +136,18 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   /// How the request was left when it was submitted: it decides the last screen.
   var _submitted = SubmissionStatus.completed;
 
+  // Contract and signature step (VDI-132): only for a request that was approved.
+  Contract? _contract;
+  var _loadingContract = false;
+  var _contractFailed = false;
+  var _contractAccepted = false;
+  var _signing = false;
+  String? _signError;
+
+  /// When the signature was recorded; `null` if the request had already signed before this answer.
+  DateTime? _signedAt;
+  var _alreadySigned = false;
+
   // DUI step (VDI-77).
   /// Photos taken so far; the API gets both together.
   final _duiPhotos = <DuiSide, Uint8List>{};
@@ -381,6 +393,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   void _continue() {
     _signals.steps.attempt(_signalStep);
+    if (_screen == Screen.signature) {
+      _sign();
+      return;
+    }
     if (_screen == Screen.review) {
       _submit();
       return;
@@ -646,7 +662,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
-  bool get _busy => _submitting || _starting || _saving || _uploadingDui || _uploadingSelfie || _locating;
+  bool get _busy => _submitting || _starting || _saving || _uploadingDui || _uploadingSelfie || _locating || _signing;
 
   /// VDI-40: reads the device and sends its fingerprint. It only runs after the notice is accepted.
   /// If it fails it does not interrupt the customer: signals feed the score, they do not block the flow.
@@ -760,7 +776,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _submitting = false;
       });
       unawaited(_forgetSavedRequest());
-      _goTo(Screen.confirmation);
+      // VDI-132: only an approved request signs; one held or waiting goes straight to its notice.
+      if (submission.status == SubmissionStatus.completed) {
+        _goTo(Screen.signature);
+        unawaited(_loadContract());
+      } else {
+        _goTo(Screen.confirmation);
+      }
     } on ApiException catch (e) {
       debugPrint('Could not submit the request: $e');
       if (!mounted) return;
@@ -769,6 +791,93 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _submitFailed = true;
       });
     }
+  }
+
+  /// VDI-132: the contract text in force, shown before signing.
+  Future<void> _loadContract() async {
+    setState(() {
+      _loadingContract = true;
+      _contractFailed = false;
+    });
+    try {
+      final contract = await _api.contract();
+      if (!mounted) return;
+      setState(() {
+        _contract = contract;
+        _loadingContract = false;
+      });
+    } on ApiException catch (e) {
+      debugPrint('Could not load the contract: $e');
+      if (!mounted) return;
+      setState(() {
+        _loadingContract = false;
+        _contractFailed = true;
+      });
+    }
+  }
+
+  /// VDI-132: signs the version that was shown. A 409 is checked against the contract in force: a new version is
+  /// shown again, otherwise the request had already signed.
+  Future<void> _sign() async {
+    final contract = _contract;
+    if (contract == null) return;
+    if (!_contractAccepted) {
+      setState(() => _attempted.add(Screen.signature));
+      return;
+    }
+    setState(() {
+      _signing = true;
+      _signError = null;
+    });
+    try {
+      final signature = await _api.signContract(_form.id!, contract.version);
+      if (!mounted) return;
+      setState(() {
+        _signing = false;
+        _signedAt = signature.signedAt;
+      });
+      _goTo(Screen.confirmation);
+    } on ApiException catch (e) {
+      debugPrint('Could not sign the contract: $e');
+      if (!mounted) return;
+      if (e.status == 409) {
+        await _afterSignConflict(contract);
+        return;
+      }
+      setState(() {
+        _signing = false;
+        _signError = ApiErrorMessages.forSign(e);
+      });
+    }
+  }
+
+  Future<void> _afterSignConflict(Contract shown) async {
+    try {
+      final current = await _api.contract();
+      if (!mounted) return;
+      if (current.version != shown.version) {
+        setState(() {
+          _signing = false;
+          _contract = current;
+          _contractAccepted = false;
+          _signError = ApiErrorMessages.contractChanged;
+        });
+        if (_scroll.hasClients) _scroll.jumpTo(0);
+        return;
+      }
+    } on ApiException {
+      if (!mounted) return;
+      setState(() {
+        _signing = false;
+        _signError = ApiErrorMessages.connection;
+      });
+      return;
+    }
+    setState(() {
+      _signing = false;
+      _alreadySigned = true;
+    });
+    _goTo(Screen.confirmation);
   }
 
   void _restart() {
@@ -799,6 +908,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _saveError = null;
       _copied = false;
       _submitted = SubmissionStatus.completed;
+      _contract = null;
+      _loadingContract = false;
+      _contractFailed = false;
+      _contractAccepted = false;
+      _signing = false;
+      _signError = null;
+      _signedAt = null;
+      _alreadySigned = false;
     });
     _goTo(Screen.welcome);
   }
@@ -865,6 +982,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 const LoadingOverlay(title: 'Revisando tu DUI…', detail: 'Estamos leyendo tus fotos. Puede tardar unos segundos.'),
               if (_uploadingSelfie)
                 const LoadingOverlay(title: 'Revisando tu selfie…', detail: 'Puede tardar unos segundos.'),
+              if (_signing)
+                const LoadingOverlay(title: 'Firmando tu contrato…', detail: 'No cierres la aplicación.'),
               if (_starting)
                 const LoadingOverlay(title: 'Preparando tu solicitud…', detail: 'Esto puede tardar unos segundos.'),
               if (_locating)
@@ -910,6 +1029,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final text = switch (_screen) {
       Screen.welcome => 'Empezar',
       Screen.review => 'Enviar solicitud',
+      Screen.signature => 'Firmar contrato',
       Screen.privacy => PrivacyNotice.acceptButton,
       Screen.identityConfirmation => 'Mis datos son correctos',
       Screen.selfie => 'Continuar con mis ingresos',
@@ -971,7 +1091,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_screen == Screen.basicData) ...const [_SavedNote(), SizedBox(height: 10)],
-                PrimaryButton(text: text, ready: _form.isScreenValid(_screen), onPressed: _busy ? null : _continue),
+                PrimaryButton(
+                  text: text,
+                  ready: _screen == Screen.signature ? _contract != null && _contractAccepted : _form.isScreenValid(_screen),
+                  onPressed: _busy || (_screen == Screen.signature && _contract == null) ? null : _continue,
+                ),
                 if (_screen == Screen.privacy) ...const [
                   SizedBox(height: 10),
                   Text(PrivacyNotice.recordedNote, style: AppText.small, textAlign: TextAlign.center),
@@ -992,6 +1116,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         Screen.income => _income(),
         Screen.expectedActivity => _expectedActivity(),
         Screen.review => _review(),
+        Screen.signature => _signature(),
         Screen.confirmation => _confirmation(),
       };
 
@@ -1617,6 +1742,66 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
+  // ---------------------------------------------------------------- 6b. Contract and signature (VDI-132)
+
+  Widget _signature() {
+    final contract = _contract;
+    final unaccepted = _attempted.contains(Screen.signature) && !_contractAccepted;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ScreenTitle('Firma tu contrato'),
+          const SizedBox(height: 6),
+          const Text(
+            'Tu solicitud fue aprobada. Lee el contrato y fírmalo para terminar.',
+            style: AppText.bodyMuted,
+          ),
+          const SizedBox(height: 20),
+          if (_signError != null) ...[
+            _ConnectionError(
+              title: 'No pudimos firmar tu contrato',
+              message: _signError!,
+              onRetry: contract == null ? _loadContract : _sign,
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (_loadingContract)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
+          else if (_contractFailed)
+            _ConnectionError(
+              title: 'No pudimos cargar el contrato',
+              message: ApiErrorMessages.connection,
+              onRetry: _loadContract,
+            )
+          else if (contract != null) ...[
+            Text('Versión ${contract.version}', style: AppText.label),
+            const SizedBox(height: 8),
+            Container(
+              key: const Key('contract-text'),
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.neutral100,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(contract.text, style: AppText.body),
+            ),
+            const SizedBox(height: 12),
+            _AcceptanceCheckbox(
+              text: 'He leído el contrato y acepto firmarlo.',
+              value: _contractAccepted,
+              onChanged: _busy ? null : (v) => setState(() => _contractAccepted = v),
+            ),
+            if (unaccepted) const ErrorText('Para firmar necesitamos que aceptes el contrato.'),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------- 7. Confirmation
 
   Widget _confirmation() => switch (_submitted) {
@@ -1661,6 +1846,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           ),
       };
 
+  /// «28/10/2026 a las 14:30», in the phone's time zone.
+  static String _signedOn(DateTime at) {
+    final local = at.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${formatDateOf(local)} a las ${two(local.hour)}:${two(local.minute)}';
+  }
+
   /// The request was received as usual.
   Widget _received() {
     return Padding(
@@ -1678,6 +1870,23 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           const ScreenTitle('¡Recibimos tu solicitud!', size: 32),
           const SizedBox(height: 8),
           const Text('Te avisaremos cuando tu cuenta esté lista.', style: AppText.body),
+          if (_signedAt != null || _alreadySigned) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.verified_outlined, size: 24, color: AppColors.brandGreen),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _signedAt == null ? 'Tu contrato ya estaba firmado.' : 'Contrato firmado el ${_signedOn(_signedAt!)}.',
+                    key: const Key('contract-signed'),
+                    style: AppText.body,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 20),
           Container(
             width: double.infinity,

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -79,6 +80,24 @@ class ProductRequestApiTests {
 		perform(get("/api/console/requests/{id}", requestId))
 			.andExpect(jsonPath("$.timeline[?(@.type == 'PRODUCT_REQUESTED')].description")
 				.value(hasItem("Producto elegido: Cuenta de ahorro plus")));
+	}
+
+	@Test
+	void theConsoleDetailShowsTheChosenProductAndNothingBefore() throws Exception {
+		String requestId = approved();
+		perform(get("/api/console/requests/{id}", requestId)).andExpect(status().isOk())
+			.andExpect(jsonPath("$.productRequest").value(nullValue()));
+
+		String requestedAt = JsonPath.read(choose(requestId, "AHORRO_PLUS").andExpect(status().isCreated())
+			.andReturn()
+			.getResponse()
+			.getContentAsString(), "$.requestedAt");
+
+		perform(get("/api/console/requests/{id}", requestId)).andExpect(status().isOk())
+			.andExpect(jsonPath("$.productRequest.product.code").value("AHORRO_PLUS"))
+			.andExpect(jsonPath("$.productRequest.product.name").value("Cuenta de ahorro plus"))
+			.andExpect(jsonPath("$.productRequest.product.minimumOpeningDepositUsd").value(100.00))
+			.andExpect(jsonPath("$.productRequest.requestedAt").value(requestedAt));
 	}
 
 	@Test

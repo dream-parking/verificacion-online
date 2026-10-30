@@ -1586,6 +1586,8 @@ export interface components {
             identityDocument: components["schemas"]["ConsoleRequestIdentityDocument"];
             income: components["schemas"]["ConsoleRequestIncome"];
             number: string;
+            /** @description Producto que eligió la solicitud aprobada; null mientras no elija ninguno */
+            productRequest: components["schemas"]["ConsoleRequestProductRequest"];
             risk: components["schemas"]["RiskAssessmentResponse"];
             riskDecisions: components["schemas"]["RiskDecisionResponse"][];
             /** @enum {string} */
@@ -1741,6 +1743,15 @@ export interface components {
             riskLevel: "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
             /** @enum {string} */
             status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
+        };
+        ConsoleRequestProductRequest: {
+            /** @description El producto elegido, con sus condiciones */
+            product: components["schemas"]["ProductResponse"];
+            /**
+             * Format: date-time
+             * @description Cuándo se registró la elección
+             */
+            requestedAt: string;
         };
         ConsoleRequestProfileVersion: {
             additionalTransactionTypeCodes: string[];

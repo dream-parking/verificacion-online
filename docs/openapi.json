@@ -685,6 +685,10 @@
           "number" : {
             "type" : "string"
           },
+          "productRequest" : {
+            "$ref" : "#/components/schemas/ConsoleRequestProductRequest",
+            "description" : "Producto que eligió la solicitud aprobada; null mientras no elija ninguno"
+          },
           "risk" : {
             "$ref" : "#/components/schemas/RiskAssessmentResponse"
           },
@@ -1059,6 +1063,20 @@
           },
           "status" : {
             "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestProductRequest" : {
+        "properties" : {
+          "product" : {
+            "$ref" : "#/components/schemas/ProductResponse",
+            "description" : "El producto elegido, con sus condiciones"
+          },
+          "requestedAt" : {
+            "description" : "Cuándo se registró la elección",
+            "format" : "date-time",
             "type" : "string"
           }
         },

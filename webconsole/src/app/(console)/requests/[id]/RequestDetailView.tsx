@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
 import { RiskDecisionLog } from "@/components/console/RiskDecisionLog";
 import { BindingDossierCard } from "@/components/console/BindingDossierCard";
+import { CaseOutcomeCard } from "@/components/console/CaseOutcomeCard";
 import { ProductRequestCard } from "@/components/console/ProductRequestCard";
 import { RnpnCheckCard } from "@/components/console/RnpnCheckCard";
 import { CustomerNumber } from "@/components/console/CustomerNumber";
@@ -366,6 +367,14 @@ export function RequestDetailView({ id }: { id: string }) {
         help="Bitácora de lo que decidió la regla de riesgo al enviar la solicitud. Es de solo lectura: ninguna decisión se edita ni se borra."
       >
         <RiskDecisionLog decisions={r.riskDecisions} />
+      </Card>
+
+      <Card
+        id="h-desenlace"
+        title="Desenlace del caso"
+        help="Si el caso terminó en fraude confirmado o en falso positivo. Un fraude confirmado pone el DUI, el teléfono y el dispositivo en las listas internas de riesgo. Corregirlo agrega un registro nuevo y revoca lo que puso el anterior; ninguno se borra."
+      >
+        <CaseOutcomeCard requestId={r.id} />
       </Card>
 
       <Card

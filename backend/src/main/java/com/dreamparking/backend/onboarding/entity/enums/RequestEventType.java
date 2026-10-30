@@ -17,10 +17,14 @@ public enum RequestEventType {
 	SCORE_ASSIGNED,
 	ENHANCED_REVIEW_REQUIRED,
 	RNPN_CHECKED,
+	/** An analyst escalated the request to a video call or to a branch (VDI-143). */
+	REQUEST_ESCALATED,
 	/** The customer signed the account contract (VDI-130). */
 	CONTRACT_SIGNED,
 	/** The signature service rejected the signature; the customer can try again (VDI-130). */
 	CONTRACT_SIGNATURE_REJECTED,
+	/** The customer chose a product of the catalog for the approved request (VDI-148). */
+	PRODUCT_REQUESTED,
 	REQUEST_ABANDONED
 
 }

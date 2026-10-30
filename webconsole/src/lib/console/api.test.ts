@@ -4,7 +4,11 @@ import { ApiError, apiFetch, fetchAllRequests, fetchDocumentPhoto, login, type P
 const json = (body: unknown, init: ResponseInit = {}) =>
   new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" }, ...init });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.resetModules();
+});
 
 // Espera que la promesa falle y devuelve el error ya tipado.
 const failure = (promise: Promise<unknown>) =>
@@ -162,5 +166,28 @@ describe("fetchDocumentPhoto", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("network")));
     const error = await failure(fetchDocumentPhoto("r1", "FRONT", "tok"));
     expect(error).toMatchObject({ status: 0, title: "Sin conexión" });
+  });
+});
+
+describe("API_URL", () => {
+  // The constant is read when the module loads, so each case loads it again with its own environment.
+  const load = async () => (await import("./api")).API_URL;
+
+  it("sale de NEXT_PUBLIC_API_URL cuando está definida", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.dev.identidad.alambritos.online");
+    vi.resetModules();
+    expect(await load()).toBe("https://api.dev.identidad.alambritos.online");
+  });
+
+  it("en desarrollo local, sin la variable, usa localhost:8080", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    vi.resetModules();
+    expect(await load()).toBe("http://localhost:8080");
+  });
+
+  it("no trae ninguna URL de Dev ni de QA escrita en el código", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    vi.resetModules();
+    expect(await load()).not.toMatch(/alambritos/);
   });
 });

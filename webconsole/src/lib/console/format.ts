@@ -4,6 +4,7 @@ import type {
   Criticality,
   AlertStatus,
   DeviceLocationStatus,
+  EscalationChannel,
   ProfileVersion,
   RequestStatus,
   RiskLevel,
@@ -26,6 +27,7 @@ export const REQUEST_STATUS: Record<RequestStatus, Badge> = {
   COMPLETED: { cls: "s-ok", label: "✓ Completada" },
   ENHANCED_REVIEW: { cls: "s-enhanced", label: "⚑ Revisión reforzada" },
   AWAITING_RNPN: { cls: "s-waiting", label: "◷ En espera" },
+  ESCALATED: { cls: "s-enhanced", label: "⇪ Escalada" },
   ABANDONED: { cls: "s-abandoned", label: "✕ Abandonada" },
 };
 
@@ -35,9 +37,18 @@ export const REQUEST_STATUS_OPTIONS = Object.entries(REQUEST_STATUS).map(([value
   label: label.replace(/^\S+\s/, ""),
 }));
 
-/** The person already sent the request: approved automatically, held for enhanced review or waiting for the RNPN. */
+/** Where an analyst escalated a request (VDI-143). */
+export const ESCALATION_CHANNEL: Record<EscalationChannel, string> = {
+  VIDEO_CALL: "Videollamada",
+  BRANCH: "Agencia",
+};
+
+/**
+ * The person already sent the request: approved automatically, held for enhanced review, escalated or waiting for the
+ * RNPN.
+ */
 export const isSubmitted = (status: RequestStatus) =>
-  status === "COMPLETED" || status === "ENHANCED_REVIEW" || status === "AWAITING_RNPN";
+  status === "COMPLETED" || status === "ENHANCED_REVIEW" || status === "AWAITING_RNPN" || status === "ESCALATED";
 
 export const CRITICALITY: Record<Criticality, Badge> = {
   CRITICAL: { cls: "c-critical", label: "◆ Crítica" },

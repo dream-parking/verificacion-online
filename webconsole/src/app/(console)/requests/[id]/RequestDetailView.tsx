@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { LoadError, KeyValue, type Pair } from "@/components/console/Ui";
 import { RiskDecisionLog } from "@/components/console/RiskDecisionLog";
 import { BindingDossierCard } from "@/components/console/BindingDossierCard";
+import { CaseOutcomeCard } from "@/components/console/CaseOutcomeCard";
+import { ProductRequestCard } from "@/components/console/ProductRequestCard";
 import { RnpnCheckCard } from "@/components/console/RnpnCheckCard";
 import { CustomerNumber } from "@/components/console/CustomerNumber";
 import { LocationMap } from "./LocationMap";
@@ -368,11 +370,27 @@ export function RequestDetailView({ id }: { id: string }) {
       </Card>
 
       <Card
+        id="h-desenlace"
+        title="Desenlace del caso"
+        help="Si el caso terminó en fraude confirmado o en falso positivo. Un fraude confirmado pone el DUI, el teléfono y el dispositivo en las listas internas de riesgo. Corregirlo agrega un registro nuevo y revoca lo que puso el anterior; ninguno se borra."
+      >
+        <CaseOutcomeCard requestId={r.id} />
+      </Card>
+
+      <Card
         id="h-expediente"
         title="Firma y expediente"
         help="El contrato que firmó la persona y la copia inmutable de la evidencia que sustentó la aprobación. Es de solo lectura."
       >
         <BindingDossierCard dossier={r.bindingDossier} />
+      </Card>
+
+      <Card
+        id="h-producto"
+        title="Producto solicitado"
+        help="El producto que la persona eligió en la app una vez aprobada su solicitud, con sus condiciones. Es de solo lectura."
+      >
+        <ProductRequestCard request={r.productRequest} />
       </Card>
 
       <Card

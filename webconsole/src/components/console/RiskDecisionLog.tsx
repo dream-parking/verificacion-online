@@ -1,20 +1,27 @@
 "use client";
 
 import type { RiskDecision } from "@/lib/console/api";
-import { formatDateTime } from "@/lib/console/format";
+import { ESCALATION_CHANNEL, formatDateTime } from "@/lib/console/format";
 
 const DECISION: Record<RiskDecision["decision"], { cls: string; label: string }> = {
   ENHANCED_REVIEW: { cls: "s-enhanced", label: "⚑ Revisión reforzada" },
   AUTOMATIC_FLOW: { cls: "s-ok", label: "✓ Flujo automático" },
+  ESCALATED: { cls: "s-enhanced", label: "⇪ Escalada" },
 };
 
-/** Why the rule decided what it did, in Spanish: the API `reason` comes in English. */
+/**
+ * Why it was decided, in Spanish. The reason of an escalation (VDI-143) already comes in Spanish with the analyst's
+ * words; the one of the automatic rule comes in English, so it is written again from the score and the threshold.
+ */
 function reason(d: RiskDecision) {
+  if (d.decision === "ESCALATED") return d.reason ?? `Escalada a ${channel(d).toLowerCase()}.`;
   const held = d.decision === "ENHANCED_REVIEW";
   return `El score ${d.score} ${held ? "supera" : "no supera"} el umbral de revisión reforzada de ${d.threshold}: ${
     held ? "la solicitud no se aprueba en automático y espera revisión" : "la solicitud sigue el flujo automático"
   }.`;
 }
+
+const channel = (d: RiskDecision) => (d.channel ? (ESCALATION_CHANNEL[d.channel] ?? d.channel) : "");
 
 const who = (decidedBy: string | null) => (!decidedBy || decidedBy === "SYSTEM" ? "Sistema (regla automática)" : decidedBy);
 
@@ -39,7 +46,8 @@ export function RiskDecisionLog({ decisions }: { decisions: RiskDecision[] | nul
             </div>
             <p className="mt-2 mb-1 text-[15px] leading-[22px]">{reason(d)}</p>
             <p className="m-0 text-sm leading-5 text-muted">
-              Score {d.score} · umbral {d.threshold} · modelo de score v{d.modelVersion} · decidió: {who(d.decidedBy)}
+              {d.channel && `Canal: ${channel(d)} · `}Score {d.score} · umbral {d.threshold} · modelo de score v
+              {d.modelVersion} · decidió: {who(d.decidedBy)}
             </p>
           </li>
         );

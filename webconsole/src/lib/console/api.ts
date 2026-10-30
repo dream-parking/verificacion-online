@@ -17,7 +17,8 @@ export type RiskLevel = "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | 
  * ENHANCED_REVIEW: submitted, but the score went above the threshold (VDI-117). AWAITING_RNPN: submitted, but the RNPN
  * did not answer after the retries (VDI-111). Neither is approved automatically.
  */
-export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+export type RequestStatus = "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
+export type EscalationChannel = "VIDEO_CALL" | "BRANCH";
 export type Criticality = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type AlertStatus = "UNASSIGNED" | "ASSIGNED" | "IN_REVIEW" | "CLOSED";
 export type Step = "PRIVACY_NOTICE" | "BASIC_DATA" | "IDENTITY_DOCUMENT" | "INCOME" | "EXPECTED_ACTIVITY" | "REVIEW";
@@ -140,14 +141,16 @@ export type IdentityDocument = {
  */
 export type RiskDecision = {
   id: number;
-  decision: "AUTOMATIC_FLOW" | "ENHANCED_REVIEW";
+  decision: "AUTOMATIC_FLOW" | "ENHANCED_REVIEW" | "ESCALATED";
   reason: string | null;
   score: number;
   threshold: number;
   modelVersion: number;
-  /** SYSTEM for the automatic rule. */
+  /** SYSTEM for the automatic rule; the analyst's name in an escalation. */
   decidedBy: string | null;
   decidedAt: string;
+  /** Where the request was escalated (VDI-143); null in the automatic decisions. */
+  channel: EscalationChannel | null;
 };
 
 export type RnpnOutcome = "MATCH" | "NO_MATCH" | "UNAVAILABLE";
@@ -171,7 +174,7 @@ export type RnpnCheck = {
  * it does not have yet. Every field below the top level is therefore optional and nullable, and the fields the API
  * always sends are re-required in `RequestDetail`.
  */
-type Loose<T> = T extends readonly (infer U)[] ? Loose<U>[] : T extends object ? { [K in keyof T]: Loose<T[K]> | null } : T;
+export type Loose<T> = T extends readonly (infer U)[] ? Loose<U>[] : T extends object ? { [K in keyof T]: Loose<T[K]> | null } : T;
 
 type RequestDetailSchema = components["schemas"]["ConsoleRequestDetail"];
 type AlwaysSent = "id" | "status" | "riskLevel" | "completedSteps" | "startedAt";

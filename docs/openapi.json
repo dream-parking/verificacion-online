@@ -685,6 +685,10 @@
           "number" : {
             "type" : "string"
           },
+          "productRequest" : {
+            "$ref" : "#/components/schemas/ConsoleRequestProductRequest",
+            "description" : "Producto que eligió la solicitud aprobada; null mientras no elija ninguno"
+          },
           "risk" : {
             "$ref" : "#/components/schemas/RiskAssessmentResponse"
           },
@@ -709,7 +713,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "steps" : {
@@ -1000,7 +1004,7 @@
             "type" : "integer"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "transactionTypeLabel" : {
@@ -1058,7 +1062,21 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ConsoleRequestProductRequest" : {
+        "properties" : {
+          "product" : {
+            "$ref" : "#/components/schemas/ProductResponse",
+            "description" : "El producto elegido, con sus condiciones"
+          },
+          "requestedAt" : {
+            "description" : "Cuándo se registró la elección",
+            "format" : "date-time",
             "type" : "string"
           }
         },
@@ -1253,7 +1271,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "CONTRACT_SIGNED", "CONTRACT_SIGNATURE_REJECTED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "REQUEST_ESCALATED", "CONTRACT_SIGNED", "CONTRACT_SIGNATURE_REJECTED", "PRODUCT_REQUESTED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1406,6 +1424,34 @@
         "required" : [ "code", "label" ],
         "type" : "object"
       },
+      "CreateRiskListEntryRequest" : {
+        "properties" : {
+          "dataType" : {
+            "description" : "DOCUMENT (DUI), PHONE o DEVICE",
+            "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+            "example" : "DOCUMENT",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Motivo de la alta",
+            "example" : "Fraude confirmado en el caso 2026-114",
+            "maxLength" : 250,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          },
+          "value" : {
+            "description" : "El dato: DUI (04567891-2), teléfono celular (7845-2310) o huella del dispositivo. Se guarda solo su huella",
+            "example" : "04567891-2",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "dataType", "reason", "value" ],
+        "type" : "object"
+      },
       "CreateUserRequest" : {
         "properties" : {
           "email" : {
@@ -1489,6 +1535,20 @@
             "type" : "array"
           }
         },
+        "type" : "object"
+      },
+      "DeactivateRiskListEntryRequest" : {
+        "properties" : {
+          "reason" : {
+            "description" : "Motivo de la baja",
+            "example" : "Se descartó el fraude tras la investigación",
+            "maxLength" : 250,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "reason" ],
         "type" : "object"
       },
       "DeclaredProfile" : {
@@ -1687,6 +1747,26 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "EscalateRequest" : {
+        "properties" : {
+          "channel" : {
+            "description" : "VIDEO_CALL (videollamada) o BRANCH (agencia)",
+            "enum" : [ "VIDEO_CALL", "BRANCH" ],
+            "example" : "VIDEO_CALL",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Por qué se escala",
+            "example" : "El monto declarado no coincide con los ingresos",
+            "maxLength" : 250,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "channel", "reason" ],
         "type" : "object"
       },
       "ExpectedActivityRequest" : {
@@ -1926,6 +2006,11 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "escalationChannel" : {
+            "description" : "Canal al que se escaló la solicitud (VIDEO_CALL: videollamada, BRANCH: agencia); vacío si no está escalada",
+            "enum" : [ "VIDEO_CALL", "BRANCH" ],
+            "type" : "string"
+          },
           "id" : {
             "format" : "uuid",
             "type" : "string"
@@ -1942,7 +2027,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "submittedAt" : {
@@ -2060,6 +2145,66 @@
           },
           "type" : {
             "example" : "about:blank",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ProductRequestResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "product" : {
+            "$ref" : "#/components/schemas/ProductResponse",
+            "description" : "El producto elegido, con sus condiciones"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "requestNumber" : {
+            "description" : "Número de la solicitud",
+            "example" : "SOL-2026-00001",
+            "type" : "string"
+          },
+          "requestedAt" : {
+            "description" : "Cuándo se registró la elección",
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ProductResponse" : {
+        "properties" : {
+          "annualInterestRate" : {
+            "description" : "Interés anual en porcentaje",
+            "example" : 0.5,
+            "type" : "number"
+          },
+          "code" : {
+            "description" : "Código estable del producto",
+            "example" : "AHORRO_BASICA",
+            "type" : "string"
+          },
+          "description" : {
+            "description" : "Qué ofrece, para comparar productos",
+            "type" : "string"
+          },
+          "minimumOpeningDepositUsd" : {
+            "description" : "Depósito mínimo para abrir, en USD",
+            "example" : 10.0,
+            "type" : "number"
+          },
+          "monthlyFeeUsd" : {
+            "description" : "Cuota mensual en USD",
+            "example" : 0.0,
+            "type" : "number"
+          },
+          "name" : {
+            "example" : "Cuenta de ahorro básica",
             "type" : "string"
           }
         },
@@ -2348,6 +2493,45 @@
         "required" : [ "amountUsd", "direction", "externalId", "occurredAt" ],
         "type" : "object"
       },
+      "RegisterOutcomeRequest" : {
+        "properties" : {
+          "outcome" : {
+            "description" : "FRAUDE_CONFIRMADO (el DUI, el teléfono y el dispositivo pasan a la lista de fraude confirmado) o FALSO_POSITIVO (solo se registra)",
+            "enum" : [ "FRAUDE_CONFIRMADO", "FALSO_POSITIVO" ],
+            "example" : "FRAUDE_CONFIRMADO",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Por qué se cierra así",
+            "example" : "El titular del DUI negó haber abierto la cuenta",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "outcome", "reason" ],
+        "type" : "object"
+      },
+      "RegisterProductRequest" : {
+        "properties" : {
+          "productCode" : {
+            "description" : "Código del producto elegido, de GET /api/onboarding/products",
+            "example" : "AHORRO_BASICA",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9_]+",
+            "type" : "string"
+          },
+          "requestId" : {
+            "description" : "Id de la solicitud aprobada, el mismo que usa la app en el resto del flujo",
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "productCode", "requestId" ],
+        "type" : "object"
+      },
       "RegisteredMovementResponse" : {
         "properties" : {
           "movement" : {
@@ -2356,6 +2540,49 @@
           "newDeviations" : {
             "items" : {
               "$ref" : "#/components/schemas/ProfileDeviation"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "RequestOutcomeResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "listed" : {
+            "description" : "Datos que este desenlace puso en la lista de fraude confirmado. Vacío si no puso ninguno (falso positivo, o ya estaban en la lista)",
+            "items" : {
+              "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "outcome" : {
+            "enum" : [ "FRAUDE_CONFIRMADO", "FALSO_POSITIVO" ],
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "registeredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "registeredBy" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "revoked" : {
+            "description" : "Datos que este desenlace sacó de las listas al corregir el anterior",
+            "items" : {
+              "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+              "type" : "string"
             },
             "type" : "array"
           }
@@ -2388,7 +2615,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "submittedAt" : {
@@ -2591,16 +2818,21 @@
       },
       "RiskDecisionResponse" : {
         "properties" : {
+          "channel" : {
+            "description" : "Canal del escalamiento (VIDEO_CALL: videollamada, BRANCH: agencia); vacío en las decisiones automáticas",
+            "enum" : [ "VIDEO_CALL", "BRANCH" ],
+            "type" : "string"
+          },
           "decidedAt" : {
             "format" : "date-time",
             "type" : "string"
           },
           "decidedBy" : {
-            "description" : "Who decided: SYSTEM for the automatic rule",
+            "description" : "Quién decidió: SYSTEM para la regla automática; el nombre del analista en un escalamiento",
             "type" : "string"
           },
           "decision" : {
-            "enum" : [ "AUTOMATIC_FLOW", "ENHANCED_REVIEW" ],
+            "enum" : [ "AUTOMATIC_FLOW", "ENHANCED_REVIEW", "ESCALATED" ],
             "type" : "string"
           },
           "id" : {
@@ -2619,6 +2851,85 @@
             "type" : "integer"
           },
           "threshold" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RiskListEntryChangeResponse" : {
+        "properties" : {
+          "action" : {
+            "enum" : [ "ADDED", "DEACTIVATED" ],
+            "type" : "string"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RiskListEntryResponse" : {
+        "properties" : {
+          "active" : {
+            "description" : "Una entrada inactiva ya no coincide, pero queda en el historial",
+            "type" : "boolean"
+          },
+          "addedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "addedBy" : {
+            "type" : "string"
+          },
+          "dataType" : {
+            "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+            "type" : "string"
+          },
+          "deactivatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "deactivatedBy" : {
+            "type" : "string"
+          },
+          "deactivationReason" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "list" : {
+            "$ref" : "#/components/schemas/RiskListResponse"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RiskListResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "type" : {
+            "enum" : [ "CONFIRMED_FRAUD", "UNDER_INVESTIGATION", "WATCH" ],
+            "type" : "string"
+          },
+          "weight" : {
+            "description" : "Peso de sus coincidencias para el score, de 1 a 100",
             "format" : "int32",
             "type" : "integer"
           }
@@ -3965,6 +4276,358 @@
         "tags" : [ "Consola · Administración del perfil transaccional" ]
       }
     },
+    "/api/console/admin/risk-lists" : {
+      "get" : {
+        "description" : "Cada lista tiene un tipo y el peso que sus coincidencias llevan al score.",
+        "operationId" : "riskListAdminLists",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RiskListResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Listas, de mayor a menor peso"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Listas internas de riesgo",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
+      }
+    },
+    "/api/console/admin/risk-lists/entries/{entryId}/changes" : {
+      "get" : {
+        "description" : "Alta y baja, cada una con quién, cuándo y el motivo.",
+        "operationId" : "riskListAdminHistory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "entryId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RiskListEntryChangeResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Cambios, del más antiguo al más reciente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La entrada no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Bitácora de una entrada",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
+      }
+    },
+    "/api/console/admin/risk-lists/entries/{entryId}/deactivate" : {
+      "post" : {
+        "description" : "No la borra: la marca inactiva, así que deja de coincidir y queda en el historial con quién, cuándo y el motivo.",
+        "operationId" : "riskListAdminDeactivate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "entryId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DeactivateRiskListEntryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RiskListEntryResponse"
+                }
+              }
+            },
+            "description" : "Entrada dada de baja"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La entrada no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La entrada ya está inactiva"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Da de baja una entrada",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
+      }
+    },
+    "/api/console/admin/risk-lists/{code}/entries" : {
+      "get" : {
+        "description" : "No trae el dato ni su huella: solo el tipo de dato, el motivo, quién y cuándo lo agregó y, si ya salió, quién y cuándo.",
+        "operationId" : "riskListAdminEntries",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RiskListEntryResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Entradas, de la más reciente a la más antigua"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La lista no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Entradas de una lista, activas e inactivas",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
+      },
+      "post" : {
+        "description" : "El dato (DUI, teléfono celular o huella del dispositivo) se guarda solo como huella con sal; el nombre no interviene. La alta queda en la bitácora con quién, cuándo y el motivo.",
+        "operationId" : "riskListAdminAdd",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateRiskListEntryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RiskListEntryResponse"
+                }
+              }
+            },
+            "description" : "Entrada agregada"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El dato no tiene el formato de su tipo"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La lista no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El dato ya está activo en esa lista"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Da de alta un dato en una lista",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
+      }
+    },
     "/api/console/admin/score-model/versions" : {
       "get" : {
         "description" : "Cada versión trae sus umbrales, quién la publicó (`publishedBy`, vacío si la publicó una migración) y cuándo (`validFrom`). La vigente es la que no tiene `validTo` (`inForce: true`).",
@@ -5199,7 +5862,7 @@
           "name" : "status",
           "required" : false,
           "schema" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           }
         }, {
@@ -5356,6 +6019,88 @@
         "tags" : [ "Consola · Solicitudes" ]
       }
     },
+    "/api/console/requests/{requestId}/escalation" : {
+      "post" : {
+        "description" : "La solicitud pasa a `ESCALATED` con el canal elegido y conserva todo lo capturado. El escalamiento queda en la bitácora de decisiones (`ESCALATED`) con el canal, el motivo, quién lo decidió y la fecha y hora; la bitácora no se puede editar. La app ve el estado y el canal, nunca el score ni los criterios. Cualquier usuario de la consola.",
+        "operationId" : "escalationEscalate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EscalateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RiskDecisionResponse"
+                }
+              }
+            },
+            "description" : "Solicitud escalada; devuelve la decisión registrada en la bitácora"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el canal o el motivo, o no tienen el formato"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no está en revisión reforzada"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Escala una solicitud en revisión reforzada",
+        "tags" : [ "Consola · Escalamiento" ]
+      }
+    },
     "/api/console/requests/{requestId}/identity-document/{side}" : {
       "get" : {
         "description" : "Descifra la foto guardada en el expediente. Cada consulta queda en la auditoría de accesos del usuario y la respuesta no se guarda en caché.",
@@ -5411,6 +6156,141 @@
         } ],
         "summary" : "Foto del DUI de una solicitud (frente o reverso)",
         "tags" : [ "Consola · Solicitudes" ]
+      }
+    },
+    "/api/console/requests/{requestId}/outcome" : {
+      "get" : {
+        "description" : "Cada desenlace con quién, cuándo, el motivo y los datos que puso o sacó de las listas.",
+        "operationId" : "requestOutcomeHistory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RequestOutcomeResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Desenlaces, del más antiguo al más reciente; el último es el vigente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Desenlaces de una solicitud",
+        "tags" : [ "Consola · Desenlace de casos" ]
+      },
+      "post" : {
+        "description" : "`FRAUDE_CONFIRMADO` pone el DUI, el teléfono y el dispositivo de la solicitud en la lista de fraude confirmado (lo que ya esté en la lista no se repite). `FALSO_POSITIVO` solo lo registra. Registrar otro desenlace corrige el anterior: no lo edita, agrega una fila, y un falso positivo saca de las listas lo que los desenlaces anteriores de la solicitud habían puesto. Solo analistas de fraude y administradores.",
+        "operationId" : "requestOutcomeRegister",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterOutcomeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RequestOutcomeResponse"
+                }
+              }
+            },
+            "description" : "Desenlace registrado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el desenlace o el motivo, o no tienen el formato"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo analistas de fraude y administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Registra el desenlace de una solicitud",
+        "tags" : [ "Consola · Desenlace de casos" ]
       }
     },
     "/api/console/score-model" : {
@@ -5885,6 +6765,129 @@
           }
         },
         "summary" : "Contrato de apertura vigente",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/product-request" : {
+      "post" : {
+        "description" : "Solo se envía el código del producto: todo lo demás (la persona, el DUI, el perfil declarado) se toma de la solicitud ya registrada, sin pedir ningún dato otra vez. Una solicitud elige una sola vez, y solo un producto al que califica (los de `GET /api/onboarding/products`). La elección queda en la línea de tiempo de la solicitud.",
+        "operationId" : "productRequestRegister",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterProductRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProductRequestResponse"
+                }
+              }
+            },
+            "description" : "Producto registrado; la respuesta lo confirma con sus condiciones"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta `requestId` o `productCode`, o no tienen el formato"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud o el producto no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no está aprobada, no califica para el producto o ya eligió uno"
+          }
+        },
+        "summary" : "Registra el producto elegido por una solicitud aprobada",
+        "tags" : [ "Onboarding" ]
+      }
+    },
+    "/api/onboarding/products" : {
+      "get" : {
+        "description" : "Devuelve solo los productos a los que califica la solicitud, con sus condiciones principales; los que no califica no aparecen. Solo una solicitud enviada y aprobada (`COMPLETED`) puede consultarlos. Regla de elegibilidad provisional: una solicitud aprobada califica a todos los productos activos.",
+        "operationId" : "productProducts",
+        "parameters" : [ {
+          "description" : "Id de la solicitud, el mismo que usa la app en el resto del flujo",
+          "in" : "query",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ProductResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Los productos a los que califica la solicitud, con sus condiciones"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta `requestId` o no es un UUID"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no está aprobada (en progreso, en revisión reforzada, en espera del RNPN o abandonada)"
+          }
+        },
+        "summary" : "Productos a los que califica la solicitud",
         "tags" : [ "Onboarding" ]
       }
     },
@@ -6798,6 +7801,9 @@
     "url" : "http://localhost:8080"
   } ],
   "tags" : [ {
+    "description" : "El analista envía una solicitud en revisión reforzada a videollamada o a agencia",
+    "name" : "Consola · Escalamiento"
+  }, {
     "description" : "Movimientos reales de la cuenta comparados con el perfil declarado",
     "name" : "Consola · Perfil transaccional"
   }, {
@@ -6830,6 +7836,12 @@
   }, {
     "description" : "Score de riesgo asignado a una solicitud",
     "name" : "Riesgo"
+  }, {
+    "description" : "Listas de datos de casos de fraude ya conocidos (administradores). Los valores se guardan solo como huella y no se devuelven",
+    "name" : "Consola · Administración de listas internas de riesgo"
+  }, {
+    "description" : "Cómo terminó un caso: fraude confirmado (alimenta las listas internas de riesgo) o falso positivo (solo se registra)",
+    "name" : "Consola · Desenlace de casos"
   }, {
     "description" : "Pasos de la solicitud de apertura de cuenta (app móvil)",
     "name" : "Onboarding"

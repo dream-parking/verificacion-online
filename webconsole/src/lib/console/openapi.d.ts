@@ -248,6 +248,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/console/admin/risk-lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listas internas de riesgo
+         * @description Cada lista tiene un tipo y el peso que sus coincidencias llevan al score.
+         */
+        get: operations["riskListAdminLists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/console/admin/risk-lists/entries/{entryId}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bitácora de una entrada
+         * @description Alta y baja, cada una con quién, cuándo y el motivo.
+         */
+        get: operations["riskListAdminHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/console/admin/risk-lists/entries/{entryId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Da de baja una entrada
+         * @description No la borra: la marca inactiva, así que deja de coincidir y queda en el historial con quién, cuándo y el motivo.
+         */
+        post: operations["riskListAdminDeactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/console/admin/risk-lists/{code}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Entradas de una lista, activas e inactivas
+         * @description No trae el dato ni su huella: solo el tipo de dato, el motivo, quién y cuándo lo agregó y, si ya salió, quién y cuándo.
+         */
+        get: operations["riskListAdminEntries"];
+        put?: never;
+        /**
+         * Da de alta un dato en una lista
+         * @description El dato (DUI, teléfono celular o huella del dispositivo) se guarda solo como huella con sal; el nombre no interviene. La alta queda en la bitácora con quién, cuándo y el motivo.
+         */
+        post: operations["riskListAdminAdd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/console/admin/score-model/versions": {
         parameters: {
             query?: never;
@@ -642,6 +726,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/console/requests/{requestId}/escalation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Escala una solicitud en revisión reforzada
+         * @description La solicitud pasa a `ESCALATED` con el canal elegido y conserva todo lo capturado. El escalamiento queda en la bitácora de decisiones (`ESCALATED`) con el canal, el motivo, quién lo decidió y la fecha y hora; la bitácora no se puede editar. La app ve el estado y el canal, nunca el score ni los criterios. Cualquier usuario de la consola.
+         */
+        post: operations["escalationEscalate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/console/requests/{requestId}/identity-document/{side}": {
         parameters: {
             query?: never;
@@ -656,6 +760,30 @@ export interface paths {
         get: operations["consoleIdentityDocumentPhoto"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/console/requests/{requestId}/outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Desenlaces de una solicitud
+         * @description Cada desenlace con quién, cuándo, el motivo y los datos que puso o sacó de las listas.
+         */
+        get: operations["requestOutcomeHistory"];
+        put?: never;
+        /**
+         * Registra el desenlace de una solicitud
+         * @description `FRAUDE_CONFIRMADO` pone el DUI, el teléfono y el dispositivo de la solicitud en la lista de fraude confirmado (lo que ya esté en la lista no se repite). `FALSO_POSITIVO` solo lo registra. Registrar otro desenlace corrige el anterior: no lo edita, agrega una fila, y un falso positivo saca de las listas lo que los desenlaces anteriores de la solicitud habían puesto. Solo analistas de fraude y administradores.
+         */
+        post: operations["requestOutcomeRegister"];
         delete?: never;
         options?: never;
         head?: never;
@@ -796,6 +924,46 @@ export interface paths {
          * @description Versión, texto y huella SHA-256 del contrato que la app muestra antes de firmar. Al firmar, la app manda esa misma `version`.
          */
         get: operations["contractSignatureContract"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/onboarding/product-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Registra el producto elegido por una solicitud aprobada
+         * @description Solo se envía el código del producto: todo lo demás (la persona, el DUI, el perfil declarado) se toma de la solicitud ya registrada, sin pedir ningún dato otra vez. Una solicitud elige una sola vez, y solo un producto al que califica (los de `GET /api/onboarding/products`). La elección queda en la línea de tiempo de la solicitud.
+         */
+        post: operations["productRequestRegister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/onboarding/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Productos a los que califica la solicitud
+         * @description Devuelve solo los productos a los que califica la solicitud, con sus condiciones principales; los que no califica no aparecen. Solo una solicitud enviada y aprobada (`COMPLETED`) puede consultarlos. Regla de elegibilidad provisional: una solicitud aprobada califica a todos los productos activos.
+         */
+        get: operations["productProducts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1418,6 +1586,8 @@ export interface components {
             identityDocument: components["schemas"]["ConsoleRequestIdentityDocument"];
             income: components["schemas"]["ConsoleRequestIncome"];
             number: string;
+            /** @description Producto que eligió la solicitud aprobada; null mientras no elija ninguno */
+            productRequest: components["schemas"]["ConsoleRequestProductRequest"];
             risk: components["schemas"]["RiskAssessmentResponse"];
             riskDecisions: components["schemas"]["RiskDecisionResponse"][];
             /** @enum {string} */
@@ -1427,7 +1597,7 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
             steps: components["schemas"]["ConsoleRequestStepTime"][];
             /** Format: date-time */
             submittedAt: string;
@@ -1539,7 +1709,7 @@ export interface components {
             /** Format: int32 */
             score: number;
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
             transactionTypeLabel: string;
         };
         ConsoleRequestLocation: {
@@ -1572,7 +1742,16 @@ export interface components {
             /** @enum {string} */
             riskLevel: "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
+        };
+        ConsoleRequestProductRequest: {
+            /** @description El producto elegido, con sus condiciones */
+            product: components["schemas"]["ProductResponse"];
+            /**
+             * Format: date-time
+             * @description Cuándo se registró la elección
+             */
+            requestedAt: string;
         };
         ConsoleRequestProfileVersion: {
             additionalTransactionTypeCodes: string[];
@@ -1665,7 +1844,7 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
             /** @enum {string} */
-            type: "REQUEST_STARTED" | "PRIVACY_ACCEPTED" | "BASIC_DATA_COMPLETED" | "IDENTITY_DOCUMENT_CAPTURED" | "IDENTITY_DOCUMENT_CONFIRMED" | "IDENTITY_DOCUMENT_REJECTED" | "LIVENESS_CHECKED" | "INCOME_REGISTERED" | "EXPECTED_ACTIVITY_REGISTERED" | "REQUEST_SUBMITTED" | "SUBMISSION_FAILED" | "SCORE_ASSIGNED" | "ENHANCED_REVIEW_REQUIRED" | "RNPN_CHECKED" | "CONTRACT_SIGNED" | "CONTRACT_SIGNATURE_REJECTED" | "REQUEST_ABANDONED";
+            type: "REQUEST_STARTED" | "PRIVACY_ACCEPTED" | "BASIC_DATA_COMPLETED" | "IDENTITY_DOCUMENT_CAPTURED" | "IDENTITY_DOCUMENT_CONFIRMED" | "IDENTITY_DOCUMENT_REJECTED" | "LIVENESS_CHECKED" | "INCOME_REGISTERED" | "EXPECTED_ACTIVITY_REGISTERED" | "REQUEST_SUBMITTED" | "SUBMISSION_FAILED" | "SCORE_ASSIGNED" | "ENHANCED_REVIEW_REQUIRED" | "RNPN_CHECKED" | "REQUEST_ESCALATED" | "CONTRACT_SIGNED" | "CONTRACT_SIGNATURE_REJECTED" | "PRODUCT_REQUESTED" | "REQUEST_ABANDONED";
         };
         ConsoleUserResponse: {
             active: boolean;
@@ -1750,6 +1929,24 @@ export interface components {
              */
             sortOrder?: number;
         };
+        CreateRiskListEntryRequest: {
+            /**
+             * @description DOCUMENT (DUI), PHONE o DEVICE
+             * @example DOCUMENT
+             * @enum {string}
+             */
+            dataType: "DOCUMENT" | "PHONE" | "DEVICE";
+            /**
+             * @description Motivo de la alta
+             * @example Fraude confirmado en el caso 2026-114
+             */
+            reason: string;
+            /**
+             * @description El dato: DUI (04567891-2), teléfono celular (7845-2310) o huella del dispositivo. Se guarda solo su huella
+             * @example 04567891-2
+             */
+            value: string;
+        };
         CreateUserRequest: {
             /**
              * Format: email
@@ -1782,6 +1979,13 @@ export interface components {
             customerId: string;
             customerNumber: string;
             requests: components["schemas"]["RequestRisk"][];
+        };
+        DeactivateRiskListEntryRequest: {
+            /**
+             * @description Motivo de la baja
+             * @example Se descartó el fraude tras la investigación
+             */
+            reason: string;
         };
         DeclaredProfile: {
             monthlyAmountRangeCode: string;
@@ -1858,6 +2062,19 @@ export interface components {
             contractVersion: string;
             /** Format: date-time */
             signedAt: string;
+        };
+        EscalateRequest: {
+            /**
+             * @description VIDEO_CALL (videollamada) o BRANCH (agencia)
+             * @example VIDEO_CALL
+             * @enum {string}
+             */
+            channel: "VIDEO_CALL" | "BRANCH";
+            /**
+             * @description Por qué se escala
+             * @example El monto declarado no coincide con los ingresos
+             */
+            reason: string;
         };
         ExpectedActivityRequest: {
             /** @description Otros tipos de dinero que también moverá, además del principal (opcional, hasta 3) */
@@ -2013,6 +2230,11 @@ export interface components {
         OnboardingRequestResponse: {
             /** Format: int32 */
             completedSteps: number;
+            /**
+             * @description Canal al que se escaló la solicitud (VIDEO_CALL: videollamada, BRANCH: agencia); vacío si no está escalada
+             * @enum {string}
+             */
+            escalationChannel: "VIDEO_CALL" | "BRANCH";
             /** Format: uuid */
             id: string;
             number: string;
@@ -2021,7 +2243,7 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
             /** Format: date-time */
             submittedAt: string;
         };
@@ -2078,6 +2300,50 @@ export interface components {
             title: string;
             /** @example about:blank */
             type: string;
+        };
+        ProductRequestResponse: {
+            /** Format: int64 */
+            id: number;
+            /** @description El producto elegido, con sus condiciones */
+            product: components["schemas"]["ProductResponse"];
+            /** Format: uuid */
+            requestId: string;
+            /**
+             * @description Número de la solicitud
+             * @example SOL-2026-00001
+             */
+            requestNumber: string;
+            /**
+             * Format: date-time
+             * @description Cuándo se registró la elección
+             */
+            requestedAt: string;
+        };
+        ProductResponse: {
+            /**
+             * @description Interés anual en porcentaje
+             * @example 0.5
+             */
+            annualInterestRate: number;
+            /**
+             * @description Código estable del producto
+             * @example AHORRO_BASICA
+             */
+            code: string;
+            /** @description Qué ofrece, para comparar productos */
+            description: string;
+            /**
+             * @description Depósito mínimo para abrir, en USD
+             * @example 10
+             */
+            minimumOpeningDepositUsd: number;
+            /**
+             * @description Cuota mensual en USD
+             * @example 0
+             */
+            monthlyFeeUsd: number;
+            /** @example Cuenta de ahorro básica */
+            name: string;
         };
         ProfileComparisonResponse: {
             /** Format: uuid */
@@ -2250,9 +2516,50 @@ export interface components {
              */
             transactionTypeCode?: string;
         };
+        RegisterOutcomeRequest: {
+            /**
+             * @description FRAUDE_CONFIRMADO (el DUI, el teléfono y el dispositivo pasan a la lista de fraude confirmado) o FALSO_POSITIVO (solo se registra)
+             * @example FRAUDE_CONFIRMADO
+             * @enum {string}
+             */
+            outcome: "FRAUDE_CONFIRMADO" | "FALSO_POSITIVO";
+            /**
+             * @description Por qué se cierra así
+             * @example El titular del DUI negó haber abierto la cuenta
+             */
+            reason: string;
+        };
+        RegisterProductRequest: {
+            /**
+             * @description Código del producto elegido, de GET /api/onboarding/products
+             * @example AHORRO_BASICA
+             */
+            productCode: string;
+            /**
+             * Format: uuid
+             * @description Id de la solicitud aprobada, el mismo que usa la app en el resto del flujo
+             */
+            requestId: string;
+        };
         RegisteredMovementResponse: {
             movement: components["schemas"]["MovementResponse"];
             newDeviations: components["schemas"]["ProfileDeviation"][];
+        };
+        RequestOutcomeResponse: {
+            /** Format: int64 */
+            id: number;
+            /** @description Datos que este desenlace puso en la lista de fraude confirmado. Vacío si no puso ninguno (falso positivo, o ya estaban en la lista) */
+            listed: ("DOCUMENT" | "PHONE" | "DEVICE")[];
+            /** @enum {string} */
+            outcome: "FRAUDE_CONFIRMADO" | "FALSO_POSITIVO";
+            reason: string;
+            /** Format: date-time */
+            registeredAt: string;
+            registeredBy: string;
+            /** Format: uuid */
+            requestId: string;
+            /** @description Datos que este desenlace sacó de las listas al corregir el anterior */
+            revoked: ("DOCUMENT" | "PHONE" | "DEVICE")[];
         };
         RequestRisk: {
             assessments: components["schemas"]["RiskAssessmentResponse"][];
@@ -2263,7 +2570,7 @@ export interface components {
             /** Format: date-time */
             startedAt: string;
             /** @enum {string} */
-            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+            status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
             /** Format: date-time */
             submittedAt: string;
         };
@@ -2342,12 +2649,17 @@ export interface components {
             signals: components["schemas"]["SignalContribution"][];
         };
         RiskDecisionResponse: {
+            /**
+             * @description Canal del escalamiento (VIDEO_CALL: videollamada, BRANCH: agencia); vacío en las decisiones automáticas
+             * @enum {string}
+             */
+            channel: "VIDEO_CALL" | "BRANCH";
             /** Format: date-time */
             decidedAt: string;
-            /** @description Who decided: SYSTEM for the automatic rule */
+            /** @description Quién decidió: SYSTEM para la regla automática; el nombre del analista en un escalamiento */
             decidedBy: string;
             /** @enum {string} */
-            decision: "AUTOMATIC_FLOW" | "ENHANCED_REVIEW";
+            decision: "AUTOMATIC_FLOW" | "ENHANCED_REVIEW" | "ESCALATED";
             /** Format: int64 */
             id: number;
             /** Format: int32 */
@@ -2357,6 +2669,42 @@ export interface components {
             score: number;
             /** Format: int32 */
             threshold: number;
+        };
+        RiskListEntryChangeResponse: {
+            /** @enum {string} */
+            action: "ADDED" | "DEACTIVATED";
+            /** Format: date-time */
+            changedAt: string;
+            changedBy: string;
+            reason: string;
+        };
+        RiskListEntryResponse: {
+            /** @description Una entrada inactiva ya no coincide, pero queda en el historial */
+            active: boolean;
+            /** Format: date-time */
+            addedAt: string;
+            addedBy: string;
+            /** @enum {string} */
+            dataType: "DOCUMENT" | "PHONE" | "DEVICE";
+            /** Format: date-time */
+            deactivatedAt: string;
+            deactivatedBy: string;
+            deactivationReason: string;
+            /** Format: int64 */
+            id: number;
+            list: components["schemas"]["RiskListResponse"];
+            reason: string;
+        };
+        RiskListResponse: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            type: "CONFIRMED_FRAUD" | "UNDER_INVESTIGATION" | "WATCH";
+            /**
+             * Format: int32
+             * @description Peso de sus coincidencias para el score, de 1 a 100
+             */
+            weight: number;
         };
         ScoreModelResponse: {
             high: components["schemas"]["Range"];
@@ -3331,6 +3679,275 @@ export interface operations {
             };
         };
     };
+    riskListAdminLists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Listas, de mayor a menor peso */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListResponse"][];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    riskListAdminHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entryId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cambios, del más antiguo al más reciente */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListEntryChangeResponse"][];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La entrada no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    riskListAdminDeactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entryId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeactivateRiskListEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description Entrada dada de baja */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListEntryResponse"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La entrada no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La entrada ya está inactiva */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    riskListAdminEntries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entradas, de la más reciente a la más antigua */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListEntryResponse"][];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La lista no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    riskListAdminAdd: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRiskListEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description Entrada agregada */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskListEntryResponse"];
+                };
+            };
+            /** @description El dato no tiene el formato de su tipo */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La lista no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description El dato ya está activo en esa lista */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     scoreModelAdminVersions: {
         parameters: {
             query?: never;
@@ -4267,7 +4884,7 @@ export interface operations {
     consoleRequestList: {
         parameters: {
             query?: {
-                status?: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ABANDONED";
+                status?: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
                 riskLevel?: "NOT_EVALUATED" | "LOW" | "PENDING_REVIEW" | "MEDIUM" | "HIGH";
                 q?: string;
                 page?: number;
@@ -4368,6 +4985,68 @@ export interface operations {
             };
         };
     };
+    escalationEscalate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EscalateRequest"];
+            };
+        };
+        responses: {
+            /** @description Solicitud escalada; devuelve la decisión registrada en la bitácora */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RiskDecisionResponse"];
+                };
+            };
+            /** @description Falta el canal o el motivo, o no tienen el formato */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no está en revisión reforzada */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     consoleIdentityDocumentPhoto: {
         parameters: {
             query?: never;
@@ -4400,6 +5079,108 @@ export interface operations {
                 };
             };
             /** @description La solicitud no tiene esa foto */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    requestOutcomeHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Desenlaces, del más antiguo al más reciente; el último es el vigente */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RequestOutcomeResponse"][];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    requestOutcomeRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterOutcomeRequest"];
+            };
+        };
+        responses: {
+            /** @description Desenlace registrado */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RequestOutcomeResponse"];
+                };
+            };
+            /** @description Falta el desenlace o el motivo, o no tienen el formato */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Falta el token o ya no es válido */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Solo analistas de fraude y administradores */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no existe */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4786,6 +5567,107 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ContractResponse"];
+                };
+            };
+        };
+    };
+    productRequestRegister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterProductRequest"];
+            };
+        };
+        responses: {
+            /** @description Producto registrado; la respuesta lo confirma con sus condiciones */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductRequestResponse"];
+                };
+            };
+            /** @description Falta `requestId` o `productCode`, o no tienen el formato */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud o el producto no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no está aprobada, no califica para el producto o ya eligió uno */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    productProducts: {
+        parameters: {
+            query: {
+                /** @description Id de la solicitud, el mismo que usa la app en el resto del flujo */
+                requestId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Los productos a los que califica la solicitud, con sus condiciones */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponse"][];
+                };
+            };
+            /** @description Falta `requestId` o no es un UUID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no existe */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description La solicitud no está aprobada (en progreso, en revisión reforzada, en espera del RNPN o abandonada) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
         };

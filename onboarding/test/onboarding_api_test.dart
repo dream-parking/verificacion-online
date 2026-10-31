@@ -481,4 +481,63 @@ void main() {
       );
     });
   });
+
+group('products (VDI-147)', () {
+  test('products asks with the request id and reads the conditions of each account', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async {
+        expect(req.method, 'GET');
+        expect(req.url.toString(), 'https://api.test/api/onboarding/products?requestId=r1');
+        return http.Response.bytes(
+          utf8.encode(
+            '[{"code":"AHORRO_BASICA","name":"Cuenta de ahorro básica","description":"Para ahorrar",'
+            '"annualInterestRate":0.5,"monthlyFeeUsd":0.0,"minimumOpeningDepositUsd":10},'
+            '{"code":"CORRIENTE","name":"Cuenta corriente"}]',
+          ),
+          200,
+        );
+      }),
+    );
+
+    final products = await api.products('r1');
+    expect(products.map((p) => p.code), ['AHORRO_BASICA', 'CORRIENTE']);
+    expect(products.first.name, 'Cuenta de ahorro básica');
+    expect(products.first.annualInterestRate, 0.5);
+    expect(products.first.monthlyFeeUsd, 0.0);
+    expect(products.first.minimumOpeningDepositUsd, 10.0);
+    expect(products.last.description, '');
+    expect(
+      [products.last.annualInterestRate, products.last.monthlyFeeUsd, products.last.minimumOpeningDepositUsd],
+      everyElement(isNull),
+      reason: 'a condition the API leaves out is not read as zero',
+    );
+  });
+
+  test('an empty list is no accounts', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async => http.Response('[]', 200)),
+    );
+    expect(await api.products('r1'), isEmpty);
+  });
+
+  test('a request that is not approved (409) throws with the status', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient(
+        (req) async => http.Response('{"status":409,"detail":"Request is not approved"}', 409),
+      ),
+    );
+    await expectLater(api.products('r1'), throwsA(isA<ApiException>().having((e) => e.status, 'status', 409)));
+  });
+
+  test('without connection it throws an ApiException without status', () async {
+    final api = OnboardingApi(
+      baseUrl: 'https://api.test',
+      client: MockClient((req) async => throw http.ClientException('no network')),
+    );
+    await expectLater(api.products('r1'), throwsA(isA<ApiException>().having((e) => e.status, 'status', isNull)));
+  });
+});
 }

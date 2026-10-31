@@ -80,6 +80,7 @@ Reglas:
 - **Errores:** `409` si la solicitud no califica para el producto (por ejemplo, uno inactivo) o si no está aprobada (en progreso, en revisión reforzada, escalada, en espera del RNPN o abandonada; esos mensajes son los de VDI-146, en inglés). `404` si la solicitud o el producto no existe. `400` si falta `requestId` o `productCode`, o el código no es de mayúsculas, números y `_` (hasta 30).
 - **Línea de tiempo:** queda el evento `PRODUCT_REQUESTED`, «Producto elegido: Cuenta de ahorro básica».
 - **Fuera de esta parte:** la apertura de la cuenta en el core sigue siendo `POST /api/console/accounts`.
+- **App (VDI-147):** después de firmar el contrato, el paso «Elige tu cuenta» llama a `GET /products?requestId=` y muestra las cuentas lado a lado con interés anual, cuota mensual y depósito para abrir; una condición que el API no manda se ve como «—», nunca como cero. No muestra nada del RNPN ni de por qué califica. Un `409` o `404` se explica en español sin el texto del servidor. Elegir una cuenta todavía no llama a `POST /product-request`: eso es VDI-149.
 
 ## Consola web — `/api/console` (requiere sesión)
 

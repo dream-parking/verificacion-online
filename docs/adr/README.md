@@ -9,3 +9,4 @@ no se edita: si cambia, se escribe un ADR nuevo que la reemplace.
 | [0002](0002-postgres-como-base-de-datos.md) | PostgreSQL como base de datos | Aceptada |
 | [0005](0005-vista-v-request-signals-copiada-en-migraciones.md) | Aceptar la vista v_request_signals copiada en cada migración | Aceptada |
 | [0006](0006-sin-url-de-respaldo-en-el-codigo.md) | Sin URL de respaldo en el código: el API se configura por variable y el build falla si falta | Aceptada |
+| [0007](0007-modelo-de-score-versionado-sin-ciudad-y-con-pesos-que-suman-100.md) | Modelo de score versionado: Ciudad fuera y pesos que suman 100 | Aceptada |

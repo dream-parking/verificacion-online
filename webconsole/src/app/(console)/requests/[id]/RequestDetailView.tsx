@@ -22,6 +22,7 @@ import {
   formatTime,
   isSubmitted,
   deviceLocationText,
+  eventText,
   locationFailureText,
   minSec,
   TIME_NOTE,
@@ -470,7 +471,7 @@ export function RequestDetailView({ id }: { id: string }) {
                 </time>
                 <span className="size-3 flex-none rounded-full bg-blue" aria-hidden="true" />
                 <span className="text-[15px] leading-[22px]">
-                  {e.description || e.type}
+                  {eventText(e.description, e.type)}
                   {e.actor && <span className="text-muted"> · {e.actor}</span>}
                 </span>
               </li>

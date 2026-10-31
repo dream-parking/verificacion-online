@@ -72,16 +72,6 @@ Reglas:
 - **Evidencia:** en `contract_signature`, una fila por solicitud que nadie puede cambiar ni borrar. Guarda la versión, la huella SHA-256 del texto, la fecha y hora, el proveedor, la IP de la conexión, el `User-Agent` y la huella del dispositivo que mandó la app en `/signals`. En la línea de tiempo queda `CONTRACT_SIGNED`. La app no recibe la IP ni el dispositivo.
 - **Simulado:** todavía no hay proveedor de firma (`APP_SIGNATURE_PROVIDER=simulated`). Rechaza el DUI `00000040-8` y firma cualquier otro. Detalle: [signature.md](signature.md).
 
-### Solicitud de producto (VDI-148, historia VDI-19)
-
-- **Productos:** `GET /api/onboarding/products?requestId=` devuelve los productos a los que califica la solicitud, con sus condiciones (VDI-146).
-- **Elegir:** `POST /api/onboarding/product-request` con `{ "requestId": "…", "productCode": "AHORRO_BASICA" }`. Solo se manda el código: la persona, el DUI y el perfil declarado se toman de la solicitud ya registrada, sin pedir nada otra vez. Responde `201` con `{ id, requestId, requestNumber, product, requestedAt }`, donde `product` trae las condiciones del producto elegido.
-- **Una sola vez:** una solicitud elige un producto una vez; otro intento, con el mismo producto o con otro, responde `409` («La solicitud ya eligió un producto…»). La base lo garantiza (un registro por solicitud) y no deja cambiarlo ni borrarlo.
-- **Errores:** `409` si la solicitud no califica para el producto (por ejemplo, uno inactivo) o si no está aprobada (en progreso, en revisión reforzada, escalada, en espera del RNPN o abandonada; esos mensajes son los de VDI-146, en inglés). `404` si la solicitud o el producto no existe. `400` si falta `requestId` o `productCode`, o el código no es de mayúsculas, números y `_` (hasta 30).
-- **Línea de tiempo:** queda el evento `PRODUCT_REQUESTED`, «Producto elegido: Cuenta de ahorro básica».
-- **Fuera de esta parte:** la apertura de la cuenta en el core sigue siendo `POST /api/console/accounts`.
-- **App (VDI-147):** después de firmar el contrato, el paso «Elige tu cuenta» llama a `GET /products?requestId=` y muestra las cuentas lado a lado con interés anual, cuota mensual y depósito para abrir; una condición que el API no manda se ve como «—», nunca como cero. No muestra nada del RNPN ni de por qué califica. Un `409` o `404` se explica en español sin el texto del servidor. Elegir una cuenta todavía no llama a `POST /product-request`: eso es VDI-149.
-
 ## Consola web — `/api/console` (requiere sesión)
 
 1. `POST /api/console/auth/login` con `{ email, password }` devuelve `accessToken` (vigencia `expiresIn` segundos, 8 h) y el usuario.

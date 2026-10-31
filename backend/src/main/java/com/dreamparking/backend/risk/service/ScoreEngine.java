@@ -75,7 +75,7 @@ public final class ScoreEngine {
 		contributions.add(liveness(model, inputs.liveness()));
 		contributions.add(rnpn(model, inputs.rnpn()));
 		for (ScoreSignal signal : PENDING) {
-			String note = signal == ScoreSignal.CITY ? "Aún no disponible: llega con la ubicación de la solicitud"
+			String note = signal == ScoreSignal.CITY ? "Aún no se evalúa en el score"
 					: "Aún no disponible: llega en otro sprint";
 			contributions.add(new Contribution(signal, null, model.weightOf(signal), note));
 		}
@@ -122,8 +122,10 @@ public final class ScoreEngine {
 			severity += 0.3;
 			findings.add("el DUI no coincide con el de los datos básicos");
 		}
+		// Weighs more than a different DUI number: without a face match (B-13) a different name is the only sign that the
+		// DUI may belong to someone else.
 		if (Boolean.FALSE.equals(document.getNamesMatchDeclared())) {
-			severity += 0.2;
+			severity += 0.6;
 			findings.add("los nombres no coinciden con los de los datos básicos");
 		}
 		if (document.getStatus() == OcrStatus.FAILED) {

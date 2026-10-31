@@ -21,7 +21,6 @@ import com.dreamparking.backend.onboarding.entity.enums.ProfileChangedBy;
 import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.onboarding.entity.enums.TypingPace;
-import com.dreamparking.backend.product.dto.ProductResponse;
 import com.dreamparking.backend.risk.dto.RiskAssessmentResponse;
 import com.dreamparking.backend.risk.dto.RiskDecisionResponse;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
@@ -35,21 +34,13 @@ import com.dreamparking.backend.rnpn.entity.enums.RnpnOutcome;
  * first; it is empty until then. {@code rnpn} is the last check of the DUI data against the RNPN (VDI-111), null until
  * the request is submitted. {@code customerNumber} is the customer number of the applicant (CLI-0000001, VDI-122), null
  * until the customer submits the first request. {@code bindingDossier} is the frozen copy of the evidence that backed
- * the approval (VDI-131), null until the customer signs. {@code productRequest} is the product the approved request
- * chose (VDI-148), null until it chooses one.
+ * the approval (VDI-131), null until the customer signs.
  */
 public record ConsoleRequestDetail(UUID id, String number, String customerNumber, RequestStatus status,
 		short completedSteps, RiskLevel riskLevel, Instant startedAt, Instant submittedAt, Applicant applicant,
 		Consent consent, IdentityDocument identityDocument, Income income, ExpectedActivity expectedActivity,
 		RiskAssessmentResponse risk, List<RiskDecisionResponse> riskDecisions, Rnpn rnpn, Signals signals,
-		List<StepTime> steps, List<TimelineEntry> timeline, BindingDossierResponse bindingDossier,
-		@Schema(description = "Producto que eligió la solicitud aprobada; null mientras no elija ninguno") ChosenProduct productRequest) {
-
-	/** The product the request chose (VDI-148), with its conditions, and when it chose it. */
-	@Schema(name = "ConsoleRequestProductRequest")
-	public record ChosenProduct(@Schema(description = "El producto elegido, con sus condiciones") ProductResponse product,
-			@Schema(description = "Cuándo se registró la elección") Instant requestedAt) {
-	}
+		List<StepTime> steps, List<TimelineEntry> timeline, BindingDossierResponse bindingDossier) {
 
 	/**
 	 * The last check against the RNPN. {@code simulated} is true while the RNPN is the stand-in service, which the console

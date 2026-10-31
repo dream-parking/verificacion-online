@@ -74,6 +74,7 @@ class ScoreEngineTests {
 		// Not available yet: the city (weight, but nothing to read it from) and the signals with no weight
 		assertThat(contribution(result, ScoreSignal.CITY).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.CITY).maxPoints()).isEqualTo(20);
+		assertThat(contribution(result, ScoreSignal.CITY).observation()).isEqualTo("Aún no se evalúa en el score");
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).maxPoints()).isNull();
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).observation()).startsWith("Aún no disponible");
@@ -219,8 +220,13 @@ class ScoreEngineTests {
 		IdentityDocument corrected = confirmed(OcrStatus.READ, reading(VALID_DUI, true, "0.95"), VALID_DUI, "Ana María",
 				"Pérez");
 		IdentityDocument typed = confirmed(OcrStatus.FAILED, null, VALID_DUI, "Ana", "Pérez");
+		IdentityDocument otherNames = confirmed(OcrStatus.READ, reading(VALID_DUI, true, "0.95"), VALID_DUI, "Ana",
+				"Pérez");
+		otherNames.compareWithDeclared(VALID_DUI, "Otra", "Persona");
 
 		assertThat(points(mismatch)).isEqualTo(6);
+		// Without a face match (B-13) a different name weighs more than a different DUI number
+		assertThat(points(otherNames)).isEqualTo(12);
 		assertThat(points(lowConfidence)).isEqualTo(2);
 		assertThat(points(corrected)).isEqualTo(1);
 		assertThat(points(typed)).isEqualTo(5);

@@ -685,10 +685,6 @@
           "number" : {
             "type" : "string"
           },
-          "productRequest" : {
-            "$ref" : "#/components/schemas/ConsoleRequestProductRequest",
-            "description" : "Producto que eligió la solicitud aprobada; null mientras no elija ninguno"
-          },
           "risk" : {
             "$ref" : "#/components/schemas/RiskAssessmentResponse"
           },
@@ -1068,20 +1064,6 @@
         },
         "type" : "object"
       },
-      "ConsoleRequestProductRequest" : {
-        "properties" : {
-          "product" : {
-            "$ref" : "#/components/schemas/ProductResponse",
-            "description" : "El producto elegido, con sus condiciones"
-          },
-          "requestedAt" : {
-            "description" : "Cuándo se registró la elección",
-            "format" : "date-time",
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
       "ConsoleRequestProfileVersion" : {
         "properties" : {
           "additionalTransactionTypeCodes" : {
@@ -1271,7 +1253,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "REQUEST_ESCALATED", "CONTRACT_SIGNED", "CONTRACT_SIGNATURE_REJECTED", "PRODUCT_REQUESTED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "REQUEST_ESCALATED", "CONTRACT_SIGNED", "CONTRACT_SIGNATURE_REJECTED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },
@@ -2150,33 +2132,6 @@
         },
         "type" : "object"
       },
-      "ProductRequestResponse" : {
-        "properties" : {
-          "id" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "product" : {
-            "$ref" : "#/components/schemas/ProductResponse",
-            "description" : "El producto elegido, con sus condiciones"
-          },
-          "requestId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "requestNumber" : {
-            "description" : "Número de la solicitud",
-            "example" : "SOL-2026-00001",
-            "type" : "string"
-          },
-          "requestedAt" : {
-            "description" : "Cuándo se registró la elección",
-            "format" : "date-time",
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
       "ProductResponse" : {
         "properties" : {
           "annualInterestRate" : {
@@ -2511,25 +2466,6 @@
           }
         },
         "required" : [ "outcome", "reason" ],
-        "type" : "object"
-      },
-      "RegisterProductRequest" : {
-        "properties" : {
-          "productCode" : {
-            "description" : "Código del producto elegido, de GET /api/onboarding/products",
-            "example" : "AHORRO_BASICA",
-            "maxLength" : 30,
-            "minLength" : 0,
-            "pattern" : "[A-Z0-9_]+",
-            "type" : "string"
-          },
-          "requestId" : {
-            "description" : "Id de la solicitud aprobada, el mismo que usa la app en el resto del flujo",
-            "format" : "uuid",
-            "type" : "string"
-          }
-        },
-        "required" : [ "productCode", "requestId" ],
         "type" : "object"
       },
       "RegisteredMovementResponse" : {
@@ -6765,66 +6701,6 @@
           }
         },
         "summary" : "Contrato de apertura vigente",
-        "tags" : [ "Onboarding" ]
-      }
-    },
-    "/api/onboarding/product-request" : {
-      "post" : {
-        "description" : "Solo se envía el código del producto: todo lo demás (la persona, el DUI, el perfil declarado) se toma de la solicitud ya registrada, sin pedir ningún dato otra vez. Una solicitud elige una sola vez, y solo un producto al que califica (los de `GET /api/onboarding/products`). La elección queda en la línea de tiempo de la solicitud.",
-        "operationId" : "productRequestRegister",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/RegisterProductRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "201" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProductRequestResponse"
-                }
-              }
-            },
-            "description" : "Producto registrado; la respuesta lo confirma con sus condiciones"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Falta `requestId` o `productCode`, o no tienen el formato"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "La solicitud o el producto no existe"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "La solicitud no está aprobada, no califica para el producto o ya eligió uno"
-          }
-        },
-        "summary" : "Registra el producto elegido por una solicitud aprobada",
         "tags" : [ "Onboarding" ]
       }
     },

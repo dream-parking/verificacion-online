@@ -932,26 +932,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/onboarding/product-request": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Registra el producto elegido por una solicitud aprobada
-         * @description Solo se envía el código del producto: todo lo demás (la persona, el DUI, el perfil declarado) se toma de la solicitud ya registrada, sin pedir ningún dato otra vez. Una solicitud elige una sola vez, y solo un producto al que califica (los de `GET /api/onboarding/products`). La elección queda en la línea de tiempo de la solicitud.
-         */
-        post: operations["productRequestRegister"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/onboarding/products": {
         parameters: {
             query?: never;
@@ -1586,8 +1566,6 @@ export interface components {
             identityDocument: components["schemas"]["ConsoleRequestIdentityDocument"];
             income: components["schemas"]["ConsoleRequestIncome"];
             number: string;
-            /** @description Producto que eligió la solicitud aprobada; null mientras no elija ninguno */
-            productRequest: components["schemas"]["ConsoleRequestProductRequest"];
             risk: components["schemas"]["RiskAssessmentResponse"];
             riskDecisions: components["schemas"]["RiskDecisionResponse"][];
             /** @enum {string} */
@@ -1744,15 +1722,6 @@ export interface components {
             /** @enum {string} */
             status: "IN_PROGRESS" | "COMPLETED" | "ENHANCED_REVIEW" | "AWAITING_RNPN" | "ESCALATED" | "ABANDONED";
         };
-        ConsoleRequestProductRequest: {
-            /** @description El producto elegido, con sus condiciones */
-            product: components["schemas"]["ProductResponse"];
-            /**
-             * Format: date-time
-             * @description Cuándo se registró la elección
-             */
-            requestedAt: string;
-        };
         ConsoleRequestProfileVersion: {
             additionalTransactionTypeCodes: string[];
             /**
@@ -1844,7 +1813,7 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
             /** @enum {string} */
-            type: "REQUEST_STARTED" | "PRIVACY_ACCEPTED" | "BASIC_DATA_COMPLETED" | "IDENTITY_DOCUMENT_CAPTURED" | "IDENTITY_DOCUMENT_CONFIRMED" | "IDENTITY_DOCUMENT_REJECTED" | "LIVENESS_CHECKED" | "INCOME_REGISTERED" | "EXPECTED_ACTIVITY_REGISTERED" | "REQUEST_SUBMITTED" | "SUBMISSION_FAILED" | "SCORE_ASSIGNED" | "ENHANCED_REVIEW_REQUIRED" | "RNPN_CHECKED" | "REQUEST_ESCALATED" | "CONTRACT_SIGNED" | "CONTRACT_SIGNATURE_REJECTED" | "PRODUCT_REQUESTED" | "REQUEST_ABANDONED";
+            type: "REQUEST_STARTED" | "PRIVACY_ACCEPTED" | "BASIC_DATA_COMPLETED" | "IDENTITY_DOCUMENT_CAPTURED" | "IDENTITY_DOCUMENT_CONFIRMED" | "IDENTITY_DOCUMENT_REJECTED" | "LIVENESS_CHECKED" | "INCOME_REGISTERED" | "EXPECTED_ACTIVITY_REGISTERED" | "REQUEST_SUBMITTED" | "SUBMISSION_FAILED" | "SCORE_ASSIGNED" | "ENHANCED_REVIEW_REQUIRED" | "RNPN_CHECKED" | "REQUEST_ESCALATED" | "CONTRACT_SIGNED" | "CONTRACT_SIGNATURE_REJECTED" | "REQUEST_ABANDONED";
         };
         ConsoleUserResponse: {
             active: boolean;
@@ -2301,24 +2270,6 @@ export interface components {
             /** @example about:blank */
             type: string;
         };
-        ProductRequestResponse: {
-            /** Format: int64 */
-            id: number;
-            /** @description El producto elegido, con sus condiciones */
-            product: components["schemas"]["ProductResponse"];
-            /** Format: uuid */
-            requestId: string;
-            /**
-             * @description Número de la solicitud
-             * @example SOL-2026-00001
-             */
-            requestNumber: string;
-            /**
-             * Format: date-time
-             * @description Cuándo se registró la elección
-             */
-            requestedAt: string;
-        };
         ProductResponse: {
             /**
              * @description Interés anual en porcentaje
@@ -2528,18 +2479,6 @@ export interface components {
              * @example El titular del DUI negó haber abierto la cuenta
              */
             reason: string;
-        };
-        RegisterProductRequest: {
-            /**
-             * @description Código del producto elegido, de GET /api/onboarding/products
-             * @example AHORRO_BASICA
-             */
-            productCode: string;
-            /**
-             * Format: uuid
-             * @description Id de la solicitud aprobada, el mismo que usa la app en el resto del flujo
-             */
-            requestId: string;
         };
         RegisteredMovementResponse: {
             movement: components["schemas"]["MovementResponse"];
@@ -5567,57 +5506,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ContractResponse"];
-                };
-            };
-        };
-    };
-    productRequestRegister: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegisterProductRequest"];
-            };
-        };
-        responses: {
-            /** @description Producto registrado; la respuesta lo confirma con sus condiciones */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ProductRequestResponse"];
-                };
-            };
-            /** @description Falta `requestId` o `productCode`, o no tienen el formato */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description La solicitud o el producto no existe */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description La solicitud no está aprobada, no califica para el producto o ya eligió uno */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
         };

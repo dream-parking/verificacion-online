@@ -140,21 +140,10 @@ class FakeApi {
     this.signResponses = const [],
     this.contractVersions = const ['2026.1'],
     this.failContractTimes = 0,
-    this.productResponses = const [],
   });
 
   /// Times `GET /contract` fails (503) before it answers.
   int failContractTimes;
-
-  /// Responses of the first `GET /products` calls, as (HTTP code, body); then 200 with [catalogProducts] (VDI-147).
-  List<(int, String)> productResponses;
-
-  /// The accounts the request qualifies for, as the API sends them.
-  static const catalogProducts =
-      '[{"code":"AHORRO_BASICA","name":"Cuenta de ahorro básica","description":"Para empezar a ahorrar",'
-      '"annualInterestRate":0.5,"monthlyFeeUsd":0.0,"minimumOpeningDepositUsd":10.0},'
-      '{"code":"CORRIENTE","name":"Cuenta corriente","description":"Para tus pagos del día a día",'
-      '"annualInterestRate":0.0,"monthlyFeeUsd":2.5,"minimumOpeningDepositUsd":100.0}]';
 
   int failStartTimes;
   int failSignalsTimes;
@@ -216,7 +205,6 @@ class FakeApi {
   List<http.Request> get livenessChecks => calls.where((r) => r.url.path.endsWith('/liveness')).toList();
   List<http.Request> get submits => calls.where((r) => r.url.path.endsWith('/submit')).toList();
   List<http.Request> get contracts => calls.where((r) => r.url.path == '/api/onboarding/contract').toList();
-  List<http.Request> get productLists => calls.where((r) => r.url.path == '/api/onboarding/products').toList();
   List<http.Request> get signatures => calls.where((r) => r.url.path.endsWith('/signature')).toList();
   List<http.Request> get incomes => calls.where((r) => r.url.path.endsWith('/income')).toList();
   List<http.Request> get activities => calls.where((r) => r.url.path.endsWith('/expected-activity')).toList();
@@ -302,14 +290,6 @@ class FakeApi {
               utf8.encode(jsonEncode({'version': version, 'text': 'Texto de prueba del contrato $version.', 'fingerprint': 'abc'})),
               200,
             );
-          }
-          if (req.url.path == '/api/onboarding/products') {
-            if (productResponses.isNotEmpty) {
-              final (status, body) = productResponses.first;
-              productResponses = productResponses.sublist(1);
-              return http.Response.bytes(utf8.encode(body), status);
-            }
-            return http.Response.bytes(utf8.encode(catalogProducts), 200);
           }
           if (req.url.path.endsWith('/signature')) {
             if (signResponses.isNotEmpty) {
@@ -514,12 +494,6 @@ void main() {
       await tap(tester, find.text('Firmar contrato'));
     }
 
-    /// «Elige tu cuenta» (VDI-147): chooses the first account and goes on.
-    Future<void> chooseProduct(WidgetTester tester) async {
-      await tap(tester, find.byKey(const Key('product-AHORRO_BASICA')));
-      await tap(tester, find.text('Elegir esta cuenta'));
-    }
-
     /// Types valid basic data in the four fields.
     Future<void> fillBasicData(WidgetTester tester) async {
       final fields = find.byType(TextField);
@@ -662,7 +636,6 @@ void main() {
       // The number is the one the server assigned, not a sample one.
       expect(fake.submits, hasLength(2));
       await signContract(tester);
-      await chooseProduct(tester);
       expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       expect(find.text('SOL-2026-00419'), findsOneWidget);
       expect(find.text('SOL-2026-00418'), findsNothing);
@@ -827,7 +800,6 @@ void main() {
 
       await tap(tester, find.text('Enviar solicitud'));
       await signContract(tester);
-      await chooseProduct(tester);
       expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       expect(find.text('SOL-2026-00420'), findsOneWidget);
     });
@@ -1057,96 +1029,6 @@ void main() {
       });
     });
 
-    group('choose an account (VDI-147)', () {
-      Future<void> reachProducts(WidgetTester tester, FakeApi fake) async {
-        await tester.pumpWidget(app(fake));
-        await submitRequest(tester);
-        await signContract(tester);
-      }
-
-      testWidgets('after signing it lists the accounts side by side with their conditions', (tester) async {
-        final fake = FakeApi();
-        await reachProducts(tester, fake);
-
-        expect(find.text('Elige tu cuenta'), findsOneWidget);
-        expect(fake.productLists.single.url.queryParameters, {'requestId': requestId});
-        expect(find.text('Cuenta de ahorro básica'), findsOneWidget);
-        expect(find.text('Cuenta corriente'), findsOneWidget);
-        expect(find.text('0.50 %'), findsOneWidget);
-        expect(find.text('Sin cuota'), findsOneWidget);
-        expect(find.text('USD 2.50'), findsOneWidget);
-        expect(find.text('USD 10.00'), findsOneWidget);
-        expect(find.text('USD 100.00'), findsOneWidget);
-        expect(find.textContaining('RNPN'), findsNothing);
-        expect(find.textContaining('elegib'), findsNothing);
-      });
-
-      testWidgets('it asks to choose before going on, then goes to the confirmation with the choice made', (tester) async {
-        final fake = FakeApi();
-        await reachProducts(tester, fake);
-
-        await tap(tester, find.text('Elegir esta cuenta'));
-        expect(find.text('Elige una cuenta para continuar.'), findsOneWidget);
-        expect(find.text('¡Recibimos tu solicitud!'), findsNothing);
-
-        await tap(tester, find.byKey(const Key('product-CORRIENTE')));
-        expect(find.text('Elige una cuenta para continuar.'), findsNothing, reason: 'choosing one clears the notice');
-        await tap(tester, find.text('Elegir esta cuenta'));
-        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
-      });
-
-      testWidgets('a request without accounts to offer says so', (tester) async {
-        final fake = FakeApi(productResponses: [(200, '[]')]);
-        await reachProducts(tester, fake);
-
-        expect(find.text('Elige tu cuenta'), findsOneWidget);
-        expect(find.text('Por ahora no tenemos cuentas para ofrecerte. Te avisaremos cuando haya una disponible.'), findsOneWidget);
-      });
-
-      testWidgets('without connection the accounts can be loaded again', (tester) async {
-        final fake = FakeApi(productResponses: [(503, '')]);
-        await reachProducts(tester, fake);
-
-        expect(find.text('No pudimos cargar las cuentas'), findsOneWidget);
-        expect(find.text('Revisa tu conexión a internet e inténtalo de nuevo.'), findsOneWidget);
-        await tap(tester, find.text('Reintentar'));
-        expect(find.text('Cuenta de ahorro básica'), findsOneWidget);
-        expect(fake.productLists, hasLength(2));
-      });
-
-      testWidgets('a request that cannot choose (409) gets a message in Spanish, not the server text', (tester) async {
-        final fake = FakeApi(productResponses: [(409, '{"status":409,"detail":"Request is not approved"}')]);
-        await reachProducts(tester, fake);
-
-        expect(find.text('No pudimos cargar las cuentas'), findsOneWidget);
-        expect(
-          find.text('Todavía no podemos mostrarte las cuentas. Si tu solicitud sigue en revisión, te avisaremos.'),
-          findsOneWidget,
-        );
-        expect(find.textContaining('not approved'), findsNothing);
-      });
-
-      testWidgets('a request held for review or waiting never sees the step', (tester) async {
-        for (final status in ['ENHANCED_REVIEW', 'AWAITING_RNPN']) {
-          final fake = FakeApi(submitStatus: status);
-          await tester.pumpWidget(app(fake));
-          await submitRequest(tester);
-          expect(find.text('Elige tu cuenta'), findsNothing, reason: status);
-          expect(fake.productLists, isEmpty, reason: status);
-          await tester.pumpWidget(const SizedBox());
-        }
-      });
-
-      testWidgets('a contract that was already signed (409) also goes to the accounts', (tester) async {
-        final fake = FakeApi(signResponses: [(409, '{"status":409,"detail":"Request already signed the contract"}')]);
-        await reachProducts(tester, fake);
-
-        expect(find.text('Elige tu cuenta'), findsOneWidget);
-        await chooseProduct(tester);
-        expect(find.text('Tu contrato ya estaba firmado.'), findsOneWidget);
-      });
-    });
-
     group('contract and signature (VDI-132)', () {
       testWidgets('an approved request shows the contract with its version and signs that version', (tester) async {
         final fake = FakeApi();
@@ -1161,7 +1043,6 @@ void main() {
         await signContract(tester);
         expect(jsonDecode(fake.signatures.single.body), {'contractVersion': '2026.1'});
         expect(fake.signatures.single.url.path, '/api/onboarding/requests/$requestId/signature');
-        await chooseProduct(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
         expect(find.byKey(const Key('contract-signed')), findsOneWidget);
         expect(find.textContaining('Contrato firmado el '), findsOneWidget);
@@ -1214,7 +1095,6 @@ void main() {
 
         await tap(tester, find.text('Reintentar'));
         expect(fake.signatures, hasLength(2));
-        await chooseProduct(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       });
 
@@ -1226,7 +1106,6 @@ void main() {
         await signContract(tester);
         expect(find.text('Revisa tu conexión a internet e inténtalo de nuevo.'), findsOneWidget);
         await tap(tester, find.text('Reintentar'));
-        await chooseProduct(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       });
 
@@ -1236,7 +1115,6 @@ void main() {
         await submitRequest(tester);
 
         await signContract(tester);
-        await chooseProduct(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
         expect(find.text('Tu contrato ya estaba firmado.'), findsOneWidget);
       });
@@ -1256,7 +1134,6 @@ void main() {
 
         await signContract(tester);
         expect(jsonDecode(fake.signatures.last.body), {'contractVersion': '2026.2'});
-        await chooseProduct(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       });
     });
@@ -1521,7 +1398,6 @@ void main() {
         await tap(tester, find.text('Enviar solicitud'));
 
         await signContract(tester);
-        await chooseProduct(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
         expect(lastSignals(fake)['deviceLocationStatus'], 'DENIED');
       });
@@ -1570,7 +1446,6 @@ void main() {
         advance(3000);
         await tap(tester, find.text('Enviar solicitud'));
         await signContract(tester);
-        await chooseProduct(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
         await tester.pumpAndSettle();
 
@@ -2870,7 +2745,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Enviando tu solicitud…'), findsNothing);
         await signContract(tester);
-        await chooseProduct(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       });
 
@@ -3240,7 +3114,6 @@ void main() {
             '/api/onboarding/requests/$requestId/submit',
           );
           await signContract(tester);
-          await chooseProduct(tester);
           expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
           expect(
             store.id,

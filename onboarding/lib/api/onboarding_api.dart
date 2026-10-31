@@ -102,42 +102,6 @@ class ContractSignature {
   final DateTime signedAt;
 }
 
-/// An account the approved request qualifies for (`GET /products`, VDI-147), with the conditions to compare. A
-/// condition the API leaves out is `null` and the screen shows it as not available: it is never shown as zero.
-class Product {
-  const Product({
-    required this.code,
-    required this.name,
-    this.description = '',
-    this.annualInterestRate,
-    this.monthlyFeeUsd,
-    this.minimumOpeningDepositUsd,
-  });
-
-  factory Product.fromJson(Map<String, dynamic> json) => Product(
-    code: json['code'] as String,
-    name: json['name'] as String,
-    description: json['description'] as String? ?? '',
-    annualInterestRate: (json['annualInterestRate'] as num?)?.toDouble(),
-    monthlyFeeUsd: (json['monthlyFeeUsd'] as num?)?.toDouble(),
-    minimumOpeningDepositUsd: (json['minimumOpeningDepositUsd'] as num?)?.toDouble(),
-  );
-
-  /// Stable code, the one `POST /product-request` takes (VDI-149).
-  final String code;
-  final String name;
-  final String description;
-
-  /// Annual interest, in percent.
-  final double? annualInterestRate;
-
-  /// Monthly fee, in USD.
-  final double? monthlyFeeUsd;
-
-  /// Minimum deposit to open the account, in USD.
-  final double? minimumOpeningDepositUsd;
-}
-
 /// Client for `/api/onboarding/requests` (see docs/integracion-api.md and docs/openapi.json).
 class OnboardingApi {
   OnboardingApi({http.Client? client, String? baseUrl})
@@ -280,16 +244,6 @@ class OnboardingApi {
     await _send('POST', '/api/onboarding/requests/$requestId/signature', body: {'contractVersion': contractVersion}),
   );
 
-  /// VDI-147: the accounts an approved request qualifies for, with their conditions. A 409 means the request is not
-  /// approved; a 404, that it does not exist.
-  Future<List<Product>> products(String requestId) async {
-    final req = http.Request(
-      'GET',
-      _base.resolve('/api/onboarding/products').replace(queryParameters: {'requestId': requestId}),
-    )..headers['Accept'] = 'application/json';
-    return [for (final p in await _deliverJson(req) as List<dynamic>) Product.fromJson(p as Map<String, dynamic>)];
-  }
-
   /// VDI-87: where a request was left and what was saved. Throws an [ApiException] 404 if it does not exist.
   Future<ResumeInfo> resume(String requestId) async =>
       ResumeInfo.fromJson(await _send('GET', '/api/onboarding/requests/$requestId/resume'));
@@ -308,10 +262,7 @@ class OnboardingApi {
     return _deliver(req);
   }
 
-  Future<Map<String, dynamic>> _deliver(http.BaseRequest req) async => await _deliverJson(req) as Map<String, dynamic>;
-
-  /// Sends the request and decodes the JSON of the answer: an object, or a list in the endpoints that return one.
-  Future<Object> _deliverJson(http.BaseRequest req) async {
+  Future<Map<String, dynamic>> _deliver(http.BaseRequest req) async {
     final http.Response res;
     try {
       res = await http.Response.fromStream(await _client.send(req).timeout(_timeout));
@@ -329,8 +280,8 @@ class OnboardingApi {
         side: problem['side'] as String?,
       );
     }
-    if (res.body.isEmpty) return const <String, dynamic>{};
-    return jsonDecode(utf8.decode(res.bodyBytes)) as Object;
+    if (res.body.isEmpty) return const {};
+    return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
   }
 
   static Map<String, dynamic> _problem(http.Response res) {

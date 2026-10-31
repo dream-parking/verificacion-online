@@ -27,14 +27,6 @@ class ApiErrorMessages {
         _ => connection,
       };
 
-  static const productsNotAvailable =
-      'Todavía no podemos mostrarte las cuentas. Si tu solicitud sigue en revisión, te avisaremos.';
-  static const productsEmpty = 'Por ahora no tenemos cuentas para ofrecerte. Te avisaremos cuando haya una disponible.';
-
-  /// Listing the accounts (VDI-147): a 409 or a 404 means the request cannot choose one now; anything else is taken as
-  /// a connection problem.
-  static String forProducts(ApiException e) => e.status == 409 || e.status == 404 ? productsNotAvailable : connection;
-
   /// Sending the DUI photos when the API did not complain about the photos themselves.
   static String forDuiUpload(ApiException e) => e.status == 409 ? duiNotSaved : connection;
 

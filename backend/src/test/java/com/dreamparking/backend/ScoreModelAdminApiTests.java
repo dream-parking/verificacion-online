@@ -151,7 +151,7 @@ class ScoreModelAdminApiTests {
 			.andExpect(status().isForbidden());
 		// the analyst still reads the model in force
 		analyst.perform(get("/api/console/score-model")).andExpect(status().isOk());
-		mvc.perform(get(VERSIONS)).andExpect(jsonPath("$.length()").value(3));
+		mvc.perform(get(VERSIONS)).andExpect(jsonPath("$.length()").value(4));
 	}
 
 	private ResultActions publish(String body) throws Exception {

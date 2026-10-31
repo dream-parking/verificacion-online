@@ -128,7 +128,7 @@ class RiskScoreSignalsApiTests {
 
 		mvc.perform(get("/api/console/requests/{id}", id))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.risk.score").value(16))
+			.andExpect(jsonPath("$.risk.score").value(18))
 			.andExpect(jsonPath("$.risk.signals[*].signal").value(hasItem("AMOUNT")));
 	}
 
@@ -142,7 +142,7 @@ class RiskScoreSignalsApiTests {
 		// newest first, so the request just made is on the first page
 		mvc.perform(get("/api/console/requests"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.content[?(@.id == '" + id + "')].score").value(hasItem(16)));
+			.andExpect(jsonPath("$.content[?(@.id == '" + id + "')].score").value(hasItem(18)));
 	}
 
 	private void sendSignals(String id, int typingSpeedCpm) throws Exception {

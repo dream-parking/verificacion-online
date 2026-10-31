@@ -30,7 +30,8 @@ class BackendApplicationTests {
 				"select count(*) from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'"
 						+ " and table_name <> 'flyway_schema_history'",
 				Integer.class);
-		assertThat(tablas).isEqualTo(43);
+		// Incluye product y product_request (V39, V41): se conservan aunque el código de producto esté revertido.
+		assertThat(tablas).isEqualTo(45);
 		assertThat(jdbc.queryForObject(
 				"select count(*) from information_schema.schemata where schema_name = 'ceiba'", Integer.class)).isZero();
 		// 2030: año sin datos semilla, así el correlativo arranca en 1.

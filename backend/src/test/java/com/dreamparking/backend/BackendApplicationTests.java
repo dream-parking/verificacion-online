@@ -2,12 +2,17 @@ package com.dreamparking.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+
+import com.dreamparking.backend.onboarding.entity.enums.RequestEventType;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
@@ -37,6 +42,14 @@ class BackendApplicationTests {
 		// 2030: año sin datos semilla, así el correlativo arranca en 1.
 		assertThat(jdbc.queryForObject("select next_request_number('2030-06-01T12:00:00Z')", String.class))
 				.isEqualTo("SOL-2030-00001");
+	}
+
+	/** Every value of the database type must exist in the Java enum, or the timeline of a request that has it fails. */
+	@Test
+	void cadaTipoDeEventoDeLaBaseExisteEnElEnum() {
+		List<String> enBase = jdbc.queryForList("select unnest(enum_range(null::request_event_type))::text", String.class);
+		List<String> enJava = Arrays.stream(RequestEventType.values()).map(Enum::name).toList();
+		assertThat(enJava).containsAll(enBase);
 	}
 
 	@Test

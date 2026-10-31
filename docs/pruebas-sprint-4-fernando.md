@@ -12,6 +12,12 @@ flutter run --dart-define=API_URL=https://api.dev.identidad.alambritos.online
 
 La primera petición puede tardar hasta un minuto si el servidor estaba dormido. La consola del equipo se usa para ver el resultado de la solicitud.
 
+## Estado de las pruebas
+
+- **Hecho:** score con nombre distinto al del DUI (SOL-2026-00454: documento de identidad 13 de 15, total 34; Ciudad «Aún no se evalúa en el score»); textos del RNPN en español con el resultado «Coincide»; VDI-141 sin `API_URL` y con la URL de Dev.
+- **Omitido:** RNPN «No coincide» y «No disponible». Necesitan crear una solicitud con las fotos del DUI y confirmar `00000020-4` o `00000030-1`.
+- **Pendiente en dispositivo:** VDI-132 completo y CP-135.
+
 ## 1. Nombre distinto al del DUI (score y textos del RNPN, B-8)
 
 **Qué cambió (PR 201):** si los nombres confirmados del DUI no coinciden con los de los datos básicos, la señal «Documento de identidad» suma 0.6 de severidad (9 de 15 puntos en el modelo v2); antes sumaba 0.2 (3 puntos). Un número de DUI distinto suma 0.3. En la fila Ciudad el desglose ahora dice «Aún no se evalúa en el score».

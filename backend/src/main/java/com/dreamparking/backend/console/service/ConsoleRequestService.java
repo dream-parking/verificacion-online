@@ -26,8 +26,6 @@ import com.dreamparking.backend.onboarding.repository.OnboardingRequestRepositor
 import com.dreamparking.backend.onboarding.repository.RequestEventRepository;
 import com.dreamparking.backend.onboarding.repository.RequestSignalsRepository;
 import com.dreamparking.backend.onboarding.repository.RequestStepRepository;
-import com.dreamparking.backend.product.dto.ProductResponse;
-import com.dreamparking.backend.product.repository.ProductRequestRepository;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
 /** Read side of the console: request list and detail. */
@@ -83,13 +81,10 @@ public class ConsoleRequestService {
 
 	private final ConsoleDossierSection dossierSection;
 
-	private final ProductRequestRepository productRequests;
-
 	public ConsoleRequestService(NamedParameterJdbcTemplate jdbc, OnboardingRequestRepository requests,
 			IncomeDeclarationRepository incomeDeclarations, ExpectedActivityRepository expectedActivities,
 			RequestSignalsRepository signals, RequestStepRepository steps, RequestEventRepository events,
-			ExpectedActivityVersionRepository expectedActivityVersions, ConsoleDossierSection dossierSection,
-			ProductRequestRepository productRequests) {
+			ExpectedActivityVersionRepository expectedActivityVersions, ConsoleDossierSection dossierSection) {
 		this.jdbc = jdbc;
 		this.requests = requests;
 		this.incomeDeclarations = incomeDeclarations;
@@ -99,7 +94,6 @@ public class ConsoleRequestService {
 		this.events = events;
 		this.expectedActivityVersions = expectedActivityVersions;
 		this.dossierSection = dossierSection;
-		this.productRequests = productRequests;
 	}
 
 	/**
@@ -191,16 +185,13 @@ public class ConsoleRequestService {
 			.map(e -> new ConsoleRequestDetail.TimelineEntry(e.getType(), e.getDescription(), e.getActor(),
 					e.getOccurredAt()))
 			.toList();
-		var productRequest = productRequests.findByRequestId(requestId)
-			.map(p -> new ConsoleRequestDetail.ChosenProduct(ProductResponse.of(p.getProduct()), p.getRequestedAt()))
-			.orElse(null);
 
 		return new ConsoleRequestDetail(request.getId(), request.getNumber(),
 				request.getCustomer() == null ? null : request.getCustomer().getNumber(), request.getStatus(),
 				request.getCompletedSteps(), request.getRiskLevel(), request.getStartedAt(),
 				request.getSubmittedAt(), applicant, dossier.consent(), dossier.identityDocument(), income,
 				expectedActivity, dossier.risk(), dossier.riskDecisions(), dossier.rnpn(), signalsView, stepTimes,
-				timeline, dossier.bindingDossier(), productRequest);
+				timeline, dossier.bindingDossier());
 	}
 
 	/** Every version of the declared profile, the oldest first; the last one is the one in force. */

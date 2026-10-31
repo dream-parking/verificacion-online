@@ -43,14 +43,14 @@ class OnboardingApiTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.level").value("LOW"))
 			.andExpect(jsonPath("$.score").value(3))
-			.andExpect(jsonPath("$.modelVersion").value(2))
+			.andExpect(jsonPath("$.modelVersion").value(3))
 			.andExpect(jsonPath("$.ruleCode").isEmpty())
 			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].points").value(3))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].maxPoints").value(20))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].observation")
 				.value("Monto mensual declarado: USD 200.01 a 500"))
 			.andExpect(jsonPath("$.explanation").value(
-					"Score 3 de 100, riesgo bajo (Modelo de score v2): suman sobre todo monto declarado (3)."));
+					"Score 3 de 100, riesgo bajo (Modelo de score v3): suman sobre todo monto declarado (3)."));
 
 		mvc.perform(get("/api/onboarding/requests/{id}", id))
 			.andExpect(jsonPath("$.riskLevel").value("LOW"))

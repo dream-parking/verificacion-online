@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "app.signature.provider", havingValue = "simulated", matchIfMissing = true)
 public class SimulatedContractSigner implements ContractSigner {
 
-	static final String REJECTION_REASON = "The simulated signature service rejected the signature for this DUI";
+	static final String REJECTION_REASON = "El servicio de firma simulado rechazó la firma de este DUI";
 
 	private final Set<String> rejectedDuis;
 

@@ -88,7 +88,7 @@ public class RequestOutcomeService {
 		ConsoleUser user = consoleUserService.activeUser(userId);
 		// Locked, so two outcomes of the same request (or the same one twice) are applied one after the other.
 		OnboardingRequest request = requests.findByIdForUpdate(requestId)
-			.orElseThrow(() -> new NotFoundException("Onboarding request not found: " + requestId));
+			.orElseThrow(() -> new NotFoundException("No existe la solicitud " + requestId));
 		RequestOutcome outcome = outcomes.saveAndFlush(new RequestOutcome(request, body.outcome(), body.reason(), user));
 
 		List<RiskListDataType> revoked = body.outcome() == CaseOutcome.FALSO_POSITIVO ? revoke(request, outcome, user)
@@ -103,7 +103,7 @@ public class RequestOutcomeService {
 	@Transactional(readOnly = true)
 	public List<RequestOutcomeResponse> history(UUID requestId) {
 		if (!requests.existsById(requestId)) {
-			throw new NotFoundException("Onboarding request not found: " + requestId);
+			throw new NotFoundException("No existe la solicitud " + requestId);
 		}
 		Map<Long, Map<OutcomeEntryLink, List<RiskListDataType>>> byOutcome = links.findByRequestId(requestId)
 			.stream()

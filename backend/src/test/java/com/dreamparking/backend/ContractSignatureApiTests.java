@@ -152,7 +152,7 @@ class ContractSignatureApiTests {
 
 		sign(requestId, terms.version())
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.detail").value(containsString("already signed")));
+			.andExpect(jsonPath("$.detail").value(containsString("ya firmó el contrato")));
 		assertThat(signaturesOf(requestId)).isEqualTo(1);
 	}
 
@@ -162,7 +162,7 @@ class ContractSignatureApiTests {
 
 		sign(requestId, terms.version())
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.detail").value(containsString("Only submitted and approved requests")));
+			.andExpect(jsonPath("$.detail").value(containsString("Solo las solicitudes enviadas y aprobadas")));
 		assertThat(signaturesOf(requestId)).isZero();
 	}
 
@@ -182,7 +182,7 @@ class ContractSignatureApiTests {
 
 		sign(requestId, terms.version())
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.detail").value(containsString("held for enhanced review")));
+			.andExpect(jsonPath("$.detail").value(containsString("en revisión reforzada")));
 		assertThat(signaturesOf(requestId)).isZero();
 	}
 
@@ -193,7 +193,7 @@ class ContractSignatureApiTests {
 
 		sign(requestId, terms.version())
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.detail").value(containsString("waiting for the RNPN")));
+			.andExpect(jsonPath("$.detail").value(containsString("espera el cotejo con el RNPN")));
 		assertThat(signaturesOf(requestId)).isZero();
 	}
 
@@ -203,7 +203,7 @@ class ContractSignatureApiTests {
 
 		sign(requestId, "2019.1")
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.detail").value(containsString("not the one in force")));
+			.andExpect(jsonPath("$.detail").value(containsString("no es la vigente")));
 		assertThat(signaturesOf(requestId)).isZero();
 	}
 
@@ -228,7 +228,7 @@ class ContractSignatureApiTests {
 
 		sign(requestId, terms.version())
 			.andExpect(status().isUnprocessableContent())
-			.andExpect(jsonPath("$.detail").value(containsString("The signature was rejected")));
+			.andExpect(jsonPath("$.detail").value(containsString("El servicio de firma rechazó la firma")));
 		em.flush();
 
 		assertThat(signaturesOf(requestId)).isZero();

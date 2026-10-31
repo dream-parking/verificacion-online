@@ -143,7 +143,7 @@ class LivenessApiTests {
 		perform(put("/api/onboarding/requests/{id}/expected-activity", id)
 			.content("{\"transactionTypeCode\": \"PAGO_SALARIO\", \"monthlyAmountRangeCode\": \"HASTA_200\"}"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.modelVersion").value(2))
+			.andExpect(jsonPath("$.modelVersion").value(3))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].points").value(8))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].maxPoints").value(10))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].observation")

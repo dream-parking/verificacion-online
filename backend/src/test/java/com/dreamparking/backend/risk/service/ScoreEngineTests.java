@@ -71,17 +71,17 @@ class ScoreEngineTests {
 		assertThat(contribution(result, ScoreSignal.TYPING_PACE).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.DEVICE).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.TIME_OF_DAY).points()).isNull();
-		// Not available yet: the city (weight, but nothing to read it from) and the signals with no weight
-		assertThat(contribution(result, ScoreSignal.CITY).points()).isNull();
-		assertThat(contribution(result, ScoreSignal.CITY).maxPoints()).isEqualTo(20);
-		assertThat(contribution(result, ScoreSignal.CITY).observation()).isEqualTo("Aún no se evalúa en el score");
+		// The city is not part of the score, even when the model still has a weight for it (the old versions do)
+		assertThat(result.contributions()).extracting(Contribution::signal).doesNotContain(ScoreSignal.CITY);
+		// Not available yet: the signals with no weight
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).maxPoints()).isNull();
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).observation()).startsWith("Aún no disponible");
 		// The RNPN is read when the request is submitted: before that there is no check and the model gives it no weight
 		assertThat(contribution(result, ScoreSignal.RNPN).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.RNPN).observation()).isEqualTo("Aún no se ha cotejado con el RNPN");
-		assertThat(result.contributions()).hasSize(ScoreSignal.values().length);
+		// every signal but the retired city
+		assertThat(result.contributions()).hasSize(ScoreSignal.values().length - 1);
 	}
 
 	@Test

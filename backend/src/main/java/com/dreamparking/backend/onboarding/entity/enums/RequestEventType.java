@@ -23,6 +23,11 @@ public enum RequestEventType {
 	CONTRACT_SIGNED,
 	/** The signature service rejected the signature; the customer can try again (VDI-130). */
 	CONTRACT_SIGNATURE_REJECTED,
+	/**
+	 * The customer chose a product (VDI-148). The code that wrote it is reverted, but the value stays in the database type
+	 * (V41) and in the timeline of the requests that chose one, so it has to stay readable.
+	 */
+	PRODUCT_REQUESTED,
 	REQUEST_ABANDONED
 
 }

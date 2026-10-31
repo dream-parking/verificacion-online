@@ -17,9 +17,6 @@ enum Screen {
 
   /// Contract and electronic signature of an approved request (VDI-132).
   signature,
-
-  /// «Elige tu cuenta»: the accounts the approved request qualifies for, side by side (VDI-147).
-  products,
   confirmation,
 }
 

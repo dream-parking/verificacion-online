@@ -18,7 +18,6 @@ import '../theme.dart';
 import 'api_error_messages.dart';
 import 'application_form.dart';
 import 'privacy_notice.dart';
-import 'products_comparison.dart';
 import 'resume_view.dart';
 import 'saved_request.dart';
 import 'widgets.dart';
@@ -144,12 +143,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   var _contractAccepted = false;
   var _signing = false;
   String? _signError;
-
-  // «Elige tu cuenta» step (VDI-147): the accounts the approved request qualifies for.
-  List<Product>? _products;
-  var _loadingProducts = false;
-  String? _productsError;
-  String? _selectedProduct;
 
   /// When the signature was recorded; `null` if the request had already signed before this answer.
   DateTime? _signedAt;
@@ -402,14 +395,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     _signals.steps.attempt(_signalStep);
     if (_screen == Screen.signature) {
       _sign();
-      return;
-    }
-    if (_screen == Screen.products) {
-      if (_selectedProduct == null) {
-        setState(() => _attempted.add(Screen.products));
-      } else {
-        _goTo(Screen.confirmation);
-      }
       return;
     }
     if (_screen == Screen.review) {
@@ -851,7 +836,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _signing = false;
         _signedAt = signature.signedAt;
       });
-      _showProducts();
+      _goTo(Screen.confirmation);
     } on ApiException catch (e) {
       debugPrint('Could not sign the contract: $e');
       if (!mounted) return;
@@ -892,38 +877,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _signing = false;
       _alreadySigned = true;
     });
-    _showProducts();
-  }
-
-  /// VDI-147: after the signature the person chooses an account.
-  void _showProducts() {
-    _goTo(Screen.products);
-    unawaited(_loadProducts());
-  }
-
-  /// VDI-147: the accounts the request qualifies for. Nothing is asked of the person: the API knows the request.
-  Future<void> _loadProducts() async {
-    setState(() {
-      _loadingProducts = true;
-      _productsError = null;
-    });
-    try {
-      final products = await _api.products(_form.id!);
-      if (!mounted) return;
-      setState(() {
-        _products = products;
-        _loadingProducts = false;
-        // A choice the API no longer offers is dropped.
-        if (!products.any((p) => p.code == _selectedProduct)) _selectedProduct = null;
-      });
-    } on ApiException catch (e) {
-      debugPrint('Could not load the products: $e');
-      if (!mounted) return;
-      setState(() {
-        _loadingProducts = false;
-        _productsError = ApiErrorMessages.forProducts(e);
-      });
-    }
+    _goTo(Screen.confirmation);
   }
 
   void _restart() {
@@ -962,10 +916,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _signError = null;
       _signedAt = null;
       _alreadySigned = false;
-      _products = null;
-      _loadingProducts = false;
-      _productsError = null;
-      _selectedProduct = null;
     });
     _goTo(Screen.welcome);
   }
@@ -1080,7 +1030,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       Screen.welcome => 'Empezar',
       Screen.review => 'Enviar solicitud',
       Screen.signature => 'Firmar contrato',
-      Screen.products => 'Elegir esta cuenta',
       Screen.privacy => PrivacyNotice.acceptButton,
       Screen.identityConfirmation => 'Mis datos son correctos',
       Screen.selfie => 'Continuar con mis ingresos',
@@ -1144,14 +1093,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 if (_screen == Screen.basicData) ...const [_SavedNote(), SizedBox(height: 10)],
                 PrimaryButton(
                   text: text,
-                  ready: switch (_screen) {
-                    Screen.signature => _contract != null && _contractAccepted,
-                    Screen.products => _selectedProduct != null,
-                    _ => _form.isScreenValid(_screen),
-                  },
-                  onPressed: _busy || (_screen == Screen.signature && _contract == null) || (_screen == Screen.products && _products == null)
-                      ? null
-                      : _continue,
+                  ready: _screen == Screen.signature ? _contract != null && _contractAccepted : _form.isScreenValid(_screen),
+                  onPressed: _busy || (_screen == Screen.signature && _contract == null) ? null : _continue,
                 ),
                 if (_screen == Screen.privacy) ...const [
                   SizedBox(height: 10),
@@ -1174,7 +1117,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         Screen.expectedActivity => _expectedActivity(),
         Screen.review => _review(),
         Screen.signature => _signature(),
-        Screen.products => _productsStep(),
         Screen.confirmation => _confirmation(),
       };
 
@@ -1860,44 +1802,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
-  // ---------------------------------------------------------------- 7. Choose an account
-
-  Widget _productsStep() {
-    final products = _products;
-    final unchosen = _attempted.contains(Screen.products) && _selectedProduct == null;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const ScreenTitle('Elige tu cuenta'),
-          const SizedBox(height: 6),
-          const Text('Compara las cuentas que tienes disponibles y elige la que prefieras.', style: AppText.bodyMuted),
-          const SizedBox(height: 20),
-          if (_loadingProducts)
-            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
-          else if (_productsError != null)
-            _ConnectionError(
-              title: 'No pudimos cargar las cuentas',
-              message: _productsError!,
-              onRetry: _loadProducts,
-            )
-          else if (products != null && products.isEmpty)
-            const Text(ApiErrorMessages.productsEmpty, style: AppText.body)
-          else if (products != null) ...[
-            ProductsComparison(
-              products: products,
-              selectedCode: _selectedProduct,
-              onSelect: (p) => setState(() => _selectedProduct = p.code),
-            ),
-            if (unchosen) const ErrorText('Elige una cuenta para continuar.'),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------- 8. Confirmation
+  // ---------------------------------------------------------------- 7. Confirmation
 
   Widget _confirmation() => switch (_submitted) {
         SubmissionStatus.completed => _received(),

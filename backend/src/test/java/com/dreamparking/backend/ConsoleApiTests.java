@@ -162,7 +162,8 @@ class ConsoleApiTests {
 	void showsTheScoreModelInForce() throws Exception {
 		mvc.perform(get("/api/console/score-model"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.version").value(2))
+			// v3 is the one that took the city out of the score (V42)
+			.andExpect(jsonPath("$.version").value(3))
 			.andExpect(jsonPath("$.low.from").value(0))
 			.andExpect(jsonPath("$.low.to").value(39))
 			.andExpect(jsonPath("$.medium.from").value(40))
@@ -174,13 +175,13 @@ class ConsoleApiTests {
 			.andExpect(jsonPath("$.weights[?(@.signal == 'TYPING_PACE')].maxPoints").value(10))
 			.andExpect(jsonPath("$.weights[?(@.signal == 'DEVICE')].maxPoints").value(10))
 			.andExpect(jsonPath("$.weights[?(@.signal == 'TIME_OF_DAY')].maxPoints").value(5))
-			.andExpect(jsonPath("$.weights[?(@.signal == 'CITY')].maxPoints").value(15))
-			.andExpect(jsonPath("$.weights[6].signal").value("RNPN"))
-			.andExpect(jsonPath("$.weights[6].maxPoints").value(15))
-			.andExpect(jsonPath("$.weights[7].signal").value("LIVENESS"))
-			.andExpect(jsonPath("$.weights[7].maxPoints").value(10))
-			.andExpect(jsonPath("$.weights[8].signal").value("INTERNAL_LISTS"))
-			.andExpect(jsonPath("$.weights[8].maxPoints").isEmpty());
+			.andExpect(jsonPath("$.weights[?(@.signal == 'CITY')]").isEmpty())
+			.andExpect(jsonPath("$.weights[5].signal").value("RNPN"))
+			.andExpect(jsonPath("$.weights[5].maxPoints").value(15))
+			.andExpect(jsonPath("$.weights[6].signal").value("LIVENESS"))
+			.andExpect(jsonPath("$.weights[6].maxPoints").value(10))
+			.andExpect(jsonPath("$.weights[7].signal").value("INTERNAL_LISTS"))
+			.andExpect(jsonPath("$.weights[7].maxPoints").isEmpty());
 	}
 
 	// ---- Alerts

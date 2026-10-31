@@ -68,7 +68,7 @@ class RiskScoreSignalsApiTests {
 				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "500_1000"}
 				""")
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.modelVersion").value(2))
+			.andExpect(jsonPath("$.modelVersion").value(3))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].points").value(6))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'TYPING_PACE')].points").value(8))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'TYPING_PACE')].observation")
@@ -116,7 +116,7 @@ class RiskScoreSignalsApiTests {
 		assertThat(jdbc.queryForList("select description from request_event where request_id = ?::uuid and type = 'SCORE_ASSIGNED'",
 				String.class, id)).hasSize(2).allMatch(d -> d.startsWith("Score de riesgo asignado: "));
 		assertThat(jdbc.queryForObject("select count(*) from risk_assessment_signal s join risk_assessment a on a.id = s.assessment_id where a.request_id = ?::uuid and a.is_current",
-				Integer.class, id)).isEqualTo(9);
+				Integer.class, id)).isEqualTo(8);
 	}
 
 	@Test

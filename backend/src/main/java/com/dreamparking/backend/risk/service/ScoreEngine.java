@@ -28,8 +28,12 @@ import com.dreamparking.backend.rnpn.entity.enums.RnpnField;
  */
 public final class ScoreEngine {
 
-	/** Signals with no way to be read yet; they are listed in the breakdown as not available. */
-	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.CITY, ScoreSignal.INTERNAL_LISTS);
+	/**
+	 * Signals with no way to be read yet; they are listed in the breakdown as not available. The city is not one of
+	 * them: it is not part of the score at all (it is still captured and shown as a device signal), so a new
+	 * evaluation has no row for it.
+	 */
+	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.INTERNAL_LISTS);
 
 	private static final BigDecimal LOW_CONFIDENCE = new BigDecimal("0.70");
 
@@ -75,9 +79,8 @@ public final class ScoreEngine {
 		contributions.add(liveness(model, inputs.liveness()));
 		contributions.add(rnpn(model, inputs.rnpn()));
 		for (ScoreSignal signal : PENDING) {
-			String note = signal == ScoreSignal.CITY ? "Aún no se evalúa en el score"
-					: "Aún no disponible: llega en otro sprint";
-			contributions.add(new Contribution(signal, null, model.weightOf(signal), note));
+			contributions.add(new Contribution(signal, null, model.weightOf(signal),
+					"Aún no disponible: llega en otro sprint"));
 		}
 		int total = contributions.stream().mapToInt(c -> c.points() == null ? 0 : c.points()).sum();
 		return new Result(Math.min(total, 100), List.copyOf(contributions));

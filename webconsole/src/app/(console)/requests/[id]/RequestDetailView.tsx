@@ -131,11 +131,12 @@ export function RequestDetailView({ id }: { id: string }) {
 
   const score = r.risk?.score;
   const contributions = r.risk?.signals ?? [];
-  // A signal without a weight yet (internal lists) says nothing about this request, so it is not listed.
-  const scoredContributions = contributions.filter((c) => c.maxPoints != null);
-  // The city is captured but the score does not weigh it yet. Scores saved earlier keep an older note ("llega con la
-  // ubicación") that is no longer true, so the text is fixed here instead of repeating it.
-  const isNotScoredYet = (c: (typeof contributions)[number]) => c.signal === "CITY" && c.points == null;
+  // A signal without a weight (internal lists) says nothing about this request, so it is not listed. Neither is the city
+  // in scores saved before it left the model: it never added points and its old note ("llega con la ubicación") is no
+  // longer true. A city that does carry points is still listed.
+  const scoredContributions = contributions.filter(
+    (c) => c.maxPoints != null && !(c.signal === "CITY" && c.points == null),
+  );
   const rule = r.risk?.ruleCode
     ? `Regla aplicada: ${r.risk.ruleCode}${r.risk.ruleName ? ` · ${r.risk.ruleName}` : ""}`
     : "Ninguna regla aplicada";
@@ -330,7 +331,7 @@ export function RequestDetailView({ id }: { id: string }) {
                         <span className="text-sm whitespace-nowrap">
                           {c.points == null ? (
                             <span className="text-muted">
-                              {isNotScoredYet(c) ? "No se evalúa aún" : "No disponible"} · 0 de {c.maxPoints}
+                              No disponible · 0 de {c.maxPoints}
                             </span>
                           ) : (
                             <>
@@ -347,11 +348,7 @@ export function RequestDetailView({ id }: { id: string }) {
                           />
                         </div>
                       )}
-                      {(isNotScoredYet(c) || c.observation) && (
-                        <p className="mt-1 mb-0 text-sm leading-5 text-muted">
-                          {isNotScoredYet(c) ? "Aún no se evalúa en el score" : c.observation}
-                        </p>
-                      )}
+                      {c.observation && <p className="mt-1 mb-0 text-sm leading-5 text-muted">{c.observation}</p>}
                     </li>
                   ))}
                 </ul>

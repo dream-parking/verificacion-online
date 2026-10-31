@@ -29,7 +29,7 @@ const dossier = (extra: Partial<NonNullable<RequestDetail["bindingDossier"]>> = 
         modelVersion: 2,
         signals: [
           { signal: "AMOUNT", name: "Monto declarado", points: 10, maxPoints: 25, observation: "Rango 200 a 500" },
-          { signal: "CITY", name: "Ciudad", points: null, maxPoints: 20, observation: null },
+          { signal: "TIME_OF_DAY", name: "Horario", points: null, maxPoints: 20, observation: null },
           { signal: "RNPN", name: "Cotejo RNPN", points: null, maxPoints: null, observation: null },
         ],
       },

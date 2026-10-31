@@ -56,14 +56,14 @@ class ScoreModelAdminApiTests {
 
 	@Test
 	void aNewThresholdAppliesToTheNextRequestsAndTheEarlierOnesKeepTheirVersion() throws Exception {
-		// 500 to 1,000 scores 6 points in model v3, which is LOW (up to 39)
+		// 500 to 1,000 scores 7 points in model v4, which is LOW (up to 39)
 		String before = startRequest();
-		registerRange(before, "500_1000").andExpect(jsonPath("$.modelVersion").value(3))
-			.andExpect(jsonPath("$.score").value(6))
+		registerRange(before, "500_1000").andExpect(jsonPath("$.modelVersion").value(4))
+			.andExpect(jsonPath("$.score").value(7))
 			.andExpect(jsonPath("$.level").value("LOW"));
 
 		publish("{\"lowMax\": 4, \"mediumMax\": 20}").andExpect(status().isCreated())
-			.andExpect(jsonPath("$.version").value(4))
+			.andExpect(jsonPath("$.version").value(5))
 			.andExpect(jsonPath("$.inForce").value(true))
 			.andExpect(jsonPath("$.validTo").isEmpty())
 			.andExpect(jsonPath("$.publishedBy").value(admin.getFullName()))
@@ -72,19 +72,19 @@ class ScoreModelAdminApiTests {
 			.andExpect(jsonPath("$.medium.to").value(20))
 			.andExpect(jsonPath("$.high.from").value(21))
 			// the weights are the ones of the version in force
-			.andExpect(jsonPath("$.weights[?(@.signal == 'AMOUNT')].maxPoints").value(20))
-			.andExpect(jsonPath("$.weights[?(@.signal == 'LIVENESS')].maxPoints").value(10))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'AMOUNT')].maxPoints").value(23))
+			.andExpect(jsonPath("$.weights[?(@.signal == 'LIVENESS')].maxPoints").value(11))
 			// and the city, which v3 took out of the score, does not come back
 			.andExpect(jsonPath("$.weights[?(@.signal == 'CITY')]").isEmpty());
 
 		String after = startRequest();
-		registerRange(after, "500_1000").andExpect(jsonPath("$.modelVersion").value(4))
-			.andExpect(jsonPath("$.score").value(6))
+		registerRange(after, "500_1000").andExpect(jsonPath("$.modelVersion").value(5))
+			.andExpect(jsonPath("$.score").value(7))
 			.andExpect(jsonPath("$.level").value("MEDIUM"));
 		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", before))
-			.andExpect(jsonPath("$.modelVersion").value(3))
+			.andExpect(jsonPath("$.modelVersion").value(4))
 			.andExpect(jsonPath("$.level").value("LOW"));
-		mvc.perform(get("/api/console/score-model")).andExpect(jsonPath("$.version").value(4));
+		mvc.perform(get("/api/console/score-model")).andExpect(jsonPath("$.version").value(5));
 	}
 
 	@Test
@@ -93,31 +93,32 @@ class ScoreModelAdminApiTests {
 
 		mvc.perform(get(VERSIONS))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.length()").value(4))
-			.andExpect(jsonPath("$[0].version").value(4))
+			.andExpect(jsonPath("$.length()").value(5))
+			.andExpect(jsonPath("$[0].version").value(5))
 			.andExpect(jsonPath("$[0].inForce").value(true))
 			.andExpect(jsonPath("$[0].publishedBy").value(admin.getFullName()))
 			.andExpect(jsonPath("$[0].validFrom").exists())
-			.andExpect(jsonPath("$[1].version").value(3))
+			.andExpect(jsonPath("$[1].version").value(4))
 			.andExpect(jsonPath("$[1].inForce").value(false))
 			.andExpect(jsonPath("$[1].validTo").exists())
 			// the versions published by a migration have no publisher
 			.andExpect(jsonPath("$[1].publishedBy").isEmpty())
-			.andExpect(jsonPath("$[2].version").value(2))
-			.andExpect(jsonPath("$[3].version").value(1));
+			.andExpect(jsonPath("$[2].version").value(3))
+			.andExpect(jsonPath("$[3].version").value(2))
+			.andExpect(jsonPath("$[4].version").value(1));
 	}
 
 	@Test
 	void everyVersionClosesTheOneBeforeSoOnlyOneIsInForce() throws Exception {
 		publish("{\"lowMax\": 30, \"mediumMax\": 60}").andExpect(status().isCreated());
 		publish("{\"lowMax\": 35, \"mediumMax\": 65}").andExpect(status().isCreated())
-			.andExpect(jsonPath("$.version").value(5));
+			.andExpect(jsonPath("$.version").value(6));
 
 		String body = mvc.perform(get(VERSIONS)).andReturn().getResponse().getContentAsString();
 		List<Integer> inForce = JsonPath.read(body, "$[?(@.inForce == true)].version");
 		List<Integer> closed = JsonPath.read(body, "$[?(@.inForce == false)].version");
-		assertThat(inForce).containsExactly(5);
-		assertThat(closed).containsExactlyInAnyOrder(1, 2, 3, 4);
+		assertThat(inForce).containsExactly(6);
+		assertThat(closed).containsExactlyInAnyOrder(1, 2, 3, 4, 5);
 	}
 
 	@Test
@@ -136,9 +137,9 @@ class ScoreModelAdminApiTests {
 		publish("{\"lowMax\": \"abc\", \"mediumMax\": 69}").andExpect(status().isBadRequest());
 		publish("").andExpect(status().isBadRequest());
 
-		// nothing was saved: v3 is still the one in force
-		mvc.perform(get(VERSIONS)).andExpect(jsonPath("$.length()").value(3)).andExpect(jsonPath("$[0].version").value(3));
-		mvc.perform(get("/api/console/score-model")).andExpect(jsonPath("$.version").value(3));
+		// nothing was saved: v4 is still the one in force
+		mvc.perform(get(VERSIONS)).andExpect(jsonPath("$.length()").value(4)).andExpect(jsonPath("$[0].version").value(4));
+		mvc.perform(get("/api/console/score-model")).andExpect(jsonPath("$.version").value(4));
 	}
 
 	@Test

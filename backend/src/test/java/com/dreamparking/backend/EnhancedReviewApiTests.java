@@ -114,7 +114,7 @@ class EnhancedReviewApiTests {
 			.andExpect(jsonPath("$.riskDecisions.length()").value(1))
 			.andExpect(jsonPath("$.riskDecisions[0].decision").value("AUTOMATIC_FLOW"))
 			.andExpect(jsonPath("$.riskDecisions[0].threshold").value(69))
-			.andExpect(jsonPath("$.riskDecisions[0].modelVersion").value(3))
+			.andExpect(jsonPath("$.riskDecisions[0].modelVersion").value(4))
 			.andExpect(jsonPath("$.riskDecisions[0].reason").value(containsString("not above the enhanced-review threshold of 69")))
 			.andExpect(jsonPath("$.timeline[*].type").value(not(hasItem("ENHANCED_REVIEW_REQUIRED"))));
 		perform(post("/api/console/accounts").content("""

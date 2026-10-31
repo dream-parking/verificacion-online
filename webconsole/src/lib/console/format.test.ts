@@ -10,6 +10,7 @@ import {
   REQUEST_STATUS,
   REQUEST_STATUS_OPTIONS,
   deviceLocationText,
+  eventText,
   locationFailureText,
   minSec,
   profileTimeline,
@@ -174,5 +175,22 @@ describe("profileTimeline", () => {
     expect(profileTimeline([])).toEqual([]);
     expect(profileTimeline(null)).toEqual([]);
     expect(profileTimeline(undefined)).toEqual([]);
+  });
+});
+
+describe("eventText", () => {
+  it("muestra en español los textos de la firma guardados en inglés (B-9)", () => {
+    expect(eventText("Contract signed", "CONTRACT_SIGNED")).toBe("Contrato firmado");
+    expect(eventText("Contract signature rejected", "CONTRACT_SIGNATURE_REJECTED")).toBe("Firma del contrato rechazada");
+  });
+  it("deja igual los textos que ya están en español", () => {
+    expect(eventText("Contrato firmado", "CONTRACT_SIGNED")).toBe("Contrato firmado");
+    expect(eventText("Solicitud escalada a videollamada: monto alto", "REQUEST_ESCALATED")).toBe(
+      "Solicitud escalada a videollamada: monto alto",
+    );
+  });
+  it("muestra el tipo cuando el evento no tiene texto", () => {
+    expect(eventText(null, "REQUEST_STARTED")).toBe("REQUEST_STARTED");
+    expect(eventText("", "REQUEST_STARTED")).toBe("REQUEST_STARTED");
   });
 });

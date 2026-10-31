@@ -59,9 +59,9 @@ class RiskScoreEdgeCaseTests {
 	@Test
 	void eachRangeAddsMorePointsThanTheOneBelow() throws Exception {
 		assertScore("HASTA_200", 0, 200);
-		assertScore("200_500", 3, 500);
-		assertScore("500_1000", 6, 1000);
-		assertScore("MAS_1000", 16, 1000.01);
+		assertScore("200_500", 4, 500);
+		assertScore("500_1000", 7, 1000);
+		assertScore("MAS_1000", 18, 1000.01);
 	}
 
 	@Test
@@ -134,26 +134,26 @@ class RiskScoreEdgeCaseTests {
 		String id = startRequest();
 		registerRange(id, "PAGO_SALARIO", "HASTA_200");
 		registerRange(id, "PAGO_SALARIO", "MAS_1000");
-		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id)).andExpect(jsonPath("$.score").value(16));
+		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id)).andExpect(jsonPath("$.score").value(18));
 		registerRange(id, "PAGO_SALARIO", "200_500");
-		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id)).andExpect(jsonPath("$.score").value(3));
+		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id)).andExpect(jsonPath("$.score").value(4));
 		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.riskLevel").value("LOW"));
 	}
 
 	@Test
 	void theRangesOfTheModelInForceSetTheLevel() throws Exception {
-		// Model v4 with narrower ranges: low up to 2, medium up to 5, high above; v3 stops being in force
+		// Model v5 with narrower ranges: low up to 2, medium up to 5, high above; v4 stops being in force
 		publishModel(2, 5);
 		assertLevel("HASTA_200", "LOW", 0);
-		assertLevel("200_500", "MEDIUM", 3);
-		assertLevel("500_1000", "HIGH", 6);
+		assertLevel("200_500", "MEDIUM", 4);
+		assertLevel("500_1000", "HIGH", 7);
 
 		String id = startRequest();
 		registerRange(id, "PAGO_SALARIO", "500_1000");
 		mvc.perform(get("/api/onboarding/requests/{id}/risk-assessment", id))
-			.andExpect(jsonPath("$.modelVersion").value(4))
+			.andExpect(jsonPath("$.modelVersion").value(5))
 			.andExpect(jsonPath("$.explanation").value(
-					"Score 6 de 100, riesgo alto (Modelo de score v4): suman sobre todo monto declarado (6)."));
+					"Score 7 de 100, riesgo alto (Modelo de score v5): suman sobre todo monto declarado (7)."));
 	}
 
 	@Test
@@ -181,13 +181,13 @@ class RiskScoreEdgeCaseTests {
 		mvc.perform(get("/api/onboarding/requests/{id}", id)).andExpect(jsonPath("$.riskLevel").value(level));
 	}
 
-	/** Replaces model v3 with a v4 that has the same weights and these ranges. */
+	/** Replaces model v4 with a v5 that has the same weights and these ranges. */
 	private void publishModel(int lowMax, int mediumMax) {
-		jdbc.update("update score_model set valid_to = now() where version = 3");
+		jdbc.update("update score_model set valid_to = now() where version = 4");
 		jdbc.update("insert into score_model (version, name, low_max, medium_max, valid_from)"
-				+ " values (4, 'Modelo de score v4', ?, ?, now())", lowMax, mediumMax);
+				+ " values (5, 'Modelo de score v5', ?, ?, now())", lowMax, mediumMax);
 		jdbc.update("insert into score_model_weight (model_version, signal, max_points)"
-				+ " select 4, signal, max_points from score_model_weight where model_version = 3");
+				+ " select 5, signal, max_points from score_model_weight where model_version = 4");
 	}
 
 	private ResultActions registerRange(String id, String type, String rangeCode) throws Exception {

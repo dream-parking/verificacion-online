@@ -82,7 +82,7 @@ class RnpnApiTests {
 			.andExpect(jsonPath("$.rnpn.checkedAt").isNotEmpty())
 			.andExpect(jsonPath("$.timeline[*].type").value(hasItem("RNPN_CHECKED")))
 			.andExpect(jsonPath("$.risk.signals[?(@.signal == 'RNPN')].points").value(0))
-			.andExpect(jsonPath("$.risk.signals[?(@.signal == 'RNPN')].maxPoints").value(15));
+			.andExpect(jsonPath("$.risk.signals[?(@.signal == 'RNPN')].maxPoints").value(18));
 	}
 
 	@Test
@@ -96,7 +96,7 @@ class RnpnApiTests {
 			.andExpect(jsonPath("$.rnpn.attempts").value(1))
 			.andExpect(jsonPath("$.rnpn.mismatchedFields[0]").value("LAST_NAMES"))
 			.andExpect(jsonPath("$.rnpn.mismatchedFields[1]").value("BIRTH_DATE"))
-			.andExpect(jsonPath("$.risk.signals[?(@.signal == 'RNPN')].points").value(15))
+			.andExpect(jsonPath("$.risk.signals[?(@.signal == 'RNPN')].points").value(18))
 			.andExpect(jsonPath("$.risk.signals[?(@.signal == 'RNPN')].observation")
 				.value(hasItem(containsString("no coinciden (apellidos, fecha de nacimiento)"))));
 	}
@@ -113,7 +113,7 @@ class RnpnApiTests {
 			.andExpect(jsonPath("$.rnpn.outcome").value("UNAVAILABLE"))
 			.andExpect(jsonPath("$.rnpn.attempts").value(3))
 			.andExpect(jsonPath("$.rnpn.mismatchedFields.length()").value(0))
-			.andExpect(jsonPath("$.risk.signals[?(@.signal == 'RNPN')].points").value(8))
+			.andExpect(jsonPath("$.risk.signals[?(@.signal == 'RNPN')].points").value(9))
 			.andExpect(jsonPath("$.timeline[*].description")
 				.value(hasItem("Cotejo con el RNPN no hecho: el RNPN no respondió")));
 		perform(post("/api/console/accounts").content("""

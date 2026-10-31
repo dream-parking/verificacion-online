@@ -192,11 +192,4 @@ class FrameQualityMonitor {
     if (mean < limit) return FrameHint.veryDark;
     return mean < darkMean ? FrameHint.tooDark : null;
   }
-
-  void reset() {
-    hint = FrameHint.analyzing;
-    _previous = null;
-    _candidate = null;
-    _count = 0;
-  }
 }

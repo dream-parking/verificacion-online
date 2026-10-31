@@ -198,14 +198,6 @@ void main() {
       expect(m.hint, FrameHint.good);
     });
 
-    test('reset forgets everything', () {
-      final m = FrameQualityMonitor();
-      for (var i = 0; i < 4; i++) {
-        m.add(stripes());
-      }
-      m.reset();
-      expect(m.hint, FrameHint.analyzing);
-    });
   });
 
   group('LumaGrid', () {

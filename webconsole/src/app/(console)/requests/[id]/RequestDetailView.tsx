@@ -131,6 +131,8 @@ export function RequestDetailView({ id }: { id: string }) {
 
   const score = r.risk?.score;
   const contributions = r.risk?.signals ?? [];
+  // A signal without a weight yet (internal lists) says nothing about this request, so it is not listed.
+  const scoredContributions = contributions.filter((c) => c.maxPoints != null);
   const rule = r.risk?.ruleCode
     ? `Regla aplicada: ${r.risk.ruleCode}${r.risk.ruleName ? ` · ${r.risk.ruleName}` : ""}`
     : "Ninguna regla aplicada";
@@ -313,16 +315,17 @@ export function RequestDetailView({ id }: { id: string }) {
             <p className="m-0 text-base leading-6">{explanationText}</p>
             {score != null && contributions.length > 0 && (
               <div className="mt-4">
-                <h3 className="mt-0 mb-2 text-[15px] font-bold">De dónde sale el score</h3>
+                <h3 className="mt-0 mb-1 text-[15px] font-bold">De dónde sale el score</h3>
+                <p className="mt-0 mb-2 text-sm leading-5 text-muted">
+                  Cada fila suma puntos de riesgo: 0 significa que no se detectó nada raro en esa señal.
+                </p>
                 <ul className="m-0 flex list-none flex-col gap-3 p-0">
-                  {contributions.map((c) => (
+                  {scoredContributions.map((c) => (
                     <li key={c.signal}>
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                         <span className="text-[15px] font-semibold">{c.name}</span>
                         <span className="text-sm whitespace-nowrap">
-                          {c.maxPoints == null ? (
-                            <span className="text-muted">Sin peso aún</span>
-                          ) : c.points == null ? (
+                          {c.points == null ? (
                             <span className="text-muted">No disponible · 0 de {c.maxPoints}</span>
                           ) : (
                             <>

@@ -71,16 +71,17 @@ class ScoreEngineTests {
 		assertThat(contribution(result, ScoreSignal.TYPING_PACE).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.DEVICE).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.TIME_OF_DAY).points()).isNull();
-		// Not available yet: the city (weight, but nothing to read it from) and the signals with no weight
-		assertThat(contribution(result, ScoreSignal.CITY).points()).isNull();
-		assertThat(contribution(result, ScoreSignal.CITY).maxPoints()).isEqualTo(20);
+		// The city is not part of the score, even when the model still has a weight for it (the old versions do)
+		assertThat(result.contributions()).extracting(Contribution::signal).doesNotContain(ScoreSignal.CITY);
+		// Not available yet: the signals with no weight
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).points()).isNull();
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).maxPoints()).isNull();
 		assertThat(contribution(result, ScoreSignal.INTERNAL_LISTS).observation()).startsWith("Aún no disponible");
 		// The RNPN is read when the request is submitted: before that there is no check and the model gives it no weight
 		assertThat(contribution(result, ScoreSignal.RNPN).points()).isNull();
-		assertThat(contribution(result, ScoreSignal.RNPN).observation()).isEqualTo("The RNPN has not been checked yet");
-		assertThat(result.contributions()).hasSize(ScoreSignal.values().length);
+		assertThat(contribution(result, ScoreSignal.RNPN).observation()).isEqualTo("Aún no se ha cotejado con el RNPN");
+		// every signal but the retired city
+		assertThat(result.contributions()).hasSize(ScoreSignal.values().length - 1);
 	}
 
 	@Test
@@ -90,7 +91,7 @@ class ScoreEngineTests {
 
 		assertThat(rnpn.points()).isZero();
 		assertThat(rnpn.maxPoints()).isEqualTo(15);
-		assertThat(rnpn.observation()).isEqualTo("RNPN check (simulated): the data matches");
+		assertThat(rnpn.observation()).isEqualTo("Cotejo RNPN (simulado): los datos coinciden");
 	}
 
 	@Test
@@ -99,7 +100,7 @@ class ScoreEngineTests {
 				ScoreSignal.RNPN);
 
 		assertThat(rnpn.points()).isEqualTo(8);
-		assertThat(rnpn.observation()).isEqualTo("RNPN check (simulated): the RNPN did not answer after 3 tries");
+		assertThat(rnpn.observation()).isEqualTo("Cotejo RNPN (simulado): el RNPN no respondió después de 3 intentos");
 	}
 
 	@Test
@@ -108,8 +109,25 @@ class ScoreEngineTests {
 
 		assertThat(contribution(result, ScoreSignal.RNPN).points()).isEqualTo(15);
 		assertThat(contribution(result, ScoreSignal.RNPN).observation())
-			.isEqualTo("RNPN check (simulated): the data does not match (last names, birth date)");
+			.isEqualTo("Cotejo RNPN (simulado): los datos no coinciden (apellidos, fecha de nacimiento)");
 		assertThat(result.score()).isEqualTo(15);
+	}
+
+	@Test
+	void anRnpnThatDoesNotAnswerAfterOneTryUsesTheSingular() {
+		Contribution rnpn = contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(rnpn(RnpnOutcome.UNAVAILABLE, 1))),
+				ScoreSignal.RNPN);
+
+		assertThat(rnpn.observation()).isEqualTo("Cotejo RNPN (simulado): el RNPN no respondió después de 1 intento");
+	}
+
+	@Test
+	void everyDataOfTheDuiThatDoesNotMatchIsNamedInSpanish() {
+		List<RnpnField> all = List.of(RnpnField.DUI, RnpnField.FIRST_NAMES, RnpnField.LAST_NAMES, RnpnField.BIRTH_DATE);
+		RnpnCheck check = new RnpnCheck(null, RnpnOutcome.NO_MATCH, "simulated", 1, all, null);
+
+		assertThat(contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(check)), ScoreSignal.RNPN).observation())
+			.isEqualTo("Cotejo RNPN (simulado): los datos no coinciden (número de DUI, nombres, apellidos, fecha de nacimiento)");
 	}
 
 	@Test
@@ -126,7 +144,7 @@ class ScoreEngineTests {
 		RnpnCheck real = new RnpnCheck(null, RnpnOutcome.MATCH, "rnpn-sv", 1, List.of(), null);
 
 		assertThat(contribution(ScoreEngine.score(modelWithRnpn(), withRnpn(real)), ScoreSignal.RNPN).observation())
-			.isEqualTo("RNPN check: the data matches");
+			.isEqualTo("Cotejo RNPN: los datos coinciden");
 	}
 
 	@ParameterizedTest
@@ -202,8 +220,13 @@ class ScoreEngineTests {
 		IdentityDocument corrected = confirmed(OcrStatus.READ, reading(VALID_DUI, true, "0.95"), VALID_DUI, "Ana María",
 				"Pérez");
 		IdentityDocument typed = confirmed(OcrStatus.FAILED, null, VALID_DUI, "Ana", "Pérez");
+		IdentityDocument otherNames = confirmed(OcrStatus.READ, reading(VALID_DUI, true, "0.95"), VALID_DUI, "Ana",
+				"Pérez");
+		otherNames.compareWithDeclared(VALID_DUI, "Otra", "Persona");
 
 		assertThat(points(mismatch)).isEqualTo(6);
+		// Without a face match (B-13) a different name weighs more than a different DUI number
+		assertThat(points(otherNames)).isEqualTo(12);
 		assertThat(points(lowConfidence)).isEqualTo(2);
 		assertThat(points(corrected)).isEqualTo(1);
 		assertThat(points(typed)).isEqualTo(5);

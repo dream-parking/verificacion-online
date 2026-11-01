@@ -34,4 +34,6 @@ jobs:
           api_location: ""
           output_location: ""
         env:
-          NEXT_PUBLIC_APP_ENV: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
+          # next.config.ts fails the build when DEPLOY_ENV is set and NEXT_PUBLIC_API_URL is missing.
+          DEPLOY_ENV: ${{ github.ref_name == 'dev' && 'dev' || 'qa' }}
+          NEXT_PUBLIC_API_URL: ${{ github.ref_name == 'dev' && 'https://api.dev.identidad.alambritos.online' || 'https://api.qa.identidad.alambritos.online' }}

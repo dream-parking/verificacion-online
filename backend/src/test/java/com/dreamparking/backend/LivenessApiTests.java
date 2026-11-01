@@ -143,13 +143,13 @@ class LivenessApiTests {
 		perform(put("/api/onboarding/requests/{id}/expected-activity", id)
 			.content("{\"transactionTypeCode\": \"PAGO_SALARIO\", \"monthlyAmountRangeCode\": \"HASTA_200\"}"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.modelVersion").value(2))
-			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].points").value(8))
-			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].maxPoints").value(10))
+			.andExpect(jsonPath("$.modelVersion").value(4))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].points").value(9))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].maxPoints").value(11))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'LIVENESS')].observation")
 				.value("Confianza de la prueba de vida: 20 %"))
 			// no signal rejects by itself: the worst liveness only moves the score, and the request goes on
-			.andExpect(jsonPath("$.score").value(8))
+			.andExpect(jsonPath("$.score").value(9))
 			.andExpect(jsonPath("$.level").value("LOW"));
 	}
 

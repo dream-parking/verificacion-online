@@ -12,6 +12,7 @@ const decision = (d: Partial<RiskDecision>): RiskDecision => ({
   modelVersion: 2,
   decidedBy: "SYSTEM",
   decidedAt: "2026-10-20T18:05:00Z",
+  channel: null,
   ...d,
 });
 
@@ -54,6 +55,27 @@ describe("RiskDecisionLog", () => {
     expect(items[0]).toHaveTextContent("Flujo automático");
     expect(items[1]).toHaveTextContent("Sistema (regla automática)");
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("un escalamiento muestra el motivo del API, el canal y el analista, en español", () => {
+    render(
+      <RiskDecisionLog
+        decisions={[
+          decision({
+            decision: "ESCALATED",
+            channel: "VIDEO_CALL",
+            reason: "Escalada a videollamada por Ana Pérez: El monto no coincide con los ingresos",
+            decidedBy: "Ana Pérez",
+          }),
+        ]}
+      />,
+    );
+    const item = screen.getByRole("listitem");
+    expect(item).toHaveTextContent("⇪ Escalada");
+    expect(item).toHaveTextContent("Escalada a videollamada por Ana Pérez: El monto no coincide con los ingresos");
+    expect(item).toHaveTextContent("Canal: Videollamada");
+    expect(item).toHaveTextContent("decidió: Ana Pérez");
+    expect(item).not.toHaveTextContent("supera el umbral");
   });
 
   it("muestra el código si llega una decisión que la consola aún no conoce", () => {

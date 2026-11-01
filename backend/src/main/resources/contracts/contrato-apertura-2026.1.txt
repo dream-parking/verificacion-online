@@ -1,0 +1,18 @@
+CONTRATO DE APERTURA DE CUENTA DE AHORRO EN LÍNEA
+Versión 2026.1
+
+TEXTO DE PRUEBA. Este contrato es un ejemplo para el entorno de desarrollo y la firma electrónica es simulada: no
+tiene validez legal. El texto definitivo lo proporciona el área legal del banco.
+
+1. Objeto. El banco abre a nombre de la persona titular una cuenta de ahorro, con los datos que declaró y confirmó en
+la solicitud de apertura.
+
+2. Datos de la persona titular. La persona declara que los datos de su DUI, de sus ingresos y del movimiento esperado
+de la cuenta son verdaderos, y se compromete a actualizarlos cuando cambien.
+
+3. Uso de la cuenta. La cuenta se usará conforme al movimiento declarado. El banco puede pedir información adicional
+si el uso de la cuenta se aparta de lo declarado.
+
+4. Firma electrónica. La persona acepta este contrato con su firma electrónica desde la aplicación del banco. El banco
+conserva la evidencia de la firma: la versión de este contrato, su huella digital, la fecha y hora, y el dispositivo y
+la dirección IP desde la que se firmó.

@@ -22,6 +22,7 @@ import org.hibernate.type.SqlTypes;
 
 import com.dreamparking.backend.customer.entity.Customer;
 import com.dreamparking.backend.customer.entity.Device;
+import com.dreamparking.backend.onboarding.entity.enums.EscalationChannel;
 import com.dreamparking.backend.onboarding.entity.enums.RequestStatus;
 import com.dreamparking.backend.risk.entity.enums.RiskLevel;
 
@@ -50,6 +51,11 @@ public class OnboardingRequest {
 	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
 	@Column(name = "status", nullable = false, columnDefinition = "request_status")
 	private RequestStatus status = RequestStatus.IN_PROGRESS;
+
+	/** Where an analyst sent the request; only while it is {@link RequestStatus#ESCALATED} (VDI-143). */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "escalation_channel", length = 12)
+	private EscalationChannel escalationChannel;
 
 	@Column(name = "completed_steps", nullable = false)
 	private Short completedSteps = (short) 0;
@@ -127,6 +133,16 @@ public class OnboardingRequest {
 
 	public void setStatus(RequestStatus status) {
 		this.status = status;
+	}
+
+	public EscalationChannel getEscalationChannel() {
+		return escalationChannel;
+	}
+
+	/** Moves the request to {@link RequestStatus#ESCALATED} with the channel the analyst chose. */
+	public void escalate(EscalationChannel channel) {
+		this.status = RequestStatus.ESCALATED;
+		this.escalationChannel = channel;
 	}
 
 	public Short getCompletedSteps() {

@@ -1,8 +1,12 @@
 package com.dreamparking.backend.risk.entity.enums;
 
 /**
- * A signal the score model combines. {@link #CITY}, {@link #RNPN} and {@link #INTERNAL_LISTS} are not available
- * yet: they show up in the breakdown as such and add nothing to the score.
+ * A signal the score model combines. {@link #INTERNAL_LISTS} is not available yet: it shows up in the breakdown as
+ * such and adds nothing to the score.
+ * <p>
+ * {@link #CITY} is retired: no model from the one that removed it on weighs it and the engine no longer lists it. It
+ * stays in the enum because the older models, the evaluations they made and the frozen dossiers still carry it, and
+ * they have to keep reading.
  */
 public enum ScoreSignal {
 

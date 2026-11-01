@@ -16,7 +16,7 @@ import com.dreamparking.backend.account.entity.enums.ProfileDeviationType;
  */
 public record ProfileComparisonResponse(UUID accountId, UUID requestId,
 		@Schema(description = "Mes comparado (calendario de El Salvador)", example = "2026-10") String month,
-		@Schema(description = "Margen sobre lo declarado antes de considerarlo una desviación", example = "20") int tolerancePercent,
+		@Schema(description = "Tolerancia vigente: margen sobre lo declarado antes de considerarlo una desviación", example = "20") int tolerancePercent,
 		Declared declared, Actual actual, List<Deviation> deviations, boolean withinProfile) {
 
 	/** What the customer declared in the onboarding request; null fields were not declared. */
@@ -39,11 +39,13 @@ public record ProfileComparisonResponse(UUID accountId, UUID requestId,
 
 	/**
 	 * A difference with the declared profile. {@code alertId} and {@code detectedAt} are null only while the deviation
-	 * has not been recorded yet.
+	 * has not been recorded yet. {@code tolerancePercent} is the one it was detected with, or the one in force while it
+	 * has not been recorded.
 	 */
 	@Schema(name = "ProfileDeviation")
 	public record Deviation(ProfileDeviationType type, String alertTypeCode, BigDecimal declaredValue,
-			BigDecimal actualValue, BigDecimal limitValue, String detail, UUID alertId, Instant detectedAt) {
+			BigDecimal actualValue, BigDecimal limitValue, String detail, UUID alertId, Instant detectedAt,
+			@Schema(description = "Tolerancia con la que se detectó", example = "20") int tolerancePercent) {
 	}
 
 }

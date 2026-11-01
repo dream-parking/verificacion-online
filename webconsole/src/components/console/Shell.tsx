@@ -49,9 +49,15 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: "/requests", label: "Solicitudes", badge: 0 },
     { href: "/alerts", label: "Bandeja de alertas", badge: unassigned },
     { href: "/map", label: "Mapa de ubicaciones", badge: 0 },
+    { href: "/dossiers", label: "Expedientes", badge: 0 },
     { href: "/score-model", label: "Modelo de score", badge: 0 },
-    // Only an administrator manages users.
-    ...(user.role === "ADMIN" ? [{ href: "/users", label: "Usuarios", badge: 0 }] : []),
+    // Only an administrator manages users and the profile tolerance.
+    ...(user.role === "ADMIN"
+      ? [
+          { href: "/profile-tolerance", label: "Tolerancia del perfil", badge: 0 },
+          { href: "/users", label: "Usuarios", badge: 0 },
+        ]
+      : []),
   ];
 
   return (

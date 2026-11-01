@@ -15,6 +15,7 @@ import '../signals/device_fingerprint.dart';
 import '../signals/device_location.dart';
 import '../signals/signals.dart';
 import '../theme.dart';
+import 'api_error_messages.dart';
 import 'application_form.dart';
 import 'privacy_notice.dart';
 import 'resume_view.dart';
@@ -135,6 +136,18 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   /// How the request was left when it was submitted: it decides the last screen.
   var _submitted = SubmissionStatus.completed;
 
+  // Contract and signature step (VDI-132): only for a request that was approved.
+  Contract? _contract;
+  var _loadingContract = false;
+  var _contractFailed = false;
+  var _contractAccepted = false;
+  var _signing = false;
+  String? _signError;
+
+  /// When the signature was recorded; `null` if the request had already signed before this answer.
+  DateTime? _signedAt;
+  var _alreadySigned = false;
+
   // DUI step (VDI-77).
   /// Photos taken so far; the API gets both together.
   final _duiPhotos = <DuiSide, Uint8List>{};
@@ -229,6 +242,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       return;
     }
     if (id == null) return;
+    final submitted = await _readSubmitted(id);
+    if (submitted != null) {
+      await _showSubmitted(id, submitted);
+      return;
+    }
     try {
       final info = await _api.resume(id);
       final selfieTaken = await _readSelfieTaken(id);
@@ -245,6 +263,70 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     } on ApiException catch (e) {
       debugPrint('Could not check the saved request: $e');
       if (e.status == 404) await _forgetSavedRequest();
+    }
+  }
+
+  Future<SubmittedRequest?> _readSubmitted(String id) async {
+    try {
+      return await widget.savedRequest.submitted(id);
+    } on Exception catch (e) {
+      debugPrint('Could not read the submitted request: $e');
+      return null;
+    }
+  }
+
+  /// The request kept in the phone was already submitted: the app opens on its notice, with its number and the last
+  /// status known, instead of the welcome. The status is then asked again; without connection the last one known stays,
+  /// and a request the API does not know or that was abandoned is forgotten.
+  Future<void> _showSubmitted(String id, SubmittedRequest saved) async {
+    if (!mounted || _screen != Screen.welcome) return;
+    setState(() {
+      _form
+        ..id = id
+        ..number = saved.number;
+      _submitted = saved.status;
+      _alreadySigned = saved.signed;
+    });
+    _showSubmittedNotice(saved.status, signed: saved.signed);
+    // The notice is already on screen, from what the phone kept: the API (which can take a minute to wake up) only
+    // brings it up to date.
+    try {
+      final current = await _api.submission(id);
+      if (!mounted || _form.id != id) return;
+      if (current == null) return await _dropSubmitted();
+      if (current.status == _submitted) return;
+      setState(() => _submitted = current.status);
+      unawaited(_keepSubmitted(id, current.status, signed: saved.signed));
+      if (_screen == Screen.signature && current.status != SubmissionStatus.completed) _goTo(Screen.confirmation);
+    } on ApiException catch (e) {
+      debugPrint('Could not check the submitted request: $e');
+      if (e.status == 404 && mounted && _form.id == id) await _dropSubmitted();
+    }
+  }
+
+  /// An approved request not signed from this phone goes back to the contract: the API answers 409 if it was signed
+  /// anyway, and that shows the notice. Any other goes straight to its notice.
+  void _showSubmittedNotice(SubmissionStatus status, {required bool signed}) {
+    if (status == SubmissionStatus.completed && !signed) {
+      _goTo(Screen.signature);
+      unawaited(_loadContract());
+    } else {
+      _goTo(Screen.confirmation);
+    }
+  }
+
+  /// The API does not know the request or it was abandoned: it is forgotten and the welcome shows.
+  Future<void> _dropSubmitted() async {
+    await _forgetSavedRequest();
+    if (mounted) _restart();
+  }
+
+  /// Keeps the request as submitted, so it is shown when the app opens again.
+  Future<void> _keepSubmitted(String id, SubmissionStatus status, {bool signed = false}) async {
+    try {
+      await widget.savedRequest.saveSubmitted(id, SubmittedRequest(_form.number ?? '', status, signed: signed));
+    } on Exception catch (e) {
+      debugPrint('Could not keep the submitted request: $e');
     }
   }
 
@@ -380,6 +462,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   void _continue() {
     _signals.steps.attempt(_signalStep);
+    if (_screen == Screen.signature) {
+      _sign();
+      return;
+    }
     if (_screen == Screen.review) {
       _submit();
       return;
@@ -411,7 +497,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _warnIdentityMismatch(differences);
         return;
       }
-      _saveAndContinue(_confirmIdentity, conflictMessage: 'No pudimos guardar los datos de tu DUI. Vuelve a tomar las fotos e inténtalo de nuevo.');
+      _saveAndContinue(_confirmIdentity, conflictMessage: ApiErrorMessages.duiDataNotSaved);
       return;
     }
     _completeStep(_screen);
@@ -533,10 +619,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             _unreadable = const UnreadablePhotos.tooLarge();
           case 400:
             _unreadable = const UnreadablePhotos(UnreadableReason.other, Retake.both);
-          case 409:
-            _duiError = 'No pudimos guardar tu DUI. Revisa que tus datos básicos estén completos e inténtalo de nuevo.';
           default:
-            _duiError = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+            _duiError = ApiErrorMessages.forDuiUpload(e);
         }
       });
     }
@@ -600,10 +684,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             _selfie = _SelfiePhase.retry;
             _selfieProblem = e.status == 422 ? SelfieProblem.fromReason(e.reason) : SelfieProblem.other;
             _selfiePhoto = null;
-          case 409:
-            _selfieError = 'Tu solicitud ya fue enviada y no se puede modificar.';
           default:
-            _selfieError = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+            _selfieError = ApiErrorMessages.forSelfieUpload(e);
         }
       });
     }
@@ -644,36 +726,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _saveError = switch (e.status) {
-          409 => conflictMessage ?? 'Tu solicitud ya fue enviada y no se puede modificar.',
-          400 => _invalidDataMessage(e.fields),
-          _ => 'Revisa tu conexión a internet e inténtalo de nuevo.',
-        };
+        _saveError = ApiErrorMessages.forSave(e, conflict: conflictMessage);
       });
     }
   }
 
-  /// Message in Spanish for a 400: names the rejected fields, never the server text.
-  static String _invalidDataMessage(List<String> fields) {
-    const labels = {
-      'firstNames': 'nombres',
-      'lastNames': 'apellidos',
-      'dui': 'DUI',
-      'mobilePhone': 'celular',
-      'birthDate': 'fecha de nacimiento',
-      'expiryDate': 'fecha de vencimiento',
-      'sourceDetail': 'origen de tus ingresos',
-    };
-    final names = [
-      for (final f in fields)
-        if (labels[f] != null) labels[f]!,
-    ];
-    return names.isEmpty
-        ? 'Revisa tus datos e inténtalo de nuevo.'
-        : 'Revisa estos datos e inténtalo de nuevo: ${names.join(', ')}.';
-  }
-
-  bool get _busy => _submitting || _starting || _saving || _uploadingDui || _uploadingSelfie || _locating;
+  bool get _busy => _submitting || _starting || _saving || _uploadingDui || _uploadingSelfie || _locating || _signing;
 
   /// VDI-40: reads the device and sends its fingerprint. It only runs after the notice is accepted.
   /// If it fails it does not interrupt the customer: signals feed the score, they do not block the flow.
@@ -764,7 +822,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       if (!mounted) return;
       setState(() {
         _starting = false;
-        _startError = 'Revisa tu conexión a internet e inténtalo de nuevo.';
+        _startError = ApiErrorMessages.connection;
       });
     }
   }
@@ -786,8 +844,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _submitted = submission.status;
         _submitting = false;
       });
-      unawaited(_forgetSavedRequest());
-      _goTo(Screen.confirmation);
+      // The phone keeps the request: when the app opens again it shows its number and how it stands.
+      unawaited(_keepSubmitted(_form.id!, submission.status));
+      // VDI-132: only an approved request signs; one held or waiting goes straight to its notice.
+      if (submission.status == SubmissionStatus.completed) {
+        _goTo(Screen.signature);
+        unawaited(_loadContract());
+      } else {
+        _goTo(Screen.confirmation);
+      }
     } on ApiException catch (e) {
       debugPrint('Could not submit the request: $e');
       if (!mounted) return;
@@ -796,6 +861,95 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _submitFailed = true;
       });
     }
+  }
+
+  /// VDI-132: the contract text in force, shown before signing.
+  Future<void> _loadContract() async {
+    setState(() {
+      _loadingContract = true;
+      _contractFailed = false;
+    });
+    try {
+      final contract = await _api.contract();
+      if (!mounted) return;
+      setState(() {
+        _contract = contract;
+        _loadingContract = false;
+      });
+    } on ApiException catch (e) {
+      debugPrint('Could not load the contract: $e');
+      if (!mounted) return;
+      setState(() {
+        _loadingContract = false;
+        _contractFailed = true;
+      });
+    }
+  }
+
+  /// VDI-132: signs the version that was shown. A 409 is checked against the contract in force: a new version is
+  /// shown again, otherwise the request had already signed.
+  Future<void> _sign() async {
+    final contract = _contract;
+    if (contract == null) return;
+    if (!_contractAccepted) {
+      setState(() => _attempted.add(Screen.signature));
+      return;
+    }
+    setState(() {
+      _signing = true;
+      _signError = null;
+    });
+    try {
+      final signature = await _api.signContract(_form.id!, contract.version);
+      if (!mounted) return;
+      setState(() {
+        _signing = false;
+        _signedAt = signature.signedAt;
+      });
+      unawaited(_keepSubmitted(_form.id!, _submitted, signed: true));
+      _goTo(Screen.confirmation);
+    } on ApiException catch (e) {
+      debugPrint('Could not sign the contract: $e');
+      if (!mounted) return;
+      if (e.status == 409) {
+        await _afterSignConflict(contract);
+        return;
+      }
+      setState(() {
+        _signing = false;
+        _signError = ApiErrorMessages.forSign(e);
+      });
+    }
+  }
+
+  Future<void> _afterSignConflict(Contract shown) async {
+    try {
+      final current = await _api.contract();
+      if (!mounted) return;
+      if (current.version != shown.version) {
+        setState(() {
+          _signing = false;
+          _contract = current;
+          _contractAccepted = false;
+          _signError = ApiErrorMessages.contractChanged;
+        });
+        if (_scroll.hasClients) _scroll.jumpTo(0);
+        return;
+      }
+    } on ApiException {
+      if (!mounted) return;
+      setState(() {
+        _signing = false;
+        _signError = ApiErrorMessages.connection;
+      });
+      return;
+    }
+    setState(() {
+      _signing = false;
+      _alreadySigned = true;
+    });
+    unawaited(_keepSubmitted(_form.id!, _submitted, signed: true));
+    _goTo(Screen.confirmation);
   }
 
   void _restart() {
@@ -826,6 +980,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _saveError = null;
       _copied = false;
       _submitted = SubmissionStatus.completed;
+      _contract = null;
+      _loadingContract = false;
+      _contractFailed = false;
+      _contractAccepted = false;
+      _signing = false;
+      _signError = null;
+      _signedAt = null;
+      _alreadySigned = false;
     });
     _goTo(Screen.welcome);
   }
@@ -892,6 +1054,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 const LoadingOverlay(title: 'Revisando tu DUI…', detail: 'Estamos leyendo tus fotos. Puede tardar unos segundos.'),
               if (_uploadingSelfie)
                 const LoadingOverlay(title: 'Revisando tu selfie…', detail: 'Puede tardar unos segundos.'),
+              if (_signing)
+                const LoadingOverlay(title: 'Firmando tu contrato…', detail: 'No cierres la aplicación.'),
               if (_starting)
                 const LoadingOverlay(title: 'Preparando tu solicitud…', detail: 'Esto puede tardar unos segundos.'),
               if (_locating)
@@ -937,6 +1101,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final text = switch (_screen) {
       Screen.welcome => 'Empezar',
       Screen.review => 'Enviar solicitud',
+      Screen.signature => 'Firmar contrato',
       Screen.privacy => PrivacyNotice.acceptButton,
       Screen.identityConfirmation => 'Mis datos son correctos',
       Screen.selfie => 'Continuar con mis ingresos',
@@ -998,7 +1163,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_screen == Screen.basicData) ...const [_SavedNote(), SizedBox(height: 10)],
-                PrimaryButton(text: text, ready: _form.isScreenValid(_screen), onPressed: _busy ? null : _continue),
+                PrimaryButton(
+                  text: text,
+                  ready: _screen == Screen.signature ? _contract != null && _contractAccepted : _form.isScreenValid(_screen),
+                  onPressed: _busy || (_screen == Screen.signature && _contract == null) ? null : _continue,
+                ),
                 if (_screen == Screen.privacy) ...const [
                   SizedBox(height: 10),
                   Text(PrivacyNotice.recordedNote, style: AppText.small, textAlign: TextAlign.center),
@@ -1019,6 +1188,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         Screen.income => _income(),
         Screen.expectedActivity => _expectedActivity(),
         Screen.review => _review(),
+        Screen.signature => _signature(),
         Screen.confirmation => _confirmation(),
       };
 
@@ -1644,6 +1814,66 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
   }
 
+  // ---------------------------------------------------------------- 6b. Contract and signature (VDI-132)
+
+  Widget _signature() {
+    final contract = _contract;
+    final unaccepted = _attempted.contains(Screen.signature) && !_contractAccepted;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ScreenTitle('Firma tu contrato'),
+          const SizedBox(height: 6),
+          const Text(
+            'Tu solicitud fue aprobada. Lee el contrato y fírmalo para terminar.',
+            style: AppText.bodyMuted,
+          ),
+          const SizedBox(height: 20),
+          if (_signError != null) ...[
+            _ConnectionError(
+              title: 'No pudimos firmar tu contrato',
+              message: _signError!,
+              onRetry: contract == null ? _loadContract : _sign,
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (_loadingContract)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
+          else if (_contractFailed)
+            _ConnectionError(
+              title: 'No pudimos cargar el contrato',
+              message: ApiErrorMessages.connection,
+              onRetry: _loadContract,
+            )
+          else if (contract != null) ...[
+            Text('Versión ${contract.version}', style: AppText.label),
+            const SizedBox(height: 8),
+            Container(
+              key: const Key('contract-text'),
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.neutral100,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(contract.text, style: AppText.body),
+            ),
+            const SizedBox(height: 12),
+            _AcceptanceCheckbox(
+              text: 'He leído el contrato y acepto firmarlo.',
+              value: _contractAccepted,
+              onChanged: _busy ? null : (v) => setState(() => _contractAccepted = v),
+            ),
+            if (unaccepted) const ErrorText('Para firmar necesitamos que aceptes el contrato.'),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------- 7. Confirmation
 
   Widget _confirmation() => switch (_submitted) {
@@ -1688,6 +1918,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           ),
       };
 
+  /// «28/10/2026 a las 14:30», in the phone's time zone.
+  static String _signedOn(DateTime at) {
+    final local = at.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${formatDateOf(local)} a las ${two(local.hour)}:${two(local.minute)}';
+  }
+
   /// The request was received as usual.
   Widget _received() {
     return Padding(
@@ -1705,6 +1942,23 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           const ScreenTitle('¡Recibimos tu solicitud!', size: 32),
           const SizedBox(height: 8),
           const Text('Te avisaremos cuando tu cuenta esté lista.', style: AppText.body),
+          if (_signedAt != null || _alreadySigned) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.verified_outlined, size: 24, color: AppColors.brandGreen),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _signedAt == null ? 'Tu contrato ya estaba firmado.' : 'Contrato firmado el ${_signedOn(_signedAt!)}.',
+                    key: const Key('contract-signed'),
+                    style: AppText.body,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 20),
           Container(
             width: double.infinity,

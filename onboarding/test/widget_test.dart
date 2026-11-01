@@ -137,7 +137,17 @@ class FakeApi {
     this.number = 'SOL-2026-00419',
     this.submitStatus = 'COMPLETED',
     this.livenessResponses = const [],
+    this.signResponses = const [],
+    this.contractVersions = const ['2026.1'],
+    this.failContractTimes = 0,
+    this.statusLookupCode = 200,
   });
+
+  /// HTTP code of `GET /requests/{id}` when the app asks how a submitted request stands.
+  int statusLookupCode;
+
+  /// Times `GET /contract` fails (503) before it answers.
+  int failContractTimes;
 
   int failStartTimes;
   int failSignalsTimes;
@@ -163,6 +173,12 @@ class FakeApi {
 
   /// Responses of the first `PUT /liveness` calls, as (HTTP code, body); then 200 with `CHECKED`.
   List<(int, String)> livenessResponses;
+
+  /// Responses of the first `POST /signature` calls, as (HTTP code, body); then 201 with the signature (VDI-132).
+  List<(int, String)> signResponses;
+
+  /// Versions `GET /contract` answers in turn; the last one stays in force. The text says which one it is.
+  List<String> contractVersions;
 
   /// HTTP codes returned by the first `PUT /identity-document/confirmation` calls (then 200).
   List<int> confirmationErrors;
@@ -192,9 +208,13 @@ class FakeApi {
       calls.where((r) => r.url.path.endsWith('/identity-document/confirmation')).toList();
   List<http.Request> get livenessChecks => calls.where((r) => r.url.path.endsWith('/liveness')).toList();
   List<http.Request> get submits => calls.where((r) => r.url.path.endsWith('/submit')).toList();
+  List<http.Request> get contracts => calls.where((r) => r.url.path == '/api/onboarding/contract').toList();
+  List<http.Request> get signatures => calls.where((r) => r.url.path.endsWith('/signature')).toList();
   List<http.Request> get incomes => calls.where((r) => r.url.path.endsWith('/income')).toList();
   List<http.Request> get activities => calls.where((r) => r.url.path.endsWith('/expected-activity')).toList();
   List<http.Request> get resumes => calls.where((r) => r.url.path.endsWith('/resume')).toList();
+  List<http.Request> get statusLookups =>
+      calls.where((r) => r.method == 'GET' && r.url.path == '/api/onboarding/requests/$requestId').toList();
   List<http.Request> get abandons => calls.where((r) => r.url.path.endsWith('/abandon')).toList();
   List<http.Request> get catalogs => calls.where((r) => r.url.path == '/api/catalogs').toList();
   List<http.Request> get signals => calls.where((r) => r.url.path.endsWith('/signals')).toList();
@@ -266,6 +286,29 @@ class FakeApi {
             submitted = true;
             return http.Response('{"number":"$number","status":"$submitStatus","completedSteps":5}', 200);
           }
+          if (req.url.path == '/api/onboarding/contract') {
+            if (failContractTimes > 0) {
+              failContractTimes--;
+              return http.Response('', 503);
+            }
+            final version = contractVersions.length > 1 ? contractVersions.removeAt(0) : contractVersions.first;
+            return http.Response.bytes(
+              utf8.encode(jsonEncode({'version': version, 'text': 'Texto de prueba del contrato $version.', 'fingerprint': 'abc'})),
+              200,
+            );
+          }
+          if (req.url.path.endsWith('/signature')) {
+            if (signResponses.isNotEmpty) {
+              final (status, body) = signResponses.first;
+              signResponses = signResponses.sublist(1);
+              return http.Response.bytes(utf8.encode(body), status);
+            }
+            return http.Response.bytes(
+              utf8.encode('{"requestId":"$requestId","contractVersion":"${contractVersions.first}","contractFingerprint":"abc",'
+                  '"signedAt":"2026-10-28T20:30:00Z","provider":"simulated","simulated":true}'),
+              201,
+            );
+          }
           if (req.url.path.endsWith('/resume')) {
             final (status, body) = resumeResponse ?? (404, '{"status":404,"detail":"Request not found"}');
             return http.Response.bytes(utf8.encode(body), status);
@@ -274,6 +317,7 @@ class FakeApi {
             return http.Response('{"status":"ABANDONED"}', abandonStatus);
           }
           if (req.method == 'GET' && req.url.path.startsWith('/api/onboarding/requests/')) {
+            if (statusLookupCode != 200) return http.Response('{"status":$statusLookupCode}', statusLookupCode);
             return submitted
                 ? http.Response('{"number":"$number","status":"$submitStatus"}', 200)
                 : http.Response('{"number":null,"status":"IN_PROGRESS"}', 200);
@@ -318,7 +362,10 @@ class FakeSavedRequestStore implements SavedRequestStore {
   Future<String?> read() async => id;
 
   @override
-  Future<void> save(String value) async => id = value;
+  Future<void> save(String value) async {
+    id = value;
+    submittedRequest = null;
+  }
 
   @override
   Future<bool> selfieTaken(String value) async => selfieId == value;
@@ -326,8 +373,24 @@ class FakeSavedRequestStore implements SavedRequestStore {
   @override
   Future<void> saveSelfieTaken(String value) async => selfieId = value;
 
+  /// The request kept as submitted (the number, how it was left and whether it was signed), if any.
+  SubmittedRequest? submittedRequest;
+
   @override
-  Future<void> clear() async => id = selfieId = null;
+  Future<SubmittedRequest?> submitted(String value) async => id == value ? submittedRequest : null;
+
+  @override
+  Future<void> saveSubmitted(String value, SubmittedRequest request) async {
+    id = value;
+    selfieId = null;
+    submittedRequest = request;
+  }
+
+  @override
+  Future<void> clear() async {
+    id = selfieId = null;
+    submittedRequest = null;
+  }
 }
 
 /// `GET /resume` of a request left at [step], with what the API saved up to there.
@@ -451,6 +514,12 @@ void main() {
     /// Location permission screen (VDI-73): "Ahora no".
     Future<void> skipLocation(WidgetTester tester) => tap(tester, find.text('Ahora no'));
 
+    /// Contract screen (VDI-132): accepts the contract and signs it.
+    Future<void> signContract(WidgetTester tester) async {
+      await tap(tester, find.byType(Checkbox));
+      await tap(tester, find.text('Firmar contrato'));
+    }
+
     /// Types valid basic data in the four fields.
     Future<void> fillBasicData(WidgetTester tester) async {
       final fields = find.byType(TextField);
@@ -480,6 +549,24 @@ void main() {
       await tap(tester, shutter);
       await tap(tester, find.text('Mis datos son correctos'));
       await passSelfie(tester);
+    }
+
+    /// Fills every step and submits.
+    Future<void> submitRequest(WidgetTester tester) async {
+      await tap(tester, find.text('Empezar'));
+      await acceptNotice(tester);
+      await tapContinue(tester);
+      await skipLocation(tester);
+      await fillBasicData(tester);
+      await tapContinue(tester);
+      await passDui(tester);
+      await tap(tester, find.text('Remesas'));
+      await tap(tester, find.text('USD 500.01 a 1,000'));
+      await tapContinue(tester);
+      await tap(tester, find.text('Ahorro'));
+      await tap(tester, find.text('Más de USD 1,000'));
+      await tapContinue(tester);
+      await tap(tester, find.text('Enviar solicitud'));
     }
 
     Widget app(
@@ -574,6 +661,7 @@ void main() {
 
       // The number is the one the server assigned, not a sample one.
       expect(fake.submits, hasLength(2));
+      await signContract(tester);
       expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       expect(find.text('SOL-2026-00419'), findsOneWidget);
       expect(find.text('SOL-2026-00418'), findsNothing);
@@ -737,6 +825,7 @@ void main() {
       await tapContinue(tester);
 
       await tap(tester, find.text('Enviar solicitud'));
+      await signContract(tester);
       expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       expect(find.text('SOL-2026-00420'), findsOneWidget);
     });
@@ -905,25 +994,123 @@ void main() {
       });
     });
 
-    group('after submitting, a request that does not go on as usual', () {
-      /// Fills every step and submits.
-      Future<void> submitRequest(WidgetTester tester) async {
+    group('opening the app with a request already submitted', () {
+      const approved = SubmittedRequest('SOL-2026-00454', SubmissionStatus.completed, signed: true);
+
+      FakeSavedRequestStore keeping(SubmittedRequest request) => FakeSavedRequestStore(requestId)..submittedRequest = request;
+
+      FakeApi answering({String status = 'COMPLETED', int code = 200}) =>
+          FakeApi(submitStatus: status, number: 'SOL-2026-00454', statusLookupCode: code)..submitted = true;
+
+      testWidgets('shows its number and how it stands instead of the welcome, without asking to resume it', (tester) async {
+        final fake = answering();
+        await tester.pumpWidget(app(fake, store: keeping(approved)));
+        await tester.pumpAndSettle();
+
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+        expect(find.text('SOL-2026-00454'), findsOneWidget);
+        expect(find.byKey(const Key('contract-signed')), findsOneWidget);
+        expect(find.text('Empezar'), findsNothing);
+        expect(fake.statusLookups, hasLength(1));
+        expect(fake.resumes, isEmpty, reason: 'a submitted request is not resumed');
+      });
+
+      testWidgets('tells how it stands now, and keeps it for next time', (tester) async {
+        final store = keeping(approved);
+        await tester.pumpWidget(app(answering(status: 'ENHANCED_REVIEW'), store: store));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('enhanced-review')), findsOneWidget);
+        expect(find.text('SOL-2026-00454'), findsOneWidget);
+        expect(store.submittedRequest?.status, SubmissionStatus.enhancedReview);
+        for (final hint in ['score', 'riesgo', 'puntaje', 'sospech', 'alto']) {
+          expect(find.textContaining(RegExp(hint, caseSensitive: false)), findsNothing, reason: 'never says why: $hint');
+        }
+      });
+
+      testWidgets('the notice shows at once from what the phone kept, and is brought up to date when the API answers',
+          (tester) async {
+        final fake = answering(status: 'ENHANCED_REVIEW')..hold(requestId);
+        await tester.pumpWidget(app(fake, store: keeping(approved)));
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget, reason: 'the API has not answered yet');
+        expect(find.text('Empezar'), findsNothing);
+
+        fake.release(requestId);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('enhanced-review')), findsOneWidget);
+      });
+
+      testWidgets('without connection it tells the last status known', (tester) async {
+        final store = keeping(const SubmittedRequest('SOL-2026-00454', SubmissionStatus.awaitingVerification));
+        await tester.pumpWidget(app(answering(code: 503), store: store));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('awaiting-verification')), findsOneWidget);
+        expect(find.text('SOL-2026-00454'), findsOneWidget);
+        expect(store.id, requestId, reason: 'it is kept for next time');
+      });
+
+      testWidgets('a request the API does not know is forgotten and the welcome shows', (tester) async {
+        final store = keeping(approved);
+        await tester.pumpWidget(app(answering(code: 404), store: store));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Empezar'), findsOneWidget);
+        expect(store.id, isNull);
+        expect(store.submittedRequest, isNull);
+      });
+
+      testWidgets('an approved request not signed from this phone goes back to the contract', (tester) async {
+        final store = keeping(const SubmittedRequest('SOL-2026-00454', SubmissionStatus.completed));
+        final fake = answering();
+        await tester.pumpWidget(app(fake, store: store));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Firmar contrato'), findsOneWidget);
+        await signContract(tester);
+        expect(fake.signatures, hasLength(1));
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+        expect(store.submittedRequest?.signed, isTrue);
+      });
+
+      testWidgets('if it was signed anyway, the contract says so and it is kept as signed', (tester) async {
+        final store = keeping(const SubmittedRequest('SOL-2026-00454', SubmissionStatus.completed));
+        final fake = answering()..signResponses = [(409, '{"status":409,"detail":"Already signed"}')];
+        await tester.pumpWidget(app(fake, store: store));
+        await tester.pumpAndSettle();
+        await signContract(tester);
+
+        expect(find.text('Tu contrato ya estaba firmado.'), findsOneWidget);
+        expect(store.submittedRequest?.signed, isTrue);
+      });
+
+      testWidgets('«Volver al inicio» goes to the welcome and keeps the request', (tester) async {
+        final store = keeping(approved);
+        await tester.pumpWidget(app(answering(), store: store));
+        await tester.pumpAndSettle();
+        await tap(tester, find.text('Volver al inicio'));
+
+        expect(find.text('Empezar'), findsOneWidget);
+        expect(store.submittedRequest, isNotNull, reason: 'it shows again the next time the app opens');
+      });
+
+      testWidgets('starting another request forgets the submitted one', (tester) async {
+        final store = keeping(approved);
+        await tester.pumpWidget(app(answering(), store: store));
+        await tester.pumpAndSettle();
+        await tap(tester, find.text('Volver al inicio'));
         await tap(tester, find.text('Empezar'));
         await acceptNotice(tester);
         await tapContinue(tester);
-        await skipLocation(tester);
-        await fillBasicData(tester);
-        await tapContinue(tester);
-        await passDui(tester);
-        await tap(tester, find.text('Remesas'));
-        await tap(tester, find.text('USD 500.01 a 1,000'));
-        await tapContinue(tester);
-        await tap(tester, find.text('Ahorro'));
-        await tap(tester, find.text('Más de USD 1,000'));
-        await tapContinue(tester);
-        await tap(tester, find.text('Enviar solicitud'));
-      }
 
+        expect(store.submittedRequest, isNull);
+      });
+    });
+
+    group('after submitting, a request that does not go on as usual', () {
       testWidgets('held for enhanced review: says a person will review it, without the criteria (VDI-118)',
           (tester) async {
         final store = FakeSavedRequestStore();
@@ -939,7 +1126,9 @@ void main() {
         for (final hint in ['score', 'riesgo', 'puntaje', 'sospech', 'alto']) {
           expect(find.textContaining(RegExp(hint, caseSensitive: false)), findsNothing, reason: 'never says why: $hint');
         }
-        expect(store.id, isNull, reason: 'a submitted request is not offered again');
+        expect(store.id, requestId, reason: 'the phone keeps it to show it when the app opens again');
+        expect(store.submittedRequest?.number, 'SOL-2026-00417');
+        expect(store.submittedRequest?.status, SubmissionStatus.enhancedReview);
 
         await tap(tester, find.text('Entendido'));
         expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
@@ -960,7 +1149,9 @@ void main() {
         for (final hint in ['RNPN', 'Registro Nacional', 'servicio', 'intentar', 'Reintentar']) {
           expect(find.textContaining(RegExp(hint, caseSensitive: false), findRichText: true), findsNothing, reason: hint);
         }
-        expect(store.id, isNull, reason: 'a submitted request is not offered again');
+        expect(store.id, requestId, reason: 'the phone keeps it to show it when the app opens again');
+        expect(store.submittedRequest?.number, 'SOL-2026-00418');
+        expect(store.submittedRequest?.status, SubmissionStatus.awaitingVerification);
 
         await tap(tester, find.text('Entendido'));
         expect(find.text('Tu cuenta, desde tu teléfono.'), findsOneWidget);
@@ -981,6 +1172,115 @@ void main() {
         await tap(tester, find.text('Entendido'));
         expect(find.text('Estamos revisando tu solicitud'), findsNothing);
         expect(find.text('Empezar'), findsOneWidget);
+      });
+    });
+
+    group('contract and signature (VDI-132)', () {
+      testWidgets('an approved request shows the contract with its version and signs that version', (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await submitRequest(tester);
+
+        expect(find.text('Firma tu contrato'), findsOneWidget);
+        expect(find.text('Versión 2026.1'), findsOneWidget);
+        expect(find.text('Texto de prueba del contrato 2026.1.'), findsOneWidget);
+        expect(find.textContaining('RNPN'), findsNothing);
+
+        await signContract(tester);
+        expect(jsonDecode(fake.signatures.single.body), {'contractVersion': '2026.1'});
+        expect(fake.signatures.single.url.path, '/api/onboarding/requests/$requestId/signature');
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+        expect(find.byKey(const Key('contract-signed')), findsOneWidget);
+        expect(find.textContaining('Contrato firmado el '), findsOneWidget);
+        expect(find.textContaining('28/10/2026'), findsOneWidget);
+      });
+
+      testWidgets('it does not sign until the contract is accepted', (tester) async {
+        final fake = FakeApi();
+        await tester.pumpWidget(app(fake));
+        await submitRequest(tester);
+
+        await tap(tester, find.text('Firmar contrato'));
+        expect(find.text('Para firmar necesitamos que aceptes el contrato.'), findsOneWidget);
+        expect(fake.signatures, isEmpty);
+      });
+
+      testWidgets('a request held for review or waiting never sees the step', (tester) async {
+        for (final status in ['ENHANCED_REVIEW', 'AWAITING_RNPN']) {
+          final fake = FakeApi(submitStatus: status);
+          await tester.pumpWidget(app(fake));
+          await submitRequest(tester);
+          expect(find.text('Firma tu contrato'), findsNothing, reason: status);
+          expect(fake.contracts, isEmpty, reason: status);
+          expect(fake.signatures, isEmpty, reason: status);
+          await tester.pumpWidget(const SizedBox());
+        }
+      });
+
+      testWidgets('without connection the contract can be loaded again', (tester) async {
+        final fake = FakeApi(failContractTimes: 1);
+        await tester.pumpWidget(app(fake));
+        await submitRequest(tester);
+
+        expect(find.text('No pudimos cargar el contrato'), findsOneWidget);
+        expect(find.text('Firmar contrato'), findsOneWidget, reason: 'the button is there but cannot be used');
+        await tap(tester, find.text('Reintentar'));
+        expect(find.text('Versión 2026.1'), findsOneWidget);
+        expect(fake.contracts, hasLength(2));
+      });
+
+      testWidgets('a signature the service rejects (422) says so and can be tried again', (tester) async {
+        final fake = FakeApi(signResponses: [(422, '{"status":422,"detail":"Signature rejected"}')]);
+        await tester.pumpWidget(app(fake));
+        await submitRequest(tester);
+
+        await signContract(tester);
+        expect(find.text('No pudimos firmar tu contrato'), findsOneWidget);
+        expect(find.text('No pudimos registrar tu firma. Inténtalo de nuevo.'), findsOneWidget);
+        expect(find.text('Firma tu contrato'), findsOneWidget);
+
+        await tap(tester, find.text('Reintentar'));
+        expect(fake.signatures, hasLength(2));
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+      });
+
+      testWidgets('without connection the signature can be sent again', (tester) async {
+        final fake = FakeApi(signResponses: [(503, '')]);
+        await tester.pumpWidget(app(fake));
+        await submitRequest(tester);
+
+        await signContract(tester);
+        expect(find.text('Revisa tu conexión a internet e inténtalo de nuevo.'), findsOneWidget);
+        await tap(tester, find.text('Reintentar'));
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+      });
+
+      testWidgets('a repeated signature (409) with the same contract says it was already signed', (tester) async {
+        final fake = FakeApi(signResponses: [(409, '{"status":409,"detail":"Request already signed the contract"}')]);
+        await tester.pumpWidget(app(fake));
+        await submitRequest(tester);
+
+        await signContract(tester);
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
+        expect(find.text('Tu contrato ya estaba firmado.'), findsOneWidget);
+      });
+
+      testWidgets('if the contract changed (409), it is shown again and must be accepted again', (tester) async {
+        final fake = FakeApi(
+          contractVersions: ['2026.1', '2026.2'],
+          signResponses: [(409, '{"status":409,"detail":"Contract version 2026.1 is not the one in force"}')],
+        );
+        await tester.pumpWidget(app(fake));
+        await submitRequest(tester);
+
+        await signContract(tester);
+        expect(find.text('El contrato se actualizó. Léelo de nuevo antes de firmar.'), findsOneWidget);
+        expect(find.text('Versión 2026.2'), findsOneWidget);
+        expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+
+        await signContract(tester);
+        expect(jsonDecode(fake.signatures.last.body), {'contractVersion': '2026.2'});
+        expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       });
     });
 
@@ -1243,6 +1543,7 @@ void main() {
         await tapContinue(tester);
         await tap(tester, find.text('Enviar solicitud'));
 
+        await signContract(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
         expect(lastSignals(fake)['deviceLocationStatus'], 'DENIED');
       });
@@ -1290,6 +1591,7 @@ void main() {
 
         advance(3000);
         await tap(tester, find.text('Enviar solicitud'));
+        await signContract(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
         await tester.pumpAndSettle();
 
@@ -2588,6 +2890,7 @@ void main() {
         fake.release('submit');
         await tester.pumpAndSettle();
         expect(find.text('Enviando tu solicitud…'), findsNothing);
+        await signContract(tester);
         expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
       });
 
@@ -2956,12 +3259,10 @@ void main() {
             fake.submits.single.url.path,
             '/api/onboarding/requests/$requestId/submit',
           );
+          await signContract(tester);
           expect(find.text('¡Recibimos tu solicitud!'), findsOneWidget);
-          expect(
-            store.id,
-            isNull,
-            reason: 'a submitted request is not offered again',
-          );
+          expect(store.id, requestId, reason: 'the phone keeps it to show it when the app opens again');
+          expect(store.submittedRequest?.signed, isTrue);
         },
       );
 

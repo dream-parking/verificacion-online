@@ -258,6 +258,24 @@
         },
         "type" : "object"
       },
+      "ArchivedDossierResponse" : {
+        "properties" : {
+          "customerNumber" : {
+            "description" : "Número del cliente; vacío si la solicitud aún no tenía cliente numerado",
+            "example" : "CLI-0000001",
+            "type" : "string"
+          },
+          "dossier" : {
+            "$ref" : "#/components/schemas/BindingDossierResponse"
+          },
+          "requestNumber" : {
+            "description" : "Número de la solicitud del expediente",
+            "example" : "SOL-2026-00001",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "BasicDataRequest" : {
         "properties" : {
           "dui" : {
@@ -284,6 +302,35 @@
           }
         },
         "required" : [ "dui", "firstNames", "lastNames", "mobilePhone" ],
+        "type" : "object"
+      },
+      "BindingDossierResponse" : {
+        "properties" : {
+          "evidence" : {
+            "$ref" : "#/components/schemas/DossierEvidence"
+          },
+          "frozenAt" : {
+            "description" : "Cuándo se congeló el expediente",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "retainedUntil" : {
+            "description" : "Hasta cuándo se retiene (VDI-134): la fecha de la firma más el plazo de retención; antes de ella no se puede borrar",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "signature" : {
+            "$ref" : "#/components/schemas/DossierSignature"
+          }
+        },
         "type" : "object"
       },
       "CaptureSignalsRequest" : {
@@ -489,6 +536,19 @@
         "required" : [ "currentPassword", "newPassword" ],
         "type" : "object"
       },
+      "ChangeProfileToleranceRequest" : {
+        "properties" : {
+          "tolerancePercent" : {
+            "description" : "Margen sobre lo declarado antes de considerarlo una desviación, en porcentaje entero de 0 a 45",
+            "example" : 25,
+            "maximum" : 45,
+            "minimum" : 0,
+            "type" : "number"
+          }
+        },
+        "required" : [ "tolerancePercent" ],
+        "type" : "object"
+      },
       "CloseAlertRequest" : {
         "properties" : {
           "comment" : {
@@ -596,6 +656,9 @@
           "applicant" : {
             "$ref" : "#/components/schemas/ConsoleRequestApplicant"
           },
+          "bindingDossier" : {
+            "$ref" : "#/components/schemas/BindingDossierResponse"
+          },
           "completedSteps" : {
             "format" : "int32",
             "type" : "integer"
@@ -646,7 +709,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "steps" : {
@@ -937,7 +1000,7 @@
             "type" : "integer"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "transactionTypeLabel" : {
@@ -995,7 +1058,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1190,7 +1253,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "REQUEST_ABANDONED" ],
+            "enum" : [ "REQUEST_STARTED", "PRIVACY_ACCEPTED", "BASIC_DATA_COMPLETED", "IDENTITY_DOCUMENT_CAPTURED", "IDENTITY_DOCUMENT_CONFIRMED", "IDENTITY_DOCUMENT_REJECTED", "LIVENESS_CHECKED", "INCOME_REGISTERED", "EXPECTED_ACTIVITY_REGISTERED", "REQUEST_SUBMITTED", "SUBMISSION_FAILED", "SCORE_ASSIGNED", "ENHANCED_REVIEW_REQUIRED", "RNPN_CHECKED", "REQUEST_ESCALATED", "CONTRACT_SIGNED", "CONTRACT_SIGNATURE_REJECTED", "PRODUCT_REQUESTED", "REQUEST_ABANDONED" ],
             "type" : "string"
           }
         },
@@ -1220,6 +1283,52 @@
           "role" : {
             "enum" : [ "KYC_LEAD", "FRAUD_ANALYST", "ADMIN" ],
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ContractResponse" : {
+        "properties" : {
+          "fingerprint" : {
+            "description" : "Huella SHA-256 del texto en UTF-8, 64 caracteres hexadecimales en minúsculas",
+            "type" : "string"
+          },
+          "text" : {
+            "description" : "Texto completo del contrato, con saltos de línea \\n",
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "Versión del contrato; la app la manda al firmar",
+            "example" : "2026.1",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ContractSignatureResponse" : {
+        "properties" : {
+          "contractFingerprint" : {
+            "description" : "Huella SHA-256 del texto firmado",
+            "type" : "string"
+          },
+          "contractVersion" : {
+            "type" : "string"
+          },
+          "provider" : {
+            "description" : "Servicio de firma: `simulated` mientras no hay un proveedor real",
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "signedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "simulated" : {
+            "description" : "true mientras la firma es del servicio simulado",
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -1295,6 +1404,34 @@
           }
         },
         "required" : [ "code", "label" ],
+        "type" : "object"
+      },
+      "CreateRiskListEntryRequest" : {
+        "properties" : {
+          "dataType" : {
+            "description" : "DOCUMENT (DUI), PHONE o DEVICE",
+            "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+            "example" : "DOCUMENT",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Motivo de la alta",
+            "example" : "Fraude confirmado en el caso 2026-114",
+            "maxLength" : 250,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          },
+          "value" : {
+            "description" : "El dato: DUI (04567891-2), teléfono celular (7845-2310) o huella del dispositivo. Se guarda solo su huella",
+            "example" : "04567891-2",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "pattern" : "[^\\p{C}\\p{So}\\p{Sk}\\p{Zl}\\p{Zp}<>]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "dataType", "reason", "value" ],
         "type" : "object"
       },
       "CreateUserRequest" : {
@@ -1382,6 +1519,20 @@
         },
         "type" : "object"
       },
+      "DeactivateRiskListEntryRequest" : {
+        "properties" : {
+          "reason" : {
+            "description" : "Motivo de la baja",
+            "example" : "Se descartó el fraude tras la investigación",
+            "maxLength" : 250,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "reason" ],
+        "type" : "object"
+      },
       "DeclaredProfile" : {
         "properties" : {
           "monthlyAmountRangeCode" : {
@@ -1413,6 +1564,191 @@
             "type" : "array"
           }
         },
+        "type" : "object"
+      },
+      "DossierConsent" : {
+        "properties" : {
+          "acceptedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "noticeVersion" : {
+            "type" : "string"
+          },
+          "signalsAccepted" : {
+            "type" : "boolean"
+          },
+          "termsAccepted" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierEvidence" : {
+        "properties" : {
+          "consent" : {
+            "$ref" : "#/components/schemas/DossierConsent"
+          },
+          "decisions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RiskDecisionResponse"
+            },
+            "type" : "array"
+          },
+          "identity" : {
+            "$ref" : "#/components/schemas/DossierIdentity"
+          },
+          "liveness" : {
+            "$ref" : "#/components/schemas/DossierLiveness"
+          },
+          "risk" : {
+            "$ref" : "#/components/schemas/DossierRisk"
+          },
+          "rnpn" : {
+            "$ref" : "#/components/schemas/DossierRnpn"
+          },
+          "schemaVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierIdentity" : {
+        "properties" : {
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "confirmedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "customerNumber" : {
+            "type" : "string"
+          },
+          "dui" : {
+            "type" : "string"
+          },
+          "expiryDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "firstNames" : {
+            "type" : "string"
+          },
+          "lastNames" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierLiveness" : {
+        "properties" : {
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "confidence" : {
+            "type" : "number"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "CHECKED", "FAILED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierRisk" : {
+        "properties" : {
+          "assessment" : {
+            "$ref" : "#/components/schemas/RiskAssessmentResponse"
+          },
+          "lowMax" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "mediumMax" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "reviewThreshold" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierRnpn" : {
+        "properties" : {
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "mismatchedFields" : {
+            "items" : {
+              "enum" : [ "DUI", "FIRST_NAMES", "LAST_NAMES", "BIRTH_DATE" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "outcome" : {
+            "enum" : [ "MATCH", "NO_MATCH", "UNAVAILABLE" ],
+            "type" : "string"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "simulated" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "DossierSignature" : {
+        "properties" : {
+          "contractFingerprint" : {
+            "type" : "string"
+          },
+          "contractVersion" : {
+            "type" : "string"
+          },
+          "signedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "EscalateRequest" : {
+        "properties" : {
+          "channel" : {
+            "description" : "VIDEO_CALL (videollamada) o BRANCH (agencia)",
+            "enum" : [ "VIDEO_CALL", "BRANCH" ],
+            "example" : "VIDEO_CALL",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Por qué se escala",
+            "example" : "El monto declarado no coincide con los ingresos",
+            "maxLength" : 250,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "channel", "reason" ],
         "type" : "object"
       },
       "ExpectedActivityRequest" : {
@@ -1652,6 +1988,11 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "escalationChannel" : {
+            "description" : "Canal al que se escaló la solicitud (VIDEO_CALL: videollamada, BRANCH: agencia); vacío si no está escalada",
+            "enum" : [ "VIDEO_CALL", "BRANCH" ],
+            "type" : "string"
+          },
           "id" : {
             "format" : "uuid",
             "type" : "string"
@@ -1668,7 +2009,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "submittedAt" : {
@@ -1819,7 +2160,7 @@
             "type" : "string"
           },
           "tolerancePercent" : {
-            "description" : "Margen sobre lo declarado antes de considerarlo una desviación",
+            "description" : "Tolerancia vigente: margen sobre lo declarado antes de considerarlo una desviación",
             "example" : 20,
             "format" : "int32",
             "type" : "integer"
@@ -1855,9 +2196,70 @@
           "limitValue" : {
             "type" : "number"
           },
+          "tolerancePercent" : {
+            "description" : "Tolerancia con la que se detectó",
+            "example" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          },
           "type" : {
             "enum" : [ "INFLOW_ABOVE_RANGE", "INFLOW_ABOVE_DECLARED_AMOUNT", "MORE_TRANSACTIONS_THAN_DECLARED", "OUTFLOW_ABOVE_DECLARED", "UNDECLARED_TRANSACTION_TYPE" ],
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ProfileToleranceChange" : {
+        "properties" : {
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "description" : "Usuario de consola que hizo el cambio; vacío en el valor inicial",
+            "type" : "string"
+          },
+          "previousPercent" : {
+            "description" : "Valor anterior; vacío en el valor inicial",
+            "example" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "tolerancePercent" : {
+            "description" : "Valor nuevo",
+            "example" : 25,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ProfileToleranceResponse" : {
+        "properties" : {
+          "changes" : {
+            "description" : "Bitácora de cambios, del más reciente al más antiguo",
+            "items" : {
+              "$ref" : "#/components/schemas/ProfileToleranceChange"
+            },
+            "type" : "array"
+          },
+          "maxPercent" : {
+            "description" : "Máximo permitido",
+            "example" : 45,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "minPercent" : {
+            "description" : "Mínimo permitido",
+            "example" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "tolerancePercent" : {
+            "description" : "Tolerancia vigente: margen sobre lo declarado antes de considerarlo una desviación",
+            "example" : 20,
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -2013,6 +2415,26 @@
         "required" : [ "amountUsd", "direction", "externalId", "occurredAt" ],
         "type" : "object"
       },
+      "RegisterOutcomeRequest" : {
+        "properties" : {
+          "outcome" : {
+            "description" : "FRAUDE_CONFIRMADO (el DUI, el teléfono y el dispositivo pasan a la lista de fraude confirmado) o FALSO_POSITIVO (solo se registra)",
+            "enum" : [ "FRAUDE_CONFIRMADO", "FALSO_POSITIVO" ],
+            "example" : "FRAUDE_CONFIRMADO",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Por qué se cierra así",
+            "example" : "El titular del DUI negó haber abierto la cuenta",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "pattern" : "\\s*|[\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{Sc} .,;:¿?¡!'\"‘’“”«»()/&%#@+*_°–—…\\-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "outcome", "reason" ],
+        "type" : "object"
+      },
       "RegisteredMovementResponse" : {
         "properties" : {
           "movement" : {
@@ -2021,6 +2443,49 @@
           "newDeviations" : {
             "items" : {
               "$ref" : "#/components/schemas/ProfileDeviation"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "RequestOutcomeResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "listed" : {
+            "description" : "Datos que este desenlace puso en la lista de fraude confirmado. Vacío si no puso ninguno (falso positivo, o ya estaban en la lista)",
+            "items" : {
+              "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "outcome" : {
+            "enum" : [ "FRAUDE_CONFIRMADO", "FALSO_POSITIVO" ],
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "registeredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "registeredBy" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "revoked" : {
+            "description" : "Datos que este desenlace sacó de las listas al corregir el anterior",
+            "items" : {
+              "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+              "type" : "string"
             },
             "type" : "array"
           }
@@ -2053,7 +2518,7 @@
             "type" : "string"
           },
           "status" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           },
           "submittedAt" : {
@@ -2256,16 +2721,21 @@
       },
       "RiskDecisionResponse" : {
         "properties" : {
+          "channel" : {
+            "description" : "Canal del escalamiento (VIDEO_CALL: videollamada, BRANCH: agencia); vacío en las decisiones automáticas",
+            "enum" : [ "VIDEO_CALL", "BRANCH" ],
+            "type" : "string"
+          },
           "decidedAt" : {
             "format" : "date-time",
             "type" : "string"
           },
           "decidedBy" : {
-            "description" : "Who decided: SYSTEM for the automatic rule",
+            "description" : "Quién decidió: SYSTEM para la regla automática; el nombre del analista en un escalamiento",
             "type" : "string"
           },
           "decision" : {
-            "enum" : [ "AUTOMATIC_FLOW", "ENHANCED_REVIEW" ],
+            "enum" : [ "AUTOMATIC_FLOW", "ENHANCED_REVIEW", "ESCALATED" ],
             "type" : "string"
           },
           "id" : {
@@ -2284,6 +2754,85 @@
             "type" : "integer"
           },
           "threshold" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RiskListEntryChangeResponse" : {
+        "properties" : {
+          "action" : {
+            "enum" : [ "ADDED", "DEACTIVATED" ],
+            "type" : "string"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RiskListEntryResponse" : {
+        "properties" : {
+          "active" : {
+            "description" : "Una entrada inactiva ya no coincide, pero queda en el historial",
+            "type" : "boolean"
+          },
+          "addedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "addedBy" : {
+            "type" : "string"
+          },
+          "dataType" : {
+            "enum" : [ "DOCUMENT", "PHONE", "DEVICE" ],
+            "type" : "string"
+          },
+          "deactivatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "deactivatedBy" : {
+            "type" : "string"
+          },
+          "deactivationReason" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "list" : {
+            "$ref" : "#/components/schemas/RiskListResponse"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RiskListResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "type" : {
+            "enum" : [ "CONFIRMED_FRAUD", "UNDER_INVESTIGATION", "WATCH" ],
+            "type" : "string"
+          },
+          "weight" : {
+            "description" : "Peso de sus coincidencias para el score, de 1 a 100",
             "format" : "int32",
             "type" : "integer"
           }
@@ -2382,6 +2931,20 @@
             "type" : "integer"
           }
         },
+        "type" : "object"
+      },
+      "SignContractRequest" : {
+        "properties" : {
+          "contractVersion" : {
+            "description" : "Versión del contrato que la app mostró a la persona, tal como la devolvió GET /api/onboarding/contract",
+            "example" : "2026.1",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[0-9A-Za-z][0-9A-Za-z._-]*",
+            "type" : "string"
+          }
+        },
+        "required" : [ "contractVersion" ],
         "type" : "object"
       },
       "SignalContribution" : {
@@ -3510,6 +4073,462 @@
         } ],
         "summary" : "Publica una versión nueva del aviso de privacidad",
         "tags" : [ "Consola · Administración de catálogos" ]
+      }
+    },
+    "/api/console/admin/profile-tolerance" : {
+      "get" : {
+        "description" : "Cada cambio trae el valor anterior y el nuevo, quién lo hizo (`changedBy`, vacío en el valor inicial) y cuándo (`changedAt`), del más reciente al más antiguo.",
+        "operationId" : "profileToleranceAdminLog",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileToleranceResponse"
+                }
+              }
+            },
+            "description" : "Tolerancia vigente y bitácora de cambios"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Tolerancia vigente y bitácora de cambios",
+        "tags" : [ "Consola · Administración del perfil transaccional" ]
+      },
+      "put" : {
+        "description" : "Aplica desde el siguiente movimiento que reporte el core, sin desplegar. Las desviaciones ya registradas conservan la tolerancia con la que se detectaron. Debe ser un entero de 0 a 45.",
+        "operationId" : "profileToleranceAdminChange",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangeProfileToleranceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileToleranceResponse"
+                }
+              }
+            },
+            "description" : "Tolerancia cambiada; devuelve la vigente y la bitácora"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Fuera de rango, vacía o igual a la vigente: `errors` dice por qué, en español, y no se guarda nada"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Cambia la tolerancia de desviación del perfil declarado",
+        "tags" : [ "Consola · Administración del perfil transaccional" ]
+      }
+    },
+    "/api/console/admin/risk-lists" : {
+      "get" : {
+        "description" : "Cada lista tiene un tipo y el peso que sus coincidencias llevan al score.",
+        "operationId" : "riskListAdminLists",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RiskListResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Listas, de mayor a menor peso"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Listas internas de riesgo",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
+      }
+    },
+    "/api/console/admin/risk-lists/entries/{entryId}/changes" : {
+      "get" : {
+        "description" : "Alta y baja, cada una con quién, cuándo y el motivo.",
+        "operationId" : "riskListAdminHistory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "entryId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RiskListEntryChangeResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Cambios, del más antiguo al más reciente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La entrada no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Bitácora de una entrada",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
+      }
+    },
+    "/api/console/admin/risk-lists/entries/{entryId}/deactivate" : {
+      "post" : {
+        "description" : "No la borra: la marca inactiva, así que deja de coincidir y queda en el historial con quién, cuándo y el motivo.",
+        "operationId" : "riskListAdminDeactivate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "entryId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DeactivateRiskListEntryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RiskListEntryResponse"
+                }
+              }
+            },
+            "description" : "Entrada dada de baja"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La entrada no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La entrada ya está inactiva"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Da de baja una entrada",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
+      }
+    },
+    "/api/console/admin/risk-lists/{code}/entries" : {
+      "get" : {
+        "description" : "No trae el dato ni su huella: solo el tipo de dato, el motivo, quién y cuándo lo agregó y, si ya salió, quién y cuándo.",
+        "operationId" : "riskListAdminEntries",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RiskListEntryResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Entradas, de la más reciente a la más antigua"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La lista no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Entradas de una lista, activas e inactivas",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
+      },
+      "post" : {
+        "description" : "El dato (DUI, teléfono celular o huella del dispositivo) se guarda solo como huella con sal; el nombre no interviene. La alta queda en la bitácora con quién, cuándo y el motivo.",
+        "operationId" : "riskListAdminAdd",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "code",
+          "required" : true,
+          "schema" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "[A-Z0-9][A-Z0-9_-]*",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateRiskListEntryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RiskListEntryResponse"
+                }
+              }
+            },
+            "description" : "Entrada agregada"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El dato no tiene el formato de su tipo"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La lista no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El dato ya está activo en esa lista"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Da de alta un dato en una lista",
+        "tags" : [ "Consola · Administración de listas internas de riesgo" ]
       }
     },
     "/api/console/admin/score-model/versions" : {
@@ -4652,6 +5671,91 @@
         "tags" : [ "Consola · Cuentas" ]
       }
     },
+    "/api/console/dossiers" : {
+      "get" : {
+        "description" : "Envía uno de los dos filtros. El expediente es la copia inmutable que se congeló al firmar. Trae datos personales: cada consulta queda en la auditoría de accesos (`VIEW_BINDING_DOSSIER`, con el número consultado, el usuario y la IP) y la respuesta no se guarda en caché.",
+        "operationId" : "dossierFind",
+        "parameters" : [ {
+          "description" : "Número de solicitud",
+          "example" : "SOL-2026-00001",
+          "in" : "query",
+          "name" : "requestNumber",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 20,
+            "minLength" : 0,
+            "pattern" : "SOL-[0-9]{4}-[0-9]{5,}",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Número de cliente",
+          "example" : "CLI-0000001",
+          "in" : "query",
+          "name" : "customerNumber",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 20,
+            "minLength" : 0,
+            "pattern" : "CLI-[0-9]{7,}",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ArchivedDossierResponse"
+                  }, {
+                    "items" : {
+                      "$ref" : "#/components/schemas/ArchivedDossierResponse"
+                    },
+                    "type" : "array"
+                  } ]
+                }
+              }
+            },
+            "description" : "Por `requestNumber`, el expediente; por `customerNumber`, la lista de expedientes del cliente (uno por solicitud firmada), del más reciente al más antiguo, vacía si no ha firmado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Ninguno o los dos filtros, o un número con formato inválido"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No hay solicitud o cliente con ese número, o la solicitud aún no firmó"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Busca el expediente de vinculación por número de solicitud o de cliente",
+        "tags" : [ "Consola · Expedientes" ]
+      }
+    },
     "/api/console/requests" : {
       "get" : {
         "description" : "Filtra por estado, nivel de riesgo y texto (nombre o número). `page` empieza en 0; `size` máximo 100.",
@@ -4661,7 +5765,7 @@
           "name" : "status",
           "required" : false,
           "schema" : {
-            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ABANDONED" ],
+            "enum" : [ "IN_PROGRESS", "COMPLETED", "ENHANCED_REVIEW", "AWAITING_RNPN", "ESCALATED", "ABANDONED" ],
             "type" : "string"
           }
         }, {
@@ -4818,6 +5922,88 @@
         "tags" : [ "Consola · Solicitudes" ]
       }
     },
+    "/api/console/requests/{requestId}/escalation" : {
+      "post" : {
+        "description" : "La solicitud pasa a `ESCALATED` con el canal elegido y conserva todo lo capturado. El escalamiento queda en la bitácora de decisiones (`ESCALATED`) con el canal, el motivo, quién lo decidió y la fecha y hora; la bitácora no se puede editar. La app ve el estado y el canal, nunca el score ni los criterios. Cualquier usuario de la consola.",
+        "operationId" : "escalationEscalate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EscalateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RiskDecisionResponse"
+                }
+              }
+            },
+            "description" : "Solicitud escalada; devuelve la decisión registrada en la bitácora"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el canal o el motivo, o no tienen el formato"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no está en revisión reforzada"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Escala una solicitud en revisión reforzada",
+        "tags" : [ "Consola · Escalamiento" ]
+      }
+    },
     "/api/console/requests/{requestId}/identity-document/{side}" : {
       "get" : {
         "description" : "Descifra la foto guardada en el expediente. Cada consulta queda en la auditoría de accesos del usuario y la respuesta no se guarda en caché.",
@@ -4873,6 +6059,141 @@
         } ],
         "summary" : "Foto del DUI de una solicitud (frente o reverso)",
         "tags" : [ "Consola · Solicitudes" ]
+      }
+    },
+    "/api/console/requests/{requestId}/outcome" : {
+      "get" : {
+        "description" : "Cada desenlace con quién, cuándo, el motivo y los datos que puso o sacó de las listas.",
+        "operationId" : "requestOutcomeHistory",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RequestOutcomeResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "Desenlaces, del más antiguo al más reciente; el último es el vigente"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Desenlaces de una solicitud",
+        "tags" : [ "Consola · Desenlace de casos" ]
+      },
+      "post" : {
+        "description" : "`FRAUDE_CONFIRMADO` pone el DUI, el teléfono y el dispositivo de la solicitud en la lista de fraude confirmado (lo que ya esté en la lista no se repite). `FALSO_POSITIVO` solo lo registra. Registrar otro desenlace corrige el anterior: no lo edita, agrega una fila, y un falso positivo saca de las listas lo que los desenlaces anteriores de la solicitud habían puesto. Solo analistas de fraude y administradores.",
+        "operationId" : "requestOutcomeRegister",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterOutcomeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RequestOutcomeResponse"
+                }
+              }
+            },
+            "description" : "Desenlace registrado"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el desenlace o el motivo, o no tienen el formato"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta el token o ya no es válido"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Solo analistas de fraude y administradores"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Registra el desenlace de una solicitud",
+        "tags" : [ "Consola · Desenlace de casos" ]
       }
     },
     "/api/console/score-model" : {
@@ -5328,6 +6649,26 @@
         } ],
         "summary" : "Define una contraseña nueva para otro usuario (administradores)",
         "tags" : [ "Consola · Usuarios" ]
+      }
+    },
+    "/api/onboarding/contract" : {
+      "get" : {
+        "description" : "Versión, texto y huella SHA-256 del contrato que la app muestra antes de firmar. Al firmar, la app manda esa misma `version`.",
+        "operationId" : "contractSignatureContract",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContractResponse"
+                }
+              }
+            },
+            "description" : "El contrato vigente"
+          }
+        },
+        "summary" : "Contrato de apertura vigente",
+        "tags" : [ "Onboarding" ]
       }
     },
     "/api/onboarding/requests" : {
@@ -6107,6 +7448,85 @@
         "tags" : [ "Onboarding" ]
       }
     },
+    "/api/onboarding/requests/{requestId}/signature" : {
+      "post" : {
+        "description" : "Firma el contrato vigente con el servicio de firma (simulado mientras no hay un proveedor real). Solo una solicitud enviada y aprobada (`COMPLETED`) puede firmar, una sola vez. Guarda la versión, la huella SHA-256 del texto firmado, la fecha y hora, y el dispositivo y la IP de la sesión; esa evidencia no se puede cambiar ni borrar.",
+        "operationId" : "contractSignatureSign",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SignContractRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ContractSignatureResponse"
+                }
+              }
+            },
+            "description" : "Contrato firmado; la evidencia quedó en el expediente"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Falta `contractVersion` o es demasiado larga"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no existe"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "La solicitud no está aprobada (en progreso, en revisión reforzada, en espera del RNPN o abandonada), ya firmó, o la versión no es la vigente"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "El servicio de firma rechazó la firma: no se guarda y se puede intentar de nuevo"
+          }
+        },
+        "summary" : "Firma electrónica del contrato",
+        "tags" : [ "Onboarding" ]
+      }
+    },
     "/api/onboarding/requests/{requestId}/submit" : {
       "post" : {
         "description" : "Requiere los pasos anteriores completos. Asigna el número y deja la solicitud como completada.",
@@ -6158,16 +7578,12 @@
     }
   },
   "servers" : [ {
-    "description" : "Dev",
-    "url" : "https://api.dev.identidad.alambritos.online"
-  }, {
-    "description" : "QA",
-    "url" : "https://api.qa.identidad.alambritos.online"
-  }, {
-    "description" : "Local",
     "url" : "http://localhost:8080"
   } ],
   "tags" : [ {
+    "description" : "El analista envía una solicitud en revisión reforzada a videollamada o a agencia",
+    "name" : "Consola · Escalamiento"
+  }, {
     "description" : "Movimientos reales de la cuenta comparados con el perfil declarado",
     "name" : "Consola · Perfil transaccional"
   }, {
@@ -6192,11 +7608,20 @@
     "description" : "Umbrales y versiones del modelo de score (administradores)",
     "name" : "Consola · Administración del modelo de score"
   }, {
+    "description" : "Expediente de vinculación archivado, por número de solicitud o de cliente",
+    "name" : "Consola · Expedientes"
+  }, {
     "description" : "Catálogos de la app y aviso de privacidad (administradores)",
     "name" : "Consola · Administración de catálogos"
   }, {
     "description" : "Score de riesgo asignado a una solicitud",
     "name" : "Riesgo"
+  }, {
+    "description" : "Listas de datos de casos de fraude ya conocidos (administradores). Los valores se guardan solo como huella y no se devuelven",
+    "name" : "Consola · Administración de listas internas de riesgo"
+  }, {
+    "description" : "Cómo terminó un caso: fraude confirmado (alimenta las listas internas de riesgo) o falso positivo (solo se registra)",
+    "name" : "Consola · Desenlace de casos"
   }, {
     "description" : "Pasos de la solicitud de apertura de cuenta (app móvil)",
     "name" : "Onboarding"
@@ -6215,5 +7640,8 @@
   }, {
     "description" : "Modelo de ponderación del score (solo lectura)",
     "name" : "Consola · Modelo de score"
+  }, {
+    "description" : "Tolerancia de desviación del perfil declarado (administradores)",
+    "name" : "Consola · Administración del perfil transaccional"
   } ]
 }

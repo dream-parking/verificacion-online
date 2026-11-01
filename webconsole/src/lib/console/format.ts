@@ -4,6 +4,7 @@ import type {
   Criticality,
   AlertStatus,
   DeviceLocationStatus,
+  EscalationChannel,
   ProfileVersion,
   RequestStatus,
   RiskLevel,
@@ -22,16 +23,45 @@ export const RISK: Record<RiskLevel, Badge> = {
 };
 
 export const REQUEST_STATUS: Record<RequestStatus, Badge> = {
-  COMPLETED: { cls: "s-ok", label: "✓ Completada" },
   IN_PROGRESS: { cls: "s-progress", label: "… En progreso" },
+  COMPLETED: { cls: "s-ok", label: "✓ Completada" },
   ENHANCED_REVIEW: { cls: "s-enhanced", label: "⚑ Revisión reforzada" },
   AWAITING_RNPN: { cls: "s-waiting", label: "◷ En espera" },
+  ESCALATED: { cls: "s-enhanced", label: "⇪ Escalada" },
   ABANDONED: { cls: "s-abandoned", label: "✕ Abandonada" },
 };
 
-/** The person already sent the request: approved automatically, held for enhanced review or waiting for the RNPN. */
+/** Options of the status filter, in the order of REQUEST_STATUS and without the symbol that precedes each badge label. */
+export const REQUEST_STATUS_OPTIONS = Object.entries(REQUEST_STATUS).map(([value, { label }]) => ({
+  value,
+  label: label.replace(/^\S+\s/, ""),
+}));
+
+/** Where an analyst escalated a request (VDI-143). */
+export const ESCALATION_CHANNEL: Record<EscalationChannel, string> = {
+  VIDEO_CALL: "Videollamada",
+  BRANCH: "Agencia",
+};
+
+/**
+ * Event texts the backend saved in English before they were translated (finding B-9). The saved event never changes,
+ * so the timeline shows them in Spanish here.
+ */
+const ENGLISH_EVENT_TEXT: Record<string, string> = {
+  "Contract signed": "Contrato firmado",
+  "Contract signature rejected": "Firma del contrato rechazada",
+};
+
+/** What the timeline says for an event: its saved text, in Spanish, or its type when it has no text. */
+export const eventText = (description: string | null | undefined, type: string) =>
+  (description && (ENGLISH_EVENT_TEXT[description] ?? description)) || type;
+
+/**
+ * The person already sent the request: approved automatically, held for enhanced review, escalated or waiting for the
+ * RNPN.
+ */
 export const isSubmitted = (status: RequestStatus) =>
-  status === "COMPLETED" || status === "ENHANCED_REVIEW" || status === "AWAITING_RNPN";
+  status === "COMPLETED" || status === "ENHANCED_REVIEW" || status === "AWAITING_RNPN" || status === "ESCALATED";
 
 export const CRITICALITY: Record<Criticality, Badge> = {
   CRITICAL: { cls: "c-critical", label: "◆ Crítica" },
@@ -156,6 +186,21 @@ export const minSec = (s: number) => `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 export const duration = (s: number) => `${Math.floor(s / 60)} min ${pad2(s % 60)} s`;
 
 export const usd = (n: number, currency = "USD") => `${currency} ${n.toLocaleString("en-US")}`;
+
+/** What each way of straying from the declared profile means (VDI-138), as the alert evidence names it. */
+export const PROFILE_DEVIATION: Record<string, { label: string; unit: "usd" | "count" }> = {
+  INFLOW_ABOVE_RANGE: { label: "Ingresos por encima del rango mensual declarado", unit: "usd" },
+  INFLOW_ABOVE_DECLARED_AMOUNT: { label: "Ingresos por encima del monto mensual declarado", unit: "usd" },
+  MORE_TRANSACTIONS_THAN_DECLARED: { label: "Más movimientos de entrada que los declarados", unit: "count" },
+  OUTFLOW_ABOVE_DECLARED: { label: "Salidas por encima de lo declarado", unit: "usd" },
+  UNDECLARED_TRANSACTION_TYPE: { label: "Dinero recibido de un tipo que no declaró", unit: "usd" },
+};
+
+/** Alert types raised when the activity strays from the declared profile (VDI-138), and the aspect each one is about. */
+export const PROFILE_ALERT_TYPE: Record<string, string> = {
+  PERFIL_EXCEDIDO: "Movimientos por encima de lo declarado en el perfil",
+  ORIGEN_DISTINTO: "Dinero recibido de un tipo que no declaró",
+};
 
 /** What the declared profile card says when the person has not declared the expected movement yet. */
 export const NO_PROFILE = "Sin declaración de movimiento";

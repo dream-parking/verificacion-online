@@ -28,8 +28,12 @@ import com.dreamparking.backend.rnpn.entity.enums.RnpnField;
  */
 public final class ScoreEngine {
 
-	/** Signals with no way to be read yet; they are listed in the breakdown as not available. */
-	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.CITY, ScoreSignal.INTERNAL_LISTS);
+	/**
+	 * Signals with no way to be read yet; they are listed in the breakdown as not available. The city is not one of
+	 * them: it is not part of the score at all (it is still captured and shown as a device signal), so a new
+	 * evaluation has no row for it.
+	 */
+	private static final List<ScoreSignal> PENDING = List.of(ScoreSignal.INTERNAL_LISTS);
 
 	private static final BigDecimal LOW_CONFIDENCE = new BigDecimal("0.70");
 
@@ -75,9 +79,8 @@ public final class ScoreEngine {
 		contributions.add(liveness(model, inputs.liveness()));
 		contributions.add(rnpn(model, inputs.rnpn()));
 		for (ScoreSignal signal : PENDING) {
-			String note = signal == ScoreSignal.CITY ? "Aún no disponible: llega con la ubicación de la solicitud"
-					: "Aún no disponible: llega en otro sprint";
-			contributions.add(new Contribution(signal, null, model.weightOf(signal), note));
+			contributions.add(new Contribution(signal, null, model.weightOf(signal),
+					"Aún no disponible: llega en otro sprint"));
 		}
 		int total = contributions.stream().mapToInt(c -> c.points() == null ? 0 : c.points()).sum();
 		return new Result(Math.min(total, 100), List.copyOf(contributions));
@@ -122,8 +125,10 @@ public final class ScoreEngine {
 			severity += 0.3;
 			findings.add("el DUI no coincide con el de los datos básicos");
 		}
+		// Weighs more than a different DUI number: without a face match (B-13) a different name is the only sign that the
+		// DUI may belong to someone else.
 		if (Boolean.FALSE.equals(document.getNamesMatchDeclared())) {
-			severity += 0.2;
+			severity += 0.6;
 			findings.add("los nombres no coinciden con los de los datos básicos");
 		}
 		if (document.getStatus() == OcrStatus.FAILED) {
@@ -218,20 +223,27 @@ public final class ScoreEngine {
 	 */
 	private static Contribution rnpn(ScoreModel model, RnpnCheck check) {
 		if (check == null) {
-			return unavailable(model, ScoreSignal.RNPN, "The RNPN has not been checked yet");
+			return unavailable(model, ScoreSignal.RNPN, "Aún no se ha cotejado con el RNPN");
 		}
-		String source = check.isSimulated() ? "RNPN check (simulated)" : "RNPN check";
+		String source = check.isSimulated() ? "Cotejo RNPN (simulado)" : "Cotejo RNPN";
 		return switch (check.getOutcome()) {
-			case MATCH -> contribution(model, ScoreSignal.RNPN, 0.0, source + ": the data matches");
-			case NO_MATCH -> contribution(model, ScoreSignal.RNPN, 1.0, source + ": the data does not match ("
+			case MATCH -> contribution(model, ScoreSignal.RNPN, 0.0, source + ": los datos coinciden");
+			case NO_MATCH -> contribution(model, ScoreSignal.RNPN, 1.0, source + ": los datos no coinciden ("
 					+ String.join(", ", check.getMismatchedFields().stream().map(ScoreEngine::fieldName).toList()) + ")");
 			case UNAVAILABLE -> contribution(model, ScoreSignal.RNPN, RNPN_UNAVAILABLE_SEVERITY,
-					source + ": the RNPN did not answer after %d tries".formatted(check.getAttempts()));
+					source + ": el RNPN no respondió después de %d %s".formatted(check.getAttempts(),
+							check.getAttempts() == 1 ? "intento" : "intentos"));
 		};
 	}
 
+	/** The data of the DUI as the person reading the observation knows it. */
 	private static String fieldName(RnpnField field) {
-		return field.name().toLowerCase().replace('_', ' ');
+		return switch (field) {
+			case DUI -> "número de DUI";
+			case FIRST_NAMES -> "nombres";
+			case LAST_NAMES -> "apellidos";
+			case BIRTH_DATE -> "fecha de nacimiento";
+		};
 	}
 
 	private static Contribution contribution(ScoreModel model, ScoreSignal signal, double severity, String observation) {

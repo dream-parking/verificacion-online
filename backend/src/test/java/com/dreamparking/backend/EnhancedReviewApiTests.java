@@ -79,7 +79,7 @@ class EnhancedReviewApiTests {
 			.andExpect(jsonPath("$.riskDecisions.length()").value(1))
 			.andExpect(jsonPath("$.riskDecisions[0].decision").value("ENHANCED_REVIEW"))
 			.andExpect(jsonPath("$.riskDecisions[0].threshold").value(2))
-			.andExpect(jsonPath("$.riskDecisions[0].modelVersion").value(3))
+			.andExpect(jsonPath("$.riskDecisions[0].modelVersion").value(99))
 			.andExpect(jsonPath("$.riskDecisions[0].score").value(greaterThan(2)))
 			.andExpect(jsonPath("$.riskDecisions[0].reason").value(containsString("above the enhanced-review threshold of 2")))
 			.andExpect(jsonPath("$.riskDecisions[0].reason").value(containsString("main signals: amount")))
@@ -114,7 +114,7 @@ class EnhancedReviewApiTests {
 			.andExpect(jsonPath("$.riskDecisions.length()").value(1))
 			.andExpect(jsonPath("$.riskDecisions[0].decision").value("AUTOMATIC_FLOW"))
 			.andExpect(jsonPath("$.riskDecisions[0].threshold").value(69))
-			.andExpect(jsonPath("$.riskDecisions[0].modelVersion").value(2))
+			.andExpect(jsonPath("$.riskDecisions[0].modelVersion").value(4))
 			.andExpect(jsonPath("$.riskDecisions[0].reason").value(containsString("not above the enhanced-review threshold of 69")))
 			.andExpect(jsonPath("$.timeline[*].type").value(not(hasItem("ENHANCED_REVIEW_REQUIRED"))));
 		perform(post("/api/console/accounts").content("""
@@ -136,8 +136,8 @@ class EnhancedReviewApiTests {
 		jdbc.update("update score_model set valid_to = now() where valid_to is null");
 		jdbc.update("""
 				insert into score_model (version, name, low_max, medium_max, valid_from)
-				values (3, 'Strict test model', 1, 2, now())""");
-		jdbc.update("insert into score_model_weight (model_version, signal, max_points) values (3, 'AMOUNT', 25)");
+				values (99, 'Strict test model', 1, 2, now())""");
+		jdbc.update("insert into score_model_weight (model_version, signal, max_points) values (99, 'AMOUNT', 25)");
 	}
 
 	/** The whole mobile flow up to submit, declaring the given monthly amount range. */

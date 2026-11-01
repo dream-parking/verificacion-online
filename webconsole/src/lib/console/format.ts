@@ -44,6 +44,19 @@ export const ESCALATION_CHANNEL: Record<EscalationChannel, string> = {
 };
 
 /**
+ * Event texts the backend saved in English before they were translated (finding B-9). The saved event never changes,
+ * so the timeline shows them in Spanish here.
+ */
+const ENGLISH_EVENT_TEXT: Record<string, string> = {
+  "Contract signed": "Contrato firmado",
+  "Contract signature rejected": "Firma del contrato rechazada",
+};
+
+/** What the timeline says for an event: its saved text, in Spanish, or its type when it has no text. */
+export const eventText = (description: string | null | undefined, type: string) =>
+  (description && (ENGLISH_EVENT_TEXT[description] ?? description)) || type;
+
+/**
  * The person already sent the request: approved automatically, held for enhanced review, escalated or waiting for the
  * RNPN.
  */

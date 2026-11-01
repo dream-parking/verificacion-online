@@ -163,6 +163,16 @@ class OnboardingApi {
     }
   }
 
+  /// How a request that was submitted stands now (`GET /requests/{id}`): its number and status, which is all the app
+  /// reads (the answer carries more for the console, and it is ignored). `null` when it is still in progress or was
+  /// abandoned. Throws an [ApiException] 404 if it does not exist.
+  Future<Submission?> submission(String requestId) async {
+    final json = await _send('GET', '/api/onboarding/requests/$requestId');
+    final status = SubmissionStatus.fromApi(json['status']);
+    final number = json['number'];
+    return status == null || number is! String ? null : Submission(number, status);
+  }
+
   /// Income step (VDI-47): catalog codes; `detail` only when the source is `OTRO`.
   /// The server stores the date and time of the declaration. It can be sent again to correct it
   /// while the request is in progress; afterwards it responds 409.

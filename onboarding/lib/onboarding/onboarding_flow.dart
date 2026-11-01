@@ -242,6 +242,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       return;
     }
     if (id == null) return;
+    final submitted = await _readSubmitted(id);
+    if (submitted != null) {
+      await _showSubmitted(id, submitted);
+      return;
+    }
     try {
       final info = await _api.resume(id);
       final selfieTaken = await _readSelfieTaken(id);
@@ -258,6 +263,70 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     } on ApiException catch (e) {
       debugPrint('Could not check the saved request: $e');
       if (e.status == 404) await _forgetSavedRequest();
+    }
+  }
+
+  Future<SubmittedRequest?> _readSubmitted(String id) async {
+    try {
+      return await widget.savedRequest.submitted(id);
+    } on Exception catch (e) {
+      debugPrint('Could not read the submitted request: $e');
+      return null;
+    }
+  }
+
+  /// The request kept in the phone was already submitted: the app opens on its notice, with its number and the last
+  /// status known, instead of the welcome. The status is then asked again; without connection the last one known stays,
+  /// and a request the API does not know or that was abandoned is forgotten.
+  Future<void> _showSubmitted(String id, SubmittedRequest saved) async {
+    if (!mounted || _screen != Screen.welcome) return;
+    setState(() {
+      _form
+        ..id = id
+        ..number = saved.number;
+      _submitted = saved.status;
+      _alreadySigned = saved.signed;
+    });
+    _showSubmittedNotice(saved.status, signed: saved.signed);
+    // The notice is already on screen, from what the phone kept: the API (which can take a minute to wake up) only
+    // brings it up to date.
+    try {
+      final current = await _api.submission(id);
+      if (!mounted || _form.id != id) return;
+      if (current == null) return await _dropSubmitted();
+      if (current.status == _submitted) return;
+      setState(() => _submitted = current.status);
+      unawaited(_keepSubmitted(id, current.status, signed: saved.signed));
+      if (_screen == Screen.signature && current.status != SubmissionStatus.completed) _goTo(Screen.confirmation);
+    } on ApiException catch (e) {
+      debugPrint('Could not check the submitted request: $e');
+      if (e.status == 404 && mounted && _form.id == id) await _dropSubmitted();
+    }
+  }
+
+  /// An approved request not signed from this phone goes back to the contract: the API answers 409 if it was signed
+  /// anyway, and that shows the notice. Any other goes straight to its notice.
+  void _showSubmittedNotice(SubmissionStatus status, {required bool signed}) {
+    if (status == SubmissionStatus.completed && !signed) {
+      _goTo(Screen.signature);
+      unawaited(_loadContract());
+    } else {
+      _goTo(Screen.confirmation);
+    }
+  }
+
+  /// The API does not know the request or it was abandoned: it is forgotten and the welcome shows.
+  Future<void> _dropSubmitted() async {
+    await _forgetSavedRequest();
+    if (mounted) _restart();
+  }
+
+  /// Keeps the request as submitted, so it is shown when the app opens again.
+  Future<void> _keepSubmitted(String id, SubmissionStatus status, {bool signed = false}) async {
+    try {
+      await widget.savedRequest.saveSubmitted(id, SubmittedRequest(_form.number ?? '', status, signed: signed));
+    } on Exception catch (e) {
+      debugPrint('Could not keep the submitted request: $e');
     }
   }
 
@@ -775,7 +844,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _submitted = submission.status;
         _submitting = false;
       });
-      unawaited(_forgetSavedRequest());
+      // The phone keeps the request: when the app opens again it shows its number and how it stands.
+      unawaited(_keepSubmitted(_form.id!, submission.status));
       // VDI-132: only an approved request signs; one held or waiting goes straight to its notice.
       if (submission.status == SubmissionStatus.completed) {
         _goTo(Screen.signature);
@@ -836,6 +906,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         _signing = false;
         _signedAt = signature.signedAt;
       });
+      unawaited(_keepSubmitted(_form.id!, _submitted, signed: true));
       _goTo(Screen.confirmation);
     } on ApiException catch (e) {
       debugPrint('Could not sign the contract: $e');
@@ -877,6 +948,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       _signing = false;
       _alreadySigned = true;
     });
+    unawaited(_keepSubmitted(_form.id!, _submitted, signed: true));
     _goTo(Screen.confirmation);
   }
 

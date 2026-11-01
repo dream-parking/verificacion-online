@@ -62,45 +62,6 @@ export type RequestSummary = {
   completedSteps: number;
 };
 
-/** What a signal added to the score. `points` is null when the signal was not available; `maxPoints` when it has no weight yet. */
-export type SignalContribution = {
-  signal: string;
-  name: string;
-  points: number | null;
-  maxPoints: number | null;
-  observation: string | null;
-};
-
-export type Assessment = {
-  level: RiskLevel;
-  /** Score from 0 to 100, the model version and what each signal added. Null / empty in assessments made by rule R-01. */
-  score?: number | null;
-  modelVersion?: number | null;
-  signals?: SignalContribution[] | null;
-  ruleCode: string | null;
-  ruleName: string | null;
-  ruleThreshold: number | null;
-  evaluatedValue: number | null;
-  explanation: string | null;
-  evaluatedAt: string | null;
-};
-
-/** What the IP geolocation provider returned. When the location is UNAVAILABLE only `failure` and `lookedUpAt` are set. */
-export type IpDetails = {
-  country: string | null;
-  countryCode: string | null;
-  region: string | null;
-  regionName: string | null;
-  city: string | null;
-  zip: string | null;
-  timezone: string | null;
-  isp: string | null;
-  org: string | null;
-  asName: string | null;
-  failure: string | null;
-  lookedUpAt: string | null;
-};
-
 /** One version of the declared transactional profile (VDI-3). The API sends them oldest first; only the last is current. */
 export type ProfileVersion = {
   version: number;

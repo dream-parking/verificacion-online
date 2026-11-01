@@ -11,7 +11,7 @@ import com.dreamparking.backend.common.exception.ApiException;
 public class SignatureRejectedException extends ApiException {
 
 	public SignatureRejectedException(String reason) {
-		super(HttpStatus.UNPROCESSABLE_CONTENT, "The signature was rejected: " + reason);
+		super(HttpStatus.UNPROCESSABLE_CONTENT, "El servicio de firma rechazó la firma: " + reason);
 	}
 
 }

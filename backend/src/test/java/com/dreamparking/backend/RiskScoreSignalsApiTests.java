@@ -68,9 +68,9 @@ class RiskScoreSignalsApiTests {
 				{"transactionTypeCode": "PAGO_SALARIO", "monthlyAmountRangeCode": "500_1000"}
 				""")
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.modelVersion").value(2))
-			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].points").value(6))
-			.andExpect(jsonPath("$.signals[?(@.signal == 'TYPING_PACE')].points").value(8))
+			.andExpect(jsonPath("$.modelVersion").value(4))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].points").value(7))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'TYPING_PACE')].points").value(10))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'TYPING_PACE')].observation")
 				.value("Muy rápido, unos 310 caracteres por minuto"))
 			.andExpect(jsonPath("$.signals[?(@.signal == 'DEVICE')].points").value(2))
@@ -105,8 +105,8 @@ class RiskScoreSignalsApiTests {
 		mvc.perform(post("/api/onboarding/requests/{id}/submit", id).contentType(MediaType.APPLICATION_JSON))
 			.andExpect(status().isOk());
 
-		read(id, "risk-assessment").andExpect(jsonPath("$.signals[?(@.signal == 'TYPING_PACE')].points").value(4))
-			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].points").value(3));
+		read(id, "risk-assessment").andExpect(jsonPath("$.signals[?(@.signal == 'TYPING_PACE')].points").value(5))
+			.andExpect(jsonPath("$.signals[?(@.signal == 'AMOUNT')].points").value(4));
 		// Two assessments, only the last one is current, and the timeline says what was assigned
 		assertThat(jdbc.queryForObject("select count(*) from risk_assessment where request_id = ?::uuid", Integer.class,
 				id)).isEqualTo(2);
@@ -116,7 +116,7 @@ class RiskScoreSignalsApiTests {
 		assertThat(jdbc.queryForList("select description from request_event where request_id = ?::uuid and type = 'SCORE_ASSIGNED'",
 				String.class, id)).hasSize(2).allMatch(d -> d.startsWith("Score de riesgo asignado: "));
 		assertThat(jdbc.queryForObject("select count(*) from risk_assessment_signal s join risk_assessment a on a.id = s.assessment_id where a.request_id = ?::uuid and a.is_current",
-				Integer.class, id)).isEqualTo(9);
+				Integer.class, id)).isEqualTo(8);
 	}
 
 	@Test
@@ -128,7 +128,7 @@ class RiskScoreSignalsApiTests {
 
 		mvc.perform(get("/api/console/requests/{id}", id))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.risk.score").value(16))
+			.andExpect(jsonPath("$.risk.score").value(18))
 			.andExpect(jsonPath("$.risk.signals[*].signal").value(hasItem("AMOUNT")));
 	}
 
@@ -142,7 +142,7 @@ class RiskScoreSignalsApiTests {
 		// newest first, so the request just made is on the first page
 		mvc.perform(get("/api/console/requests"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.content[?(@.id == '" + id + "')].score").value(hasItem(16)));
+			.andExpect(jsonPath("$.content[?(@.id == '" + id + "')].score").value(hasItem(18)));
 	}
 
 	private void sendSignals(String id, int typingSpeedCpm) throws Exception {

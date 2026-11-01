@@ -28,6 +28,8 @@ public record ScoreModelResponse(short version, String name, Range low, Range me
 				model.getValidFrom(), model.getValidTo(), model.getValidTo() == null,
 				model.getPublishedBy() == null ? null : model.getPublishedBy().getFullName(),
 				Arrays.stream(ScoreSignal.values())
+					// The city is retired: only the versions that still weigh it list it.
+					.filter(signal -> signal != ScoreSignal.CITY || model.weightOf(signal) != null)
 					.map(signal -> new Weight(signal, signal.label(), model.weightOf(signal)))
 					.toList());
 	}

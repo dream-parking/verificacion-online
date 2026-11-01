@@ -222,12 +222,12 @@ class EscalationApiTests {
 
 	/** A submitted request held for enhanced review: a model in force with a threshold of 2 and a high amount. */
 	private String held() throws Exception {
-		if (jdbc.queryForObject("select count(*) from score_model where version = 3", Integer.class) == 0) {
+		if (jdbc.queryForObject("select count(*) from score_model where version = 99", Integer.class) == 0) {
 			jdbc.update("update score_model set valid_to = now() where valid_to is null");
 			jdbc.update("""
 					insert into score_model (version, name, low_max, medium_max, valid_from)
-					values (3, 'Strict test model', 1, 2, now())""");
-			jdbc.update("insert into score_model_weight (model_version, signal, max_points) values (3, 'AMOUNT', 25)");
+					values (99, 'Strict test model', 1, 2, now())""");
+			jdbc.update("insert into score_model_weight (model_version, signal, max_points) values (99, 'AMOUNT', 25)");
 		}
 		String requestId = submitted("MAS_1000");
 		em.flush();

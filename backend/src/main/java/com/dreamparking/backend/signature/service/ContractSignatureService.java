@@ -72,11 +72,11 @@ public class ContractSignatureService {
 	@Transactional(noRollbackFor = SignatureRejectedException.class)
 	public ContractSignatureResponse sign(UUID requestId, String contractVersion, String ip, String device) {
 		OnboardingRequest request = requests.findById(requestId)
-			.orElseThrow(() -> new NotFoundException("Onboarding request not found: " + requestId));
+			.orElseThrow(() -> new NotFoundException("No existe la solicitud " + requestId));
 		checkCanSign(request);
 		if (!terms.version().equals(contractVersion.trim())) {
-			throw new InvalidStateException("Contract version " + contractVersion.trim() + " is not the one in force ("
-					+ terms.version() + "): show the contract again and sign that version");
+			throw new InvalidStateException("La versión " + contractVersion.trim() + " del contrato no es la vigente ("
+					+ terms.version() + "): muestra el contrato de nuevo y firma esa versión");
 		}
 
 		SigningResult result = signer.sign(new SigningQuery(requestId, request.getCustomer().getDui(), terms.version(),
@@ -96,7 +96,7 @@ public class ContractSignatureService {
 		}
 		catch (DataIntegrityViolationException ex) {
 			// Two signatures of the same request at the same time: the unique request_id lets only one through.
-			throw new InvalidStateException("Request " + requestId + " already signed the contract");
+			throw new InvalidStateException("La solicitud " + requestId + " ya firmó el contrato");
 		}
 		// VDI-131: the evidence that backed the approval is frozen with the signature, in the same transaction.
 		dossiers.freeze(requestId, new BindingDossierResponse.Signature(terms.version(), terms.fingerprint(),
@@ -110,16 +110,16 @@ public class ContractSignatureService {
 	/** Same rule as {@code AccountService.open}: only an approved request, and only once. */
 	private void checkCanSign(OnboardingRequest request) {
 		if (request.getStatus() == RequestStatus.ENHANCED_REVIEW) {
-			throw new InvalidStateException("The request is held for enhanced review and cannot sign the contract");
+			throw new InvalidStateException("La solicitud está en revisión reforzada y no puede firmar el contrato");
 		}
 		if (request.getStatus() == RequestStatus.AWAITING_RNPN) {
-			throw new InvalidStateException("The request is waiting for the RNPN and cannot sign the contract");
+			throw new InvalidStateException("La solicitud espera el cotejo con el RNPN y no puede firmar el contrato");
 		}
 		if (request.getStatus() != RequestStatus.COMPLETED) {
-			throw new InvalidStateException("Only submitted and approved requests can sign the contract");
+			throw new InvalidStateException("Solo las solicitudes enviadas y aprobadas pueden firmar el contrato");
 		}
 		if (signatures.existsByRequestId(request.getId())) {
-			throw new InvalidStateException("Request " + request.getId() + " already signed the contract");
+			throw new InvalidStateException("La solicitud " + request.getId() + " ya firmó el contrato");
 		}
 	}
 

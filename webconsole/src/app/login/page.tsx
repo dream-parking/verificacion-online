@@ -1,12 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { FullLogo } from "@/components/console/Logo";
 import { ApiError, login } from "@/lib/console/api";
 import { startSession, useSession } from "@/lib/console/session";
-import { LoginVideo } from "./LoginVideo";
 
 function loginErrorMessage(e: unknown) {
   if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
@@ -45,8 +43,7 @@ export default function LoginPage() {
   }
 
   return (
-    // Split screen: form on the left and image on the right (only from 1024 px).
-    <div className="grid min-h-screen bg-white lg:grid-cols-[minmax(420px,36%)_1fr]">
+    <div className="min-h-screen bg-white">
       <main className="flex min-h-screen flex-col px-6 py-8 sm:px-12">
         <div className="flex flex-1 items-center justify-center py-6">
           <form className="anim-page w-full max-w-[400px]" onSubmit={signIn}>
@@ -114,20 +111,6 @@ export default function LoginPage() {
         </div>
         <p className="m-0 text-center text-[13px] text-muted">Confianza que nos une, futuro que construimos</p>
       </main>
-
-      {/* Decorative image: it adds no information that is not already in the form. */}
-      <aside className="relative hidden overflow-hidden bg-dark lg:block" aria-hidden="true">
-        <Image
-          src="/brand/login-postman.webp"
-          alt=""
-          fill
-          priority
-          unoptimized
-          sizes="64vw"
-          className="anim-fade object-cover object-[50%_40%]"
-        />
-        <LoginVideo src="/brand/login-postman.mp4" poster="/brand/login-postman.webp" />
-      </aside>
     </div>
   );
 }

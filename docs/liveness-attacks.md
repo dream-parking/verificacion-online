@@ -49,5 +49,5 @@ Copiar esta tabla en el ticket VDI-116 (o en Confluence) y llenarla por teléfon
 
 ## Qué hacer con los resultados
 
-- Si en los casos 2 a 5 la señal suma pocos puntos (confianza alta), el API no distingue ese ataque; es la limitación ya conocida del modelo de visión de una sola imagen (ver «Prueba de vida» en [integracion-api.md](integracion-api.md)) y es el argumento para un proveedor dedicado o para volver a un reto activo en el teléfono.
+- Si en los casos 2 a 5 la señal suma pocos puntos (confianza alta), el API no distingue ese ataque; es la limitación ya conocida del modelo de visión de una sola imagen (ver «Prueba de vida» en [api-integration.md](api-integration.md)) y es el argumento para un proveedor dedicado o para volver a un reto activo en el teléfono.
 - Si el caso 1 suma muchos puntos en algún teléfono, la cámara frontal de ese modelo engaña al proveedor: anotarlo y abrir un bug.

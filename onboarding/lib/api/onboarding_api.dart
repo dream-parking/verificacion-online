@@ -102,7 +102,7 @@ class ContractSignature {
   final DateTime signedAt;
 }
 
-/// Client for `/api/onboarding/requests` (see docs/integracion-api.md and docs/openapi.json).
+/// Client for `/api/onboarding/requests` (see docs/api-integration.md and docs/openapi.json).
 class OnboardingApi {
   OnboardingApi({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),

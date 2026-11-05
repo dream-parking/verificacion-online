@@ -1,66 +1,52 @@
-# RNPN check (VDI-111, story VDI-17)
+# Cotejo con el RNPN (VDI-111, historia VDI-17)
 
-When a request is submitted (`POST /api/onboarding/requests/{id}/submit`) the backend checks the data of the DUI the
-customer **confirmed** (number, first names, last names and birth date) against the RNPN. There is no public RNPN API,
-so for now the service is **simulated**; the rest of the application only knows the `RnpnClient` interface, so the real
-service can replace it without touching anything else.
+Cuando se envía una solicitud (`POST /api/onboarding/requests/{id}/submit`), el backend coteja con el RNPN los datos del DUI que la persona **confirmó** (número, nombres, apellidos y fecha de nacimiento). No existe una API pública del RNPN, así que por ahora el servicio es **simulado**; el resto de la aplicación solo conoce la interfaz `RnpnClient`, de modo que el servicio real pueda reemplazarlo sin tocar nada más.
 
-## Results
+## Resultados
 
-| Result | Meaning | What happens to the request | Points of the `RNPN` signal |
+| Resultado | Significado | Qué pasa con la solicitud | Puntos de la señal `RNPN` |
 |---|---|---|---|
-| `MATCH` | The RNPN holds the same data. | Continues as usual. | 0 |
-| `NO_MATCH` | The RNPN answered and some data differs (`mismatchedFields`). | Continues; the analyst sees which data differs. | all (15 in score model v2) |
-| `UNAVAILABLE` | The RNPN did not answer after the retries. | Status `AWAITING_RNPN`: not approved automatically, no account can be opened. | half (8 of 15) |
+| `MATCH` | El RNPN tiene los mismos datos. | Sigue como siempre. | 0 |
+| `NO_MATCH` | El RNPN respondió y algún dato difiere (`mismatchedFields`). | Sigue; la persona analista ve cuáles datos difieren. | todos (18 en el modelo de score v4 vigente) |
+| `UNAVAILABLE` | El RNPN no respondió tras los reintentos. | Estado `AWAITING_RNPN`: no se aprueba automáticamente y no se puede abrir una cuenta. | la mitad (9 de 18) |
 
-No result approves or rejects a request by itself: the signal only adds to the score.
+Ningún resultado aprueba o rechaza una solicitud por sí solo: la señal solo suma al score.
 
-## Retries
+## Reintentos
 
-If the RNPN does not answer, it is asked again until `app.rnpn.attempts` tries in total (3 by default), waiting
-`app.rnpn.retry-delay` after the first failure (500 ms) and twice as long after each next one (500 ms, then 1 s). The
-RNPN is asked **outside any database transaction**, so a slow answer does not hold a connection.
+Si el RNPN no responde, se le vuelve a preguntar hasta completar `app.rnpn.attempts` intentos en total (3 por defecto), esperando `app.rnpn.retry-delay` tras el primer fallo (500 ms) y el doble tras cada siguiente (500 ms, luego 1 s). El RNPN se consulta **fuera de cualquier transacción de la base**, para que una respuesta lenta no retenga una conexión.
 
-## What is stored
+## Qué se guarda
 
-Table `rnpn_check`, append-only (the database refuses updates and deletes; only deleting the whole request cascades):
-the result, the provider, the number of `attempts`, the `mismatched_fields`, the `failure` when the RNPN did not answer,
-and the date and time. The timeline gets an `RNPN_CHECKED` event.
+Tabla `rnpn_check`, solo de agregado (la base rechaza las actualizaciones y los borrados; solo se borra en cascada al eliminar la solicitud completa): el resultado, el proveedor, el número de `attempts`, los `mismatched_fields`, el `failure` cuando el RNPN no respondió, y la fecha y hora. La línea de tiempo recibe un evento `RNPN_CHECKED`.
 
-The console detail (`GET /api/console/requests/{id}`) returns the last check as `rnpn`:
-`outcome`, `simulated` (true while the RNPN is the stand-in, which the console must say), `provider`, `attempts`,
-`mismatchedFields` and `checkedAt`. The request list filters the waiting requests with `?status=AWAITING_RNPN`.
+El detalle de la consola (`GET /api/console/requests/{id}`) devuelve el último cotejo como `rnpn`: `outcome`, `simulated` (verdadero mientras el RNPN es un sustituto, lo cual la consola debe decir), `provider`, `attempts`, `mismatchedFields` y `checkedAt`. El listado de solicitudes filtra las que esperan con `?status=AWAITING_RNPN`.
 
-The mobile app gets nothing about the RNPN: after submitting it only reads `status`, which is `AWAITING_RNPN` when the
-request waits. It must not mention the RNPN or ask the person to try again (the retries are the API's).
+La app móvil no recibe nada sobre el RNPN: después de enviar solo lee `status`, que es `AWAITING_RNPN` cuando la solicitud espera. No debe mencionar el RNPN ni pedirle a la persona que lo intente de nuevo (los reintentos son de la API).
 
-If a request waits for the RNPN **and** its score is above the threshold, the status stays `AWAITING_RNPN`; the decision
-to hold it for enhanced review is still written to the audit log and the timeline.
+Si una solicitud espera al RNPN **y** su score supera el umbral, el estado sigue siendo `AWAITING_RNPN`; la decisión de retenerla para revisión reforzada igualmente queda en el registro de auditoría y en la línea de tiempo.
 
-## Test DUIs of the simulated RNPN
+## DUI de prueba del RNPN simulado
 
-The answer depends only on the DUI number of the basic data and the confirmed DUI:
+La respuesta depende solo del número de DUI de los datos básicos y del DUI confirmado:
 
-| DUI | Result |
+| DUI | Resultado |
 |---|---|
-| `00000020-4` | `NO_MATCH`, with `LAST_NAMES` and `BIRTH_DATE` as mismatched fields |
-| `00000030-1` | `UNAVAILABLE` (it never answers, so the request waits after 3 tries) |
-| any other DUI, for example `01234567-8` | `MATCH` |
+| `00000020-4` | `NO_MATCH`, con `LAST_NAMES` y `BIRTH_DATE` como campos que no coinciden |
+| `00000030-1` | `UNAVAILABLE` (nunca responde, así que la solicitud espera tras 3 intentos) |
+| cualquier otro DUI, por ejemplo `01234567-8` | `MATCH` |
 
-Both are valid DUI numbers (the check digit is correct). The lists are configurable with
-`APP_RNPN_SIMULATED_NO_MATCH_DUIS` and `APP_RNPN_SIMULATED_UNAVAILABLE_DUIS` (comma-separated).
+Ambos son números de DUI válidos (el dígito verificador es correcto). Las listas se configuran con `APP_RNPN_SIMULATED_NO_MATCH_DUIS` y `APP_RNPN_SIMULATED_UNAVAILABLE_DUIS` (separadas por comas).
 
-## Configuration
+## Configuración
 
-| Variable | Default | |
+| Variable | Valor por defecto | |
 |---|---|---|
-| `APP_RNPN_PROVIDER` | `simulated` | The only provider for now. |
-| `APP_RNPN_ATTEMPTS` | `3` | Total tries, at least 1. |
-| `APP_RNPN_RETRY_DELAY` | `500ms` | Wait after the first failed try; it doubles after each next one. |
+| `APP_RNPN_PROVIDER` | `simulated` | El único proveedor por ahora. |
+| `APP_RNPN_ATTEMPTS` | `3` | Intentos en total, al menos 1. |
+| `APP_RNPN_RETRY_DELAY` | `500ms` | Espera tras el primer intento fallido; se duplica tras cada siguiente. |
 
-## Not done here
+## Qué no se hace aquí
 
-- A way to release a request that waits (a new try of the RNPN check, or an analyst deciding): a request in
-  `AWAITING_RNPN` does not move by itself.
-- `GET /resume` still answers `COMPLETED` for a request that waits, like it does for one held for enhanced review. If the
-  app has to tell them apart when the person reopens it (VDI-112), that needs a decision with the app team.
+- Una forma de liberar una solicitud que espera (un nuevo intento del cotejo con el RNPN, o una persona analista que decida): una solicitud en `AWAITING_RNPN` no avanza por sí sola.
+- `GET /resume` sigue respondiendo `COMPLETED` para una solicitud que espera, igual que para una retenida en revisión reforzada. Si la app necesita distinguirlas cuando la persona la reabre (VDI-112), eso requiere una decisión con el equipo de la app.

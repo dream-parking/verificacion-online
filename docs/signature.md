@@ -1,82 +1,68 @@
-# Electronic signature of the contract (VDI-130, story VDI-15)
+# Firma electrónica del contrato (VDI-130, historia VDI-15)
 
-The customer of an approved request signs the account contract from the app. There is no signature provider yet, so for
-now the service is **simulated**, like the RNPN of VDI-111. The rest of the application only knows the `ContractSigner`
-interface, so a real provider can replace it without touching anything else.
+La persona cliente de una solicitud aprobada firma desde la app el contrato de apertura de cuenta. Todavía no hay un proveedor de firma, así que por ahora el servicio es **simulado**, igual que el RNPN de VDI-111. El resto de la aplicación solo conoce la interfaz `ContractSigner`, de modo que un proveedor real pueda reemplazarlo sin tocar nada más.
 
-## The contract
+## El contrato
 
-The backend owns the text: `backend/src/main/resources/contracts/contrato-apertura-<version>.txt`, chosen by
-`app.contract.version` (`2026.1`). The current text is a **test text** marked as such; the bank's legal team provides
-the real one.
+El texto lo guarda el backend: `backend/src/main/resources/contracts/contrato-apertura-<version>.txt`, elegido por `app.contract.version` (`2026.1`). El texto actual es un **texto de prueba** marcado como tal; el equipo legal del banco entrega el real.
 
-- `GET /api/onboarding/contract` returns `version`, `text` and `fingerprint` (SHA-256 of the text in UTF-8, lower-case
-  hex). Line ends are read as `\n`, so the fingerprint does not depend on how git checked the file out.
-- The app shows the text and signs by sending the `version` it showed. The backend computes the fingerprint itself, so a
-  signature always proves which exact words were signed.
-- A new version is a new file and a new `APP_CONTRACT_VERSION`. A request that tries to sign a version that is no longer
-  in force gets `409` and must show the contract again.
+- `GET /api/onboarding/contract` devuelve `version`, `text` y `fingerprint` (SHA-256 del texto en UTF-8, en hexadecimal y minúsculas). Los saltos de línea se leen como `\n`, por lo que la huella no depende de cómo git descargó el archivo.
+- La app muestra el texto y firma enviando la `version` que mostró. El backend calcula la huella por su cuenta, así que una firma siempre prueba cuáles palabras exactas se firmaron.
+- Una versión nueva es un archivo nuevo y un `APP_CONTRACT_VERSION` nuevo. Una solicitud que intenta firmar una versión que ya no está vigente recibe `409` y debe mostrar el contrato otra vez.
 
-## Who can sign
+## Quién puede firmar
 
-`POST /api/onboarding/requests/{id}/signature` with `{ "contractVersion": "2026.1" }`:
+`POST /api/onboarding/requests/{id}/signature` con `{ "contractVersion": "2026.1" }`:
 
-| Situation | Answer |
+| Situación | Respuesta |
 |---|---|
-| Submitted and approved (`COMPLETED`), first time | `201`, the signature |
-| Same request again | `409` already signed |
-| `ENHANCED_REVIEW`, `AWAITING_RNPN`, `IN_PROGRESS` or `ABANDONED` | `409`, the same rule as opening an account |
-| `contractVersion` is not the one in force | `409` |
-| `contractVersion` missing or blank | `400` |
-| Unknown request | `404` |
-| The signature service rejects it | `422`; nothing stored as a signature, the customer can try again |
+| Enviada y aprobada (`COMPLETED`), primera vez | `201`, la firma |
+| La misma solicitud otra vez | `409`, ya firmada |
+| `ENHANCED_REVIEW`, `AWAITING_RNPN`, `IN_PROGRESS` o `ABANDONED` | `409`, la misma regla que para abrir una cuenta |
+| `contractVersion` no es la vigente | `409` |
+| Falta `contractVersion` o está en blanco | `400` |
+| Solicitud desconocida | `404` |
+| El servicio de firma la rechaza | `422`; no se guarda nada como firma y la persona puede intentarlo de nuevo |
 
-Two signatures of the same request at the same time: `contract_signature.request_id` is unique, so only one gets through
-and the other answers `409`.
+Dos firmas de la misma solicitud al mismo tiempo: `contract_signature.request_id` es único, así que solo una pasa y la otra responde `409`.
 
-## What is stored
+## Qué se guarda
 
-Table `contract_signature` (migration `V33__contract_signature.sql`), append-only: the database refuses updates and
-deletes; only deleting the whole request cascades.
+Tabla `contract_signature` (migración `V33__contract_signature.sql`), solo de agregado: la base rechaza las actualizaciones y los borrados; solo se borra en cascada al eliminar la solicitud completa.
 
-| Column | |
+| Columna | |
 |---|---|
-| `contract_version`, `contract_fingerprint` | Which text was signed |
-| `signed_at` | Date and time of the signature |
-| `provider` | `simulated` while there is no real provider |
-| `ip` | Client address of the signing call |
-| `device` | `User-Agent` of the signing call |
-| `device_fingerprint` | Device fingerprint the app sent in `/signals`, if any |
+| `contract_version`, `contract_fingerprint` | Qué texto se firmó |
+| `signed_at` | Fecha y hora de la firma |
+| `provider` | `simulated` mientras no haya un proveedor real |
+| `ip` | Dirección del cliente que hizo la llamada de firma |
+| `device` | `User-Agent` de la llamada de firma |
+| `device_fingerprint` | Huella del dispositivo que la app envió en `/signals`, si la hubo |
 
-The timeline gets `CONTRACT_SIGNED`, or `CONTRACT_SIGNATURE_REJECTED` with the reason. The app does not receive the IP
-or the device.
+La línea de tiempo recibe `CONTRACT_SIGNED`, o `CONTRACT_SIGNATURE_REJECTED` con el motivo. La app no recibe la IP ni el dispositivo.
 
-## Test DUI of the simulated service
+## DUI de prueba del servicio simulado
 
-| DUI | Result |
+| DUI | Resultado |
 |---|---|
-| `00000040-8` | Rejected (`422`) |
-| any other DUI | Signed |
+| `00000040-8` | Rechazada (`422`) |
+| cualquier otro DUI | Firmada |
 
-`00000040-8` is a valid DUI and the simulated RNPN matches it, so its request is approved and reaches the signature. The
-list is configurable with `APP_SIGNATURE_SIMULATED_REJECTED_DUIS` (comma-separated).
+`00000040-8` es un DUI válido y el RNPN simulado lo da por coincidente, así que su solicitud se aprueba y llega a la firma. La lista se configura con `APP_SIGNATURE_SIMULATED_REJECTED_DUIS` (separada por comas).
 
-## Configuration
+## Configuración
 
-| Variable | Default | |
+| Variable | Valor por defecto | |
 |---|---|---|
-| `APP_CONTRACT_VERSION` | `2026.1` | Version of the contract in force; its text file must exist or the backend does not start. |
-| `APP_SIGNATURE_PROVIDER` | `simulated` | The only provider for now. |
-| `APP_SIGNATURE_SIMULATED_REJECTED_DUIS` | `00000040-8` | DUIs the simulated service rejects. |
+| `APP_CONTRACT_VERSION` | `2026.1` | Versión del contrato vigente; su archivo de texto debe existir o el backend no arranca. |
+| `APP_SIGNATURE_PROVIDER` | `simulated` | El único proveedor por ahora. |
+| `APP_SIGNATURE_SIMULATED_REJECTED_DUIS` | `00000040-8` | DUI que el servicio simulado rechaza. |
 
-## Binding dossier
+## Expediente de vinculación
 
-Signing freezes the binding dossier (VDI-131, `BindingDossierService.freeze`) in the same transaction, with the contract version,
-the fingerprint and the signature date; a rejected signature freezes none. See `docs/expediente-vinculacion.md`. The
-migrations are `V35` (dossier) and `V36` (retention), numbered after this one's `V33` and `V34`.
+Al firmar se congela el expediente de vinculación (VDI-131, `BindingDossierService.freeze`) en la misma transacción, con la versión del contrato, la huella y la fecha de la firma; una firma rechazada no congela ninguno. Ver `docs/binding-dossier.md`. Las migraciones son `V35` (expediente) y `V36` (retención), numeradas después de `V33` y `V34` de esta.
 
-## Not done here
+## Qué no se hace aquí
 
-- **IP behind a proxy:** the IP is the client address the backend sees (`getRemoteAddr`), the same as the other signals.
-  Behind the Azure ingress that may be the proxy unless forwarded headers are trusted.
-- **Real provider:** a real service is a network call. It should then run outside the database transaction, like the RNPN.
+- **IP detrás de un proxy:** la IP es la dirección del cliente que ve el backend (`getRemoteAddr`), igual que en las demás señales. Detrás del ingress de Azure puede ser la del proxy, a menos que se confíe en las cabeceras reenviadas.
+- **Proveedor real:** un servicio real es una llamada de red. Entonces debería ejecutarse fuera de la transacción de la base, como el RNPN.

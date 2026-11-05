@@ -1,5 +1,5 @@
 // Client of the console API. The types follow docs/openapi.json; in responses the optional
-// fields can come as null (see docs/integracion-api.md).
+// fields can come as null (see docs/api-integration.md).
 
 import type { components } from "./openapi";
 
